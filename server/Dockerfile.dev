@@ -1,0 +1,17 @@
+# Koristimo laganu verziju Node-a
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Kopiramo package fajlove i instaliramo zavisnosti
+COPY package*.json ./
+RUN npm install
+
+# Kopiramo ostatak koda
+COPY . .
+
+# Eksponiramo port koji server koristi
+EXPOSE 3000
+
+# Pokrećemo server u dev modu
+CMD ["npm", "run", "dev"]

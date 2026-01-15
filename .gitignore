@@ -40,3 +40,5 @@ Thumbs.db
 temp_*.cpp
 # Folder za privremene fajlove (ako ga napravite)
 server/temp/
+
+secure-connect-assessly-cassandra.zip
