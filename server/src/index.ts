@@ -48,7 +48,98 @@ redisClient.on('error', (err) => console.error('❌ Redis Client Error:', err));
 
 // --- ROUTES ---
 app.get('/', (req, res) => {
-  res.send('Assessly Backend is Running! 🚀');
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Assessly Backend</title>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          background-color: #f4f4f4;
+          color: #333;
+          text-align: center;
+          padding: 50px;
+        }
+        .container {
+          max-width: 600px;
+          margin: auto;
+          background: white;
+          padding: 40px;
+          border-radius: 10px;
+          box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+          color: #2c3e50;
+        }
+        .status {
+          font-size: 1.2em;
+          margin: 20px 0;
+        }
+        .links {
+          margin-top: 30px;
+        }
+        .links a {
+          display: inline-block;
+          margin: 0 10px;
+          padding: 10px 20px;
+          background: #3498db;
+          color: white;
+          text-decoration: none;
+          border-radius: 5px;
+        }
+        .links a:hover {
+          background: #2980b9;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>🚀 Assessly Backend</h1>
+        <p class="status">Backend is Running Successfully!</p>
+        <p>This server provides API endpoints for database operations and real-time communication.</p>
+        <div class="links">
+          <a href="/status/redis">Redis Status</a>
+          <a href="/status/neo4j">Neo4j Status</a>
+          <a href="/status/cassandra">Cassandra Status</a>
+          <a href="http://localhost:5173">Client App</a>
+        </div>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
+// Database status endpoints
+app.get('/status/redis', async (req, res) => {
+  try {
+    const pong = await redisClient.ping();
+    res.json({ status: 'ok', message: pong });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: (error as Error).message });
+  }
+});
+
+app.get('/status/neo4j', async (req, res) => {
+  try {
+    const session = neo4jDriver.session();
+    const result = await session.run("RETURN 1 AS test");
+    await session.close();
+    res.json({ status: 'ok', message: result.records[0].get("test").toNumber().toString() });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: (error as Error).message });
+  }
+});
+
+app.get('/status/cassandra', async (req, res) => {
+  try {
+    const result = await cassandraClient.execute('SELECT release_version FROM system.local');
+    res.json({ status: 'ok', message: result.first().get('release_version') });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: (error as Error).message });
+  }
 });
 
 // --- CORE LOGIC: DATABASE INITIALIZATION ---
