@@ -6,6 +6,8 @@
 import dotenv from 'dotenv';
 dotenv.config(); // Mora biti na samom vrhu
 
+import authRoutes from './routes/authRoutes.js';
+import examRoutes from './routes/examRoutes.js';
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
@@ -232,6 +234,8 @@ const gracefulShutdown = async () => {
 };
 
 // Pokretanje aplikacije
+app.use('/api/auth', authRoutes);
+app.use('/api/exams', examRoutes)
 startServer();
 
 // Registracija signala za gašenje

@@ -1,0 +1,86 @@
+import { Request, Response } from 'express';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import { v4 as uuidv4 } from 'uuid';
+import { neo4jDriver } from '../neo4j.js';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+
+// REGISTRACIJA
+export const register = async (req: Request, res: Response) => {
+  const { email, password, firstName, lastName, role } = req.body;
+  const session = neo4jDriver.session();
+
+  try {
+    // Hash password
+    const passwordHash = await bcrypt.hash(password, 10);
+    const id = uuidv4();
+
+    // Cypher query for creating a new user
+    const result = await session.run(
+      `CREATE (u:User {
+        id: $id, 
+        email: $email, 
+        passwordHash: $passwordHash, 
+        firstName: $firstName, 
+        lastName: $lastName, 
+        role: $role,
+        createdAt: datetime()
+      }) RETURN u`,
+      { id, email, passwordHash, firstName, lastName, role }
+    );
+
+    const newUser = result.records[0].get('u').properties;
+    delete newUser.passwordHash; 
+
+    res.status(201).json({ message: "User succssesfuly added", user: newUser });
+  } catch (error: any) {
+    if (error.code === 'Neo.ClientError.Schema.ConstraintValidationFailed') {
+      res.status(400).json({ error: "Email is alredy registered" });
+    } else {
+      res.status(500).json({ error: "Error while registering" });
+    }
+  } finally {
+    await session.close();
+  }
+};
+
+// LOGIN
+export const login = async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+  const session = neo4jDriver.session();
+
+  try {
+    // Find user by email
+    const result = await session.run(
+      'MATCH (u:User {email: $email}) RETURN u',
+      { email }
+    );
+
+    if (result.records.length === 0) {
+      return res.status(401).json({ error: "Pogrešan email ili lozinka" });
+    }
+
+    const user = result.records[0].get('u').properties;
+
+    // Validate password
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: "Pogrešan email ili lozinka" });
+    }
+
+    // Generate JWT
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    delete user.passwordHash;
+    res.json({ token, user });
+  } catch (error) {
+    res.status(500).json({ error: "Greska pri logovanju" });
+  } finally {
+    await session.close();
+  }
+};
