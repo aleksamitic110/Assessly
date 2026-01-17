@@ -1,0 +1,13 @@
+-----------------------------Neo4j-----------------------------
+User: {id (UUID), email, passwordHash, firstName, lastName, role}
+Subject: {id, name, description}
+Exam: {id, name, startTime, durationMinutes}
+Task: {id, title, description, starterCode, testCases (JSON string)}
+
+--------------------------Redis---------------------------------
+Status studenta: user:status:{userId} -> vrednosti: active, idle, offline (sa TTL od 60s).
+Tajmer ispita: exam:timer:{examId} -> vrednost: preostale sekunde (koristi se Redis TTL).
+Chat poruke: chat:{examId}:latest -> lista poslednjih poruka.
+Anti-cheat brojač: user:violations:{examId}:{userId} -> broj sumnjivih aktivnosti.
+
+
