@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { neo4jDriver } from '../neo4j.js';
+import { logUserActivity } from '../services/cassandraService.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
@@ -33,7 +34,22 @@ export const register = async (req: Request, res: Response) => {
     const newUser = result.records[0].get('u').properties;
     delete newUser.passwordHash; 
 
-    res.status(201).json({ message: "User succssesfuly added", user: newUser });
+    const token = jwt.sign(
+      { id: newUser.id, email: newUser.email, role: newUser.role },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    try {
+      await logUserActivity(newUser.id, 'REGISTER', {
+        email: newUser.email,
+        role: newUser.role
+      });
+    } catch (logError) {
+      console.warn('Failed to log user registration activity:', logError);
+    }
+
+    res.status(201).json({ message: "User succssesfuly added", token, user: newUser });
   } catch (error: any) {
     if (error.code === 'Neo.ClientError.Schema.ConstraintValidationFailed') {
       res.status(400).json({ error: "Email is alredy registered" });
@@ -77,6 +93,14 @@ export const login = async (req: Request, res: Response) => {
     );
 
     delete user.passwordHash;
+    try {
+      await logUserActivity(user.id, 'LOGIN', {
+        email: user.email,
+        role: user.role
+      });
+    } catch (logError) {
+      console.warn('Failed to log user login activity:', logError);
+    }
     res.json({ token, user });
   } catch (error) {
     res.status(500).json({ error: "Greska pri logovanju" });

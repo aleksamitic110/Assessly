@@ -1,53 +1,71 @@
-import { useState, useEffect } from 'react'
-import './App.css'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 
-interface Status {
-  status: 'ok' | 'error';
-  message: string;
-}
+// Pages
+import Login from './pages/Login';
+import Register from './pages/Register';
+import Dashboard from './pages/Dashboard';
+import ProfessorDashboard from './pages/ProfessorDashboard';
+import StudentDashboard from './pages/StudentDashboard';
+import ExamPage from './pages/ExamPage';
 
 function App() {
-  const [redisStatus, setRedisStatus] = useState<Status | null>(null);
-  const [neo4jStatus, setNeo4jStatus] = useState<Status | null>(null);
-  const [cassandraStatus, setCassandraStatus] = useState<Status | null>(null);
-
-  useEffect(() => {
-    const fetchStatus = async (db: string, setter: (status: Status) => void) => {
-      try {
-        const response = await fetch(`http://localhost:3000/status/${db}`);
-        const data = await response.json();
-        setter(data);
-      } catch (error) {
-        setter({ status: 'error', message: 'Failed to fetch' });
-      }
-    };
-
-    fetchStatus('redis', setRedisStatus);
-    fetchStatus('neo4j', setNeo4jStatus);
-    fetchStatus('cassandra', setCassandraStatus);
-  }, []);
-
-  const StatusIndicator = ({ name, status }: { name: string; status: Status | null }) => {
-    if (!status) return <div>{name}: Loading...</div>;
-    const color = status.status === 'ok' ? 'green' : 'red';
-    return (
-      <div style={{ color }}>
-        {name}: {status.status.toUpperCase()} - {status.message}
-      </div>
-    );
-  };
-
   return (
-    <div className="app">
-      <h1>Assessly Database Status Dashboard</h1>
-      <div className="status-list">
-        <StatusIndicator name="Redis" status={redisStatus} />
-        <StatusIndicator name="Neo4j" status={neo4jStatus} />
-        <StatusIndicator name="Cassandra" status={cassandraStatus} />
-      </div>
-      <p>Check the console for any errors.</p>
-    </div>
-  )
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+
+          {/* Protected routes */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Professor only */}
+          <Route
+            path="/professor"
+            element={
+              <ProtectedRoute allowedRoles={['PROFESSOR']}>
+                <ProfessorDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Student only */}
+          <Route
+            path="/student"
+            element={
+              <ProtectedRoute allowedRoles={['STUDENT']}>
+                <StudentDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/exam/:examId"
+            element={
+              <ProtectedRoute allowedRoles={['STUDENT']}>
+                <ExamPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Default redirect */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+          {/* 404 - redirect to dashboard */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
 }
 
-export default App
+export default App;
