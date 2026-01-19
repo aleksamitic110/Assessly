@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Assessly Dashboard v2</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #0f0; display: flex; gap: 20px;}
+        .panel { width: 50%; }
+        .box { border: 1px solid #444; padding: 15px; margin-bottom: 15px; background: #222; border-radius: 8px; }
+        input, button { padding: 8px; background: #333; color: white; border: 1px solid #555; cursor: pointer; }
+        button:hover { background: #444; }
+        .red { color: #ff5555; }
+        .yellow { color: #ffff55; }
+        #logs { height: 400px; overflow-y: scroll; background: #000; border: 1px solid #333; padding: 10px; font-size: 12px; }
+        .violation-card { background: #300; padding: 5px; margin: 2px 0; border-left: 3px solid red; }
+    </style>
+</head>
+<body>
+    <div class="panel">
+        <h1>🕵️‍♂️ Assessly Monitor</h1>
+        
+        <div class="box">
+            <h3>1. Identitet</h3>
+            <input type="text" id="token" placeholder="Paste JWT Token here" style="width: 100%;">
+            <br><br>
+            <button onclick="connect()">🔌 CONNECT</button>
+            <span id="status" style="margin-left: 10px; color: red;">OFFLINE</span>
+        </div>
+
+        <div class="box">
+            <h3>2. Ispitna Soba</h3>
+            <input type="text" id="examId" value="ispit-123" placeholder="Exam ID">
+            <button onclick="joinExam()">👉 JOIN ROOM</button>
+        </div>
+
+        <div class="box" style="border-color: #ff5555;">
+            <h3 class="red">3. 😈 Cheat Simulator (Student)</h3>
+            <button onclick="simulateCheat('tab_switch')" class="red">👀 ALT+TAB (Blur)</button>
+            <button onclick="simulateCheat('copy_paste')" class="red">📋 COPY/PASTE</button>
+        </div>
+
+        <div class="box" style="border-color: #ffff55;">
+            <h3 class="yellow">4. Professor Controls</h3>
+            <button onclick="startExam()">⏱️ START EXAM (60m)</button>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h3>📡 Live Logs & Alerts</h3>
+        <div id="logs"></div>
+    </div>
+
+    <script>
+        let socket;
+        const examIdInput = document.getElementById('examId');
+
+        function log(msg, type = 'info') {
+            const div = document.createElement('div');
+            div.innerHTML = type === 'alert' ? `🚨 <b>${msg}</b>` : `> ${msg}`;
+            if(type === 'alert') div.className = 'violation-card';
+            document.getElementById('logs').prepend(div);
+        }
+
+        function connect() {
+            const token = document.getElementById('token').value;
+            if (!token) return alert("Daj token!");
+
+            socket = io('http://localhost:3000', {
+                auth: { token: token }
+            });
+
+            socket.on('connect', () => {
+                document.getElementById('status').innerText = "ONLINE";
+                document.getElementById('status').style.color = "lime";
+                log("✅ Connected successfully");
+            });
+
+            // Slušamo ALARME (Ovo vidi profesor)
+            socket.on('violation_alert', (data) => {
+                log(`PREKRŠAJ! Student: ${data.email} | Tip: ${data.type} | Ukupno: ${data.count}`, 'alert');
+            });
+
+            socket.on('student_status_update', (data) => {
+                log(`ℹ️ Status Update: ${data.email} is now ${data.status.toUpperCase()}`);
+            });
+
+            socket.on('exam_started', () => log("🏁 Exam STARTED!"));
+            socket.on('timer_sync', (d) => log(`⏱️ Timer Synced: ${Math.floor(d.remainingMilliseconds/1000)}s left`));
+        }
+
+        function joinExam() {
+            socket.emit('join_exam', examIdInput.value);
+            log(`➡️ Joining ${examIdInput.value}...`);
+        }
+
+        function simulateCheat(type) {
+            if(!socket) return alert("Nisi konektovan!");
+            // Šaljemo serveru da smo varali
+            socket.emit('violation', { 
+                examId: examIdInput.value, 
+                type: type 
+            });
+            log(`📤 Sending violation: ${type}...`);
+        }
+
+        function startExam() {
+            socket.emit('start_exam', { examId: examIdInput.value, durationMinutes: 60 });
+        }
+    </script>
+</body>
+</html>
