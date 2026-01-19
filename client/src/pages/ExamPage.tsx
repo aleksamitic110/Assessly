@@ -207,8 +207,11 @@ Vreme izvrsavanja: 0.003s`;
         'Ispit predat',
         'SUCCESS'
       );
+       alert('Ispit je uspesno predat!');
     }
-    alert('Ispit je uspesno predat!');
+    else {
+      alert('Ispit nije uspesno predat! Greska je do: ' + (!examId ? 'nedostaje ID ispita. ' : '') + " ili " + (!currentTask ? 'nedostaje trenutni zadatak.' : ''));
+    }
     navigate('/student');
   };
 
@@ -310,7 +313,7 @@ Izlaz: [11, 12, 22, 25, 34, 64, 90]`}
               value={code}
               onChange={(value) => setCode(value || '')}
               options={{
-                readOnly: isLoadingTask || !!taskError || !currentTask,
+                readOnly: isLoadingTask || !!taskError,
                 fontSize: 14,
                 minimap: { enabled: false },
                 scrollBeyondLastLine: false,
