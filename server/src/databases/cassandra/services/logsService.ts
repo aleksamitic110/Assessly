@@ -1,23 +1,13 @@
-import { cassandraClient } from '../cassandra.js';
+import { cassandraClient } from '../client.js';
 import { types } from 'cassandra-driver';
 import type {
-  ExecutionLog,
-  SecurityEvent,
-  ExecutionStatus,
-  SecurityEventType,
-  UserActivityEventType,
   ExecutionLogResponse,
-  SecurityEventResponse
-} from '../types/cassandra.js';
+  ExecutionStatus,
+  SecurityEventResponse,
+  SecurityEventType,
+  UserActivityEventType
+} from '../types.js';
 
-// ============================================
-// EXECUTION LOGS - Logovanje izvršavanja koda
-// ============================================
-
-/**
- * Sačuvaj log izvršavanja koda studenta
- * Koristi se kada student pokrene kod na ispitu
- */
 export async function logExecution(
   examId: string,
   studentId: string,
@@ -31,21 +21,21 @@ export async function logExecution(
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `;
 
-  await cassandraClient.execute(query, [
-    types.Uuid.fromString(examId),
-    types.Uuid.fromString(studentId),
-    types.Uuid.fromString(taskId),
-    new Date(),
-    sourceCode,
-    output,
-    status
-  ], { prepare: true });
+  await cassandraClient.execute(
+    query,
+    [
+      types.Uuid.fromString(examId),
+      types.Uuid.fromString(studentId),
+      types.Uuid.fromString(taskId),
+      new Date(),
+      sourceCode,
+      output,
+      status
+    ],
+    { prepare: true }
+  );
 }
 
-/**
- * Dohvati sve logove izvršavanja za studenta na ispitu
- * Sortirano od najnovijeg ka najstarijem (DESC)
- */
 export async function getExecutionLogs(
   examId: string,
   studentId: string,
@@ -58,11 +48,15 @@ export async function getExecutionLogs(
     LIMIT ?
   `;
 
-  const result = await cassandraClient.execute(query, [
-    types.Uuid.fromString(examId),
-    types.Uuid.fromString(studentId),
-    limit
-  ], { prepare: true });
+  const result = await cassandraClient.execute(
+    query,
+    [
+      types.Uuid.fromString(examId),
+      types.Uuid.fromString(studentId),
+      limit
+    ],
+    { prepare: true }
+  );
 
   return result.rows.map(row => ({
     examId: row.exam_id.toString(),
@@ -75,9 +69,6 @@ export async function getExecutionLogs(
   }));
 }
 
-/**
- * Dohvati logove za specifičan task
- */
 export async function getExecutionLogsForTask(
   examId: string,
   studentId: string,
@@ -90,12 +81,15 @@ export async function getExecutionLogsForTask(
     ALLOW FILTERING
   `;
 
-  const result = await cassandraClient.execute(query, [
-    types.Uuid.fromString(examId),
-    types.Uuid.fromString(studentId)
-  ], { prepare: true });
+  const result = await cassandraClient.execute(
+    query,
+    [
+      types.Uuid.fromString(examId),
+      types.Uuid.fromString(studentId)
+    ],
+    { prepare: true }
+  );
 
-  // Filter by taskId in application layer (Cassandra doesn't support filtering on non-primary key efficiently)
   return result.rows
     .filter(row => row.task_id.toString() === taskId)
     .map(row => ({
@@ -109,14 +103,6 @@ export async function getExecutionLogsForTask(
     }));
 }
 
-// ============================================
-// SECURITY EVENTS - Anti-cheat logovi
-// ============================================
-
-/**
- * Sačuvaj bezbednosni događaj (sumnjiva aktivnost)
- * Koristi se kada detektujemo TAB_SWITCH, COPY_PASTE, itd.
- */
 export async function logSecurityEvent(
   examId: string,
   studentId: string,
@@ -128,19 +114,19 @@ export async function logSecurityEvent(
     VALUES (?, ?, ?, ?, ?)
   `;
 
-  await cassandraClient.execute(query, [
-    types.Uuid.fromString(examId),
-    types.Uuid.fromString(studentId),
-    eventType,
-    new Date(),
-    JSON.stringify(details)
-  ], { prepare: true });
+  await cassandraClient.execute(
+    query,
+    [
+      types.Uuid.fromString(examId),
+      types.Uuid.fromString(studentId),
+      eventType,
+      new Date(),
+      JSON.stringify(details)
+    ],
+    { prepare: true }
+  );
 }
 
-/**
- * Dohvati sve bezbednosne događaje za ispit
- * Profesor može da vidi sve sumnjive aktivnosti
- */
 export async function getSecurityEvents(
   examId: string,
   limit: number = 100
@@ -152,10 +138,14 @@ export async function getSecurityEvents(
     LIMIT ?
   `;
 
-  const result = await cassandraClient.execute(query, [
-    types.Uuid.fromString(examId),
-    limit
-  ], { prepare: true });
+  const result = await cassandraClient.execute(
+    query,
+    [
+      types.Uuid.fromString(examId),
+      limit
+    ],
+    { prepare: true }
+  );
 
   return result.rows.map(row => ({
     examId: row.exam_id.toString(),
@@ -166,9 +156,6 @@ export async function getSecurityEvents(
   }));
 }
 
-/**
- * Dohvati bezbednosne događaje za specifičnog studenta na ispitu
- */
 export async function getSecurityEventsForStudent(
   examId: string,
   studentId: string
@@ -179,11 +166,12 @@ export async function getSecurityEventsForStudent(
     WHERE exam_id = ?
   `;
 
-  const result = await cassandraClient.execute(query, [
-    types.Uuid.fromString(examId)
-  ], { prepare: true });
+  const result = await cassandraClient.execute(
+    query,
+    [types.Uuid.fromString(examId)],
+    { prepare: true }
+  );
 
-  // Filter by studentId in application layer
   return result.rows
     .filter(row => row.student_id.toString() === studentId)
     .map(row => ({
@@ -195,10 +183,6 @@ export async function getSecurityEventsForStudent(
     }));
 }
 
-/**
- * Prebroj koliko sumnjiivih događaja ima student na ispitu
- * Koristi se za anti-cheat threshold
- */
 export async function countSecurityEvents(
   examId: string,
   studentId: string
@@ -207,13 +191,6 @@ export async function countSecurityEvents(
   return events.length;
 }
 
-// ============================================
-// USER ACTIVITY - Login/Register audit log
-// ============================================
-
-/**
- * SaŽ›uvaj aktivnost korisnika (login/registracija)
- */
 export async function logUserActivity(
   userId: string,
   eventType: UserActivityEventType,
@@ -224,10 +201,14 @@ export async function logUserActivity(
     VALUES (?, ?, ?, ?)
   `;
 
-  await cassandraClient.execute(query, [
-    types.Uuid.fromString(userId),
-    eventType,
-    new Date(),
-    JSON.stringify(details)
-  ], { prepare: true });
+  await cassandraClient.execute(
+    query,
+    [
+      types.Uuid.fromString(userId),
+      eventType,
+      new Date(),
+      JSON.stringify(details)
+    ],
+    { prepare: true }
+  );
 }

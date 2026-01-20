@@ -6,10 +6,9 @@ import {
   getSecurityEvents,
   getSecurityEventsForStudent,
   countSecurityEvents
-} from '../services/cassandraService.js';
-import type { LogExecutionRequest, LogSecurityEventRequest } from '../types/cassandra.js';
+} from '../services/logsService.js';
+import type { LogExecutionRequest, LogSecurityEventRequest } from '../types.js';
 
-// Extend Request to include user from JWT middleware
 interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
@@ -18,14 +17,6 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
-// ============================================
-// EXECUTION LOGS ENDPOINTS
-// ============================================
-
-/**
- * POST /api/logs/execution
- * Student loguje izvršavanje koda
- */
 export async function createExecutionLog(req: AuthenticatedRequest, res: Response) {
   try {
     const { examId, taskId, sourceCode, output, status } = req.body as LogExecutionRequest;
@@ -40,7 +31,6 @@ export async function createExecutionLog(req: AuthenticatedRequest, res: Respons
     }
 
     await logExecution(examId, studentId, taskId, sourceCode, output || '', status);
-
     res.status(201).json({ message: 'Execution logged successfully' });
   } catch (error) {
     console.error('Error logging execution:', error);
@@ -48,10 +38,6 @@ export async function createExecutionLog(req: AuthenticatedRequest, res: Respons
   }
 }
 
-/**
- * GET /api/logs/execution/:examId
- * Dohvati logove izvršavanja za trenutnog studenta na ispitu
- */
 export async function getMyExecutionLogs(req: AuthenticatedRequest, res: Response) {
   try {
     const { examId } = req.params;
@@ -69,10 +55,6 @@ export async function getMyExecutionLogs(req: AuthenticatedRequest, res: Respons
   }
 }
 
-/**
- * GET /api/logs/execution/:examId/:studentId
- * Profesor dohvata logove studenta (zahteva PROFESSOR role)
- */
 export async function getStudentExecutionLogs(req: AuthenticatedRequest, res: Response) {
   try {
     const { examId, studentId } = req.params;
@@ -90,14 +72,6 @@ export async function getStudentExecutionLogs(req: AuthenticatedRequest, res: Re
   }
 }
 
-// ============================================
-// SECURITY EVENTS ENDPOINTS
-// ============================================
-
-/**
- * POST /api/logs/security
- * Frontend loguje sumnjivi događaj (tab switch, copy-paste, itd.)
- */
 export async function createSecurityEvent(req: AuthenticatedRequest, res: Response) {
   try {
     const { examId, eventType, details } = req.body as LogSecurityEventRequest;
@@ -112,7 +86,6 @@ export async function createSecurityEvent(req: AuthenticatedRequest, res: Respon
     }
 
     await logSecurityEvent(examId, studentId, eventType, details || {});
-
     res.status(201).json({ message: 'Security event logged' });
   } catch (error) {
     console.error('Error logging security event:', error);
@@ -120,10 +93,6 @@ export async function createSecurityEvent(req: AuthenticatedRequest, res: Respon
   }
 }
 
-/**
- * GET /api/logs/security/:examId
- * Profesor dohvata sve sumnjive događaje na ispitu
- */
 export async function getExamSecurityEvents(req: AuthenticatedRequest, res: Response) {
   try {
     const { examId } = req.params;
@@ -141,10 +110,6 @@ export async function getExamSecurityEvents(req: AuthenticatedRequest, res: Resp
   }
 }
 
-/**
- * GET /api/logs/security/:examId/:studentId
- * Profesor dohvata sumnjive događaje za specifičnog studenta
- */
 export async function getStudentSecurityEvents(req: AuthenticatedRequest, res: Response) {
   try {
     const { examId, studentId } = req.params;
@@ -155,23 +120,16 @@ export async function getStudentSecurityEvents(req: AuthenticatedRequest, res: R
     }
 
     const events = await getSecurityEventsForStudent(examId, studentId);
-    const count = events.length;
-
-    res.json({ events, totalViolations: count });
+    res.json({ events, totalViolations: events.length });
   } catch (error) {
     console.error('Error fetching student security events:', error);
     res.status(500).json({ error: 'Failed to fetch security events' });
   }
 }
 
-/**
- * GET /api/logs/security/:examId/:studentId/count
- * Brzo prebrojavanje kršenja za anti-cheat
- */
 export async function getViolationCount(req: AuthenticatedRequest, res: Response) {
   try {
     const { examId, studentId } = req.params;
-
     const count = await countSecurityEvents(examId, studentId);
     res.json({ count });
   } catch (error) {

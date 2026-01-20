@@ -2,29 +2,26 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
-import { neo4jDriver } from '../neo4j.js';
-import { logUserActivity } from '../services/cassandraService.js';
+import { neo4jDriver } from '../driver.js';
+import { logUserActivity } from '../../cassandra/services/logsService.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
-// REGISTRACIJA
 export const register = async (req: Request, res: Response) => {
   const { email, password, firstName, lastName, role } = req.body;
   const session = neo4jDriver.session();
 
   try {
-    // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
     const id = uuidv4();
 
-    // Cypher query for creating a new user
     const result = await session.run(
       `CREATE (u:User {
-        id: $id, 
-        email: $email, 
-        passwordHash: $passwordHash, 
-        firstName: $firstName, 
-        lastName: $lastName, 
+        id: $id,
+        email: $email,
+        passwordHash: $passwordHash,
+        firstName: $firstName,
+        lastName: $lastName,
         role: $role,
         createdAt: datetime()
       }) RETURN u`,
@@ -32,7 +29,7 @@ export const register = async (req: Request, res: Response) => {
     );
 
     const newUser = result.records[0].get('u').properties;
-    delete newUser.passwordHash; 
+    delete newUser.passwordHash;
 
     const token = jwt.sign(
       { id: newUser.id, email: newUser.email, role: newUser.role },
@@ -49,43 +46,38 @@ export const register = async (req: Request, res: Response) => {
       console.warn('Failed to log user registration activity:', logError);
     }
 
-    res.status(201).json({ message: "User succssesfuly added", token, user: newUser });
+    res.status(201).json({ message: 'User successfully added', token, user: newUser });
   } catch (error: any) {
     if (error.code === 'Neo.ClientError.Schema.ConstraintValidationFailed') {
-      res.status(400).json({ error: "Email is alredy registered" });
+      res.status(400).json({ error: 'Email is already registered' });
     } else {
-      res.status(500).json({ error: "Error while registering" });
+      res.status(500).json({ error: 'Error while registering' });
     }
   } finally {
     await session.close();
   }
 };
 
-// LOGIN
 export const login = async (req: Request, res: Response) => {
   const { email, password } = req.body;
   const session = neo4jDriver.session();
 
   try {
-    // Find user by email
     const result = await session.run(
       'MATCH (u:User {email: $email}) RETURN u',
       { email }
     );
 
     if (result.records.length === 0) {
-      return res.status(401).json({ error: "Pogrešan email ili lozinka" });
+      return res.status(401).json({ error: 'Pogresan email ili lozinka' });
     }
 
     const user = result.records[0].get('u').properties;
-
-    // Validate password
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
-      return res.status(401).json({ error: "Pogrešan email ili lozinka" });
+      return res.status(401).json({ error: 'Pogresan email ili lozinka' });
     }
 
-    // Generate JWT
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
       JWT_SECRET,
@@ -101,9 +93,10 @@ export const login = async (req: Request, res: Response) => {
     } catch (logError) {
       console.warn('Failed to log user login activity:', logError);
     }
+
     res.json({ token, user });
   } catch (error) {
-    res.status(500).json({ error: "Greska pri logovanju" });
+    res.status(500).json({ error: 'Greska pri logovanju' });
   } finally {
     await session.close();
   }

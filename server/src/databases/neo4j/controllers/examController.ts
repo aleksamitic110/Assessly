@@ -1,7 +1,6 @@
-// src/controllers/examController.ts
 import { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { neo4jDriver } from '../neo4j.js';
+import { neo4jDriver } from '../driver.js';
 
 export const createSubject = async (req: any, res: Response) => {
   const { name, description } = req.body;
@@ -22,7 +21,7 @@ export const createSubject = async (req: any, res: Response) => {
 
     res.status(201).json(result.records[0].get('s').properties);
   } catch (error) {
-    res.status(500).json({ error: "Error while creating subject" });
+    res.status(500).json({ error: 'Error while creating subject' });
   } finally {
     await session.close();
   }
@@ -46,7 +45,7 @@ export const createExam = async (req: any, res: Response) => {
 
     res.status(201).json(result.records[0].get('e').properties);
   } catch (error) {
-    res.status(500).json({ error: "Greska pri kreiranju ispita" });
+    res.status(500).json({ error: 'Error while creating exam' });
   } finally {
     await session.close();
   }
@@ -76,7 +75,7 @@ export const createTask = async (req: any, res: Response) => {
 
     res.status(201).json(result.records[0].get('t').properties);
   } catch (error) {
-    res.status(500).json({ error: "Greska pri kreiranju zadatka" });
+    res.status(500).json({ error: 'Error while creating task' });
   } finally {
     await session.close();
   }
@@ -109,7 +108,7 @@ export const getAvailableExams = async (req: any, res: Response) => {
 
     res.json(exams);
   } catch (error) {
-    res.status(500).json({ error: "Greska pri dohvatanju ispita" });
+    res.status(500).json({ error: 'Error while fetching exams' });
   } finally {
     await session.close();
   }
@@ -129,7 +128,7 @@ export const getExamById = async (req: any, res: Response) => {
     );
 
     if (result.records.length === 0) {
-      return res.status(404).json({ error: "Ispit nije pronadjen" });
+      return res.status(404).json({ error: 'Exam not found' });
     }
 
     const exam = result.records[0].get('e').properties;
@@ -144,7 +143,7 @@ export const getExamById = async (req: any, res: Response) => {
       subjectName: subject.name
     });
   } catch (error) {
-    res.status(500).json({ error: "Greska pri dohvatanju ispita" });
+    res.status(500).json({ error: 'Error while fetching exam' });
   } finally {
     await session.close();
   }
@@ -188,7 +187,7 @@ export const getProfessorSubjects = async (req: any, res: Response) => {
 
     res.json(subjects);
   } catch (error) {
-    res.status(500).json({ error: "Greska pri dohvatanju predmeta" });
+    res.status(500).json({ error: 'Error while fetching subjects' });
   } finally {
     await session.close();
   }
@@ -221,7 +220,7 @@ export const getExamTasks = async (req: any, res: Response) => {
 
     res.json(tasks);
   } catch (error) {
-    res.status(500).json({ error: "Greska pri dohvatanju zadataka" });
+    res.status(500).json({ error: 'Error while fetching tasks' });
   } finally {
     await session.close();
   }
