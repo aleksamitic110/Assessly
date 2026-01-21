@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { socket, connectSocket, disconnectSocket } from '../services/socket';
 import type { Exam as ExamType } from '../types';
 
 interface Subject {
@@ -12,6 +13,16 @@ interface Subject {
 
 interface SubjectWithExams extends Subject {
   exams: ExamType[];
+}
+
+//SOCKET Tip za alert
+interface Alert {
+  studentId: string;
+  email: string;
+  type: string;
+  count: number;
+  timestamp: number;
+  examId: string;
 }
 
 export default function ProfessorDashboard() {
@@ -40,6 +51,10 @@ export default function ProfessorDashboard() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
+  //SOCKET STATES
+  const [liveAlerts, setLiveAlerts] = useState<Alert[]>([]);
+  const [monitoredExams, setMonitoredExams] = useState<Set<string>>(new Set());
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -48,6 +63,57 @@ export default function ProfessorDashboard() {
   const toggleSubject = (subjectId: string) => {
     setExpandedSubjectId((prev) => (prev === subjectId ? null : subjectId));
   };
+
+  //SOCKET: Glavna logika za profesora
+  useEffect(() => {
+    //Konektuj se
+    connectSocket();
+
+    //Slusaj prekrsaje (Big Brother)
+    socket.on('violation_alert', (data: Alert) => {
+      console.log('🚨 NEW ALERT:', data);
+      setLiveAlerts((prev) => [data, ...prev]); // Dodaj novi na vrh liste
+      
+      // Opciono: Zvuk alarma
+      new Audio('/alert.mp3').play().catch(() => {});
+    });
+
+    //Slusaj status studenata (Online/Offline)
+    socket.on('student_status_update', (data) => {
+      console.log(`Status: ${data.email} -> ${data.status}`);
+    });
+
+    return () => {
+      socket.off('violation_alert');
+      socket.off('student_status_update');
+      disconnectSocket();
+    };
+  }, []);
+
+  //SOCKET: Funkcija za pokretanje ispita
+  const handleStartExam = (exam: ExamType) => {
+    if(!confirm(`Da li ste sigurni da želite da pokrenete ispit "${exam.name}"?`)) return;
+
+    // Prvo se pridruži sobi da bi dobio potvrdu
+    handleMonitorExam(exam.id);
+
+    socket.emit('start_exam', { 
+      examId: exam.id, 
+      durationMinutes: exam.durationMinutes 
+    });
+    
+    setMessage(`Komanda za start ispita "${exam.name}" je poslata!`);
+  };
+
+  //SOCKET: Funkcija za pracenje (Join Room)
+  const handleMonitorExam = (examId: string) => {
+    if (monitoredExams.has(examId)) return;
+
+    socket.emit('join_exam', examId);
+    setMonitoredExams(prev => new Set(prev).add(examId));
+    setMessage(`Uključeno praćenje za ispit ID: ${examId.substring(0, 8)}...`);
+  };
+
 
   useEffect(() => {
     let isMounted = true;
@@ -296,27 +362,44 @@ export default function ProfessorDashboard() {
             )}
           </div>
 
-          {/* Live Monitoring Card */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+          {/*SOCKET: Live Monitoring Card*/}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 flex flex-col h-96">
             <div className="flex items-center mb-4">
-              <div className="p-3 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
-                <svg className="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="p-3 bg-red-100 dark:bg-red-900 rounded-lg animate-pulse">
+                <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                 </svg>
               </div>
               <h3 className="ml-3 text-lg font-semibold text-gray-900 dark:text-white">
-                Live Monitoring
+                Live Alerts ({liveAlerts.length})
               </h3>
             </div>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Pratite studente u realnom vremenu tokom ispita
-            </p>
-            <button
-              className="w-full px-4 py-2 text-sm font-medium text-white bg-yellow-600 rounded-lg hover:bg-yellow-700 transition-colors"
-              onClick={() => alert('Live monitoring ce biti implementiran sa Socket.io')}
+            
+            <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 rounded p-2 border border-gray-200 dark:border-gray-700">
+              {liveAlerts.length === 0 ? (
+                <p className="text-center text-gray-500 mt-10">Nema aktivnih prekršaja.</p>
+              ) : (
+                <div className="space-y-2">
+                  {liveAlerts.map((alert, idx) => (
+                    <div key={idx} className="p-2 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 rounded text-sm">
+                      <div className="flex justify-between font-bold text-red-700 dark:text-red-400">
+                        <span>{alert.email}</span>
+                        <span>{new Date(alert.timestamp).toLocaleTimeString()}</span>
+                      </div>
+                      <div className="text-gray-600 dark:text-gray-300">
+                        Tip: {alert.type} | Puta: {alert.count}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button 
+              onClick={() => setLiveAlerts([])}
+              className="mt-2 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-right"
             >
-              Otvori monitoring
+              Ocisti logove
             </button>
           </div>
         </div>
@@ -398,17 +481,35 @@ export default function ProfessorDashboard() {
                                 {subject.exams.map((exam) => (
                                   <li
                                     key={exam.id}
-                                    className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-300"
+                                    className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 p-3 rounded shadow-sm"
                                   >
                                     <div className="flex flex-col">
-                                      <span>{exam.name}</span>
+                                      <span className="font-semibold">{exam.name}</span>
                                       <span className="text-xs text-gray-500 dark:text-gray-400">
-                                        Exam ID: {exam.id}
+                                        ID: {exam.id} | Početak: {new Date(exam.startTime).toLocaleString()}
                                       </span>
                                     </div>
-                                    <span className="text-gray-500 dark:text-gray-400">
-                                      {exam.startTime}
-                                    </span>
+                                    
+                                    {/*SOCKET: Actions Buttons */}
+                                    <div className="flex space-x-2">
+                                      <button 
+                                        onClick={() => handleMonitorExam(exam.id)}
+                                        className={`px-3 py-1 text-xs rounded border ${
+                                          monitoredExams.has(exam.id) 
+                                            ? 'bg-yellow-100 text-yellow-700 border-yellow-300' 
+                                            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                        }`}
+                                      >
+                                        {monitoredExams.has(exam.id) ? '👀 Praćenje aktivno' : 'Prati'}
+                                      </button>
+                                      
+                                      <button 
+                                        onClick={() => handleStartExam(exam)}
+                                        className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                                      >
+                                        ▶ Start
+                                      </button>
+                                    </div>
                                   </li>
                                 ))}
                               </ul>

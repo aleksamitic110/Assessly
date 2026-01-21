@@ -4,6 +4,8 @@ import Editor from '@monaco-editor/react';
 import { useAuth } from '../context/AuthContext';
 import logsService from '../services/logs';
 import api from '../services/api';
+//Importujemo socket servis
+import { socket, connectSocket, disconnectSocket } from '../services/socket';
 import type { Exam, Task as TaskType } from '../types';
 
 export default function ExamPage() {
@@ -26,6 +28,31 @@ export default function ExamPage() {
 
   // Anti-cheat refs
   const lastActivityRef = useRef<number>(Date.now());
+
+  //SOCKET: Glavna logika za povezivanje i tajmer
+  useEffect(() => {
+    if (!examId) return;
+
+    //Konektujemo se na socket
+    connectSocket();
+
+    //Ulazimo u sobu ispita
+    socket.emit('join_exam', examId);
+
+    // Slusamo sinhronizaciju vremena (Redis Backend)
+    // Server salje remainingMilliseconds, mi pretvaramo u sekunde
+    socket.on('timer_sync', (data: { remainingMilliseconds: number }) => {
+      console.log('Backend Time Sync:', data.remainingMilliseconds);
+      const secondsLeft = Math.floor(data.remainingMilliseconds / 1000);
+      setTimeLeft(secondsLeft > 0 ? secondsLeft : 0);
+    });
+
+    // Ciscenje pri izlasku
+    return () => {
+      socket.off('timer_sync');
+      disconnectSocket();
+    };
+  }, [examId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -72,13 +99,13 @@ export default function ExamPage() {
     };
   }, [examId]);
 
-  // Timer
+  // Timer (Lokalni ticker - sluzi da odbrojava sekunde izmedju sync-ova)
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 0) {
           clearInterval(timer);
-          handleSubmit();
+          // handleSubmit(); // Opciono: Automatska predaja kad istekne vreme
           return 0;
         }
         return prev - 1;
@@ -93,29 +120,44 @@ export default function ExamPage() {
     const handleVisibilityChange = () => {
       if (document.hidden && examId) {
         setViolations((prev) => prev + 1);
+        
+        //Cassandra Log
         logsService.logSecurityEvent(examId, 'TAB_SWITCH', {
           timestamp: new Date().toISOString(),
           violations: violations + 1,
         });
+
+        //SOCKET Live Professor Alert
+        socket.emit('violation', { examId, type: 'tab_switch' });
       }
     };
 
     const handleBlur = () => {
       if (examId) {
         setViolations((prev) => prev + 1);
+        
+        // Cassandra Log
         logsService.logSecurityEvent(examId, 'BLUR', {
           timestamp: new Date().toISOString(),
         });
+
+        // SOCKET Tvoj Alarm
+        socket.emit('violation', { examId, type: 'tab_blur' });
       }
     };
 
     const handleCopyPaste = (e: ClipboardEvent) => {
       if (examId && e.type === 'paste') {
         setViolations((prev) => prev + 1);
+        
+        // Cassandra Log
         logsService.logSecurityEvent(examId, 'COPY_PASTE', {
           timestamp: new Date().toISOString(),
           type: e.type,
         });
+
+        //SOCKET Alarm
+        socket.emit('violation', { examId, type: 'copy_paste' });
       }
     };
 
@@ -156,7 +198,7 @@ export default function ExamPage() {
       }
     }
 
-    // Simulate code execution (u pravom projektu bi se slalo na backend)
+    // Simulate code execution
     setTimeout(() => {
       const mockOutput = `Pre sortiranja: 64 34 25 12 22 11 90
 Posle sortiranja: 11 12 22 25 34 64 90
@@ -167,14 +209,14 @@ Vreme izvrsavanja: 0.003s`;
       setIsRunning(false);
 
       // Log successful execution
-    if (examId) {
-      logsService.logExecution(
-        examId,
-        currentTask.id,
-        code,
-        mockOutput,
-        'SUCCESS'
-      );
+      if (examId) {
+        logsService.logExecution(
+          examId,
+          currentTask.id,
+          code,
+          mockOutput,
+          'SUCCESS'
+        );
       }
     }, 2000);
   };
@@ -207,7 +249,7 @@ Vreme izvrsavanja: 0.003s`;
         'Ispit predat',
         'SUCCESS'
       );
-       alert('Ispit je uspesno predat!');
+      alert('Ispit je uspesno predat!');
     }
     else {
       alert('Ispit nije uspesno predat! Greska je do: ' + (!examId ? 'nedostaje ID ispita. ' : '') + " ili " + (!currentTask ? 'nedostaje trenutni zadatak.' : ''));
