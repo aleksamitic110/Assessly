@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import type { UserRole } from '../types';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -10,13 +9,12 @@ export default function Register() {
     confirmPassword: '',
     firstName: '',
     lastName: '',
-    role: 'STUDENT' as UserRole,
   });
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const { register } = useAuth();
-  const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -26,6 +24,7 @@ export default function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
 
     // Validation
     if (formData.password !== formData.confirmPassword) {
@@ -46,9 +45,15 @@ export default function Register() {
         password: formData.password,
         firstName: formData.firstName,
         lastName: formData.lastName,
-        role: formData.role,
       });
-      navigate('/dashboard');
+      setSuccess('Registracija uspesna. Proverite email da biste verifikovali nalog.');
+      setFormData({
+        email: '',
+        password: '',
+        confirmPassword: '',
+        firstName: '',
+        lastName: '',
+      });
     } catch (err: any) {
       setError(err.response?.data?.error || 'Greska prilikom registracije');
     } finally {
@@ -79,6 +84,11 @@ export default function Register() {
             {error && (
               <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg">
                 {error}
+              </div>
+            )}
+            {success && (
+              <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 px-4 py-3 rounded-lg">
+                {success}
               </div>
             )}
 
@@ -141,26 +151,6 @@ export default function Register() {
                 className="mt-1 block w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
                 placeholder="vas@email.com"
               />
-            </div>
-
-            {/* Role selection */}
-            <div>
-              <label
-                htmlFor="role"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                Uloga
-              </label>
-              <select
-                id="role"
-                name="role"
-                value={formData.role}
-                onChange={handleChange}
-                className="mt-1 block w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
-              >
-                <option value="STUDENT">Student</option>
-                <option value="PROFESSOR">Profesor</option>
-              </select>
             </div>
 
             {/* Password fields */}

@@ -10,7 +10,7 @@ interface AvailableExam {
   subjectName: string;
   startTime: string;
   durationMinutes: number;
-  status: 'upcoming' | 'active' | 'completed';
+  status: 'wait_room' | 'waiting_start' | 'active' | 'paused' | 'completed';
 }
 
 export default function StudentDashboard() {
@@ -24,11 +24,11 @@ export default function StudentDashboard() {
   const getExamStatus = (startTime: string, durationMinutes: number): AvailableExam['status'] => {
     const start = new Date(startTime).getTime();
     if (Number.isNaN(start)) {
-      return 'upcoming';
+      return 'waiting_start';
     }
     const end = start + durationMinutes * 60 * 1000;
     const now = Date.now();
-    if (now < start) return 'upcoming';
+    if (now < start) return 'wait_room';
     if (now <= end) return 'active';
     return 'completed';
   };
@@ -47,7 +47,7 @@ export default function StudentDashboard() {
           subjectName: exam.subjectName || 'Nepoznat predmet',
           startTime: exam.startTime,
           durationMinutes: exam.durationMinutes,
-          status: getExamStatus(exam.startTime, exam.durationMinutes),
+          status: exam.status || getExamStatus(exam.startTime, exam.durationMinutes),
         }));
         if (isMounted) {
           setExams(mapped);
@@ -80,16 +80,28 @@ export default function StudentDashboard() {
 
   const getStatusBadge = (status: AvailableExam['status']) => {
     switch (status) {
-      case 'upcoming':
+      case 'wait_room':
         return (
           <span className="px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-            Predstoeci
+            Ceka termin
+          </span>
+        );
+      case 'waiting_start':
+        return (
+          <span className="px-3 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
+            Ceka start
           </span>
         );
       case 'active':
         return (
           <span className="px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
             Aktivan
+          </span>
+        );
+      case 'paused':
+        return (
+          <span className="px-3 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+            Pauziran
           </span>
         );
       case 'completed':
@@ -163,7 +175,7 @@ export default function StudentDashboard() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Predstoeci ispiti</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {exams.filter(e => e.status === 'upcoming').length}
+                  {exams.filter(e => e.status === 'wait_room' || e.status === 'waiting_start').length}
                 </p>
               </div>
             </div>
@@ -179,7 +191,7 @@ export default function StudentDashboard() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Aktivni ispiti</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {exams.filter(e => e.status === 'active').length}
+                  {exams.filter(e => e.status === 'active' || e.status === 'paused').length}
                 </p>
               </div>
             </div>
@@ -270,12 +282,28 @@ export default function StudentDashboard() {
                           Zapocni ispit
                         </button>
                       )}
-                      {exam.status === 'upcoming' && (
+                      {exam.status === 'wait_room' && (
                         <button
                           disabled
                           className="px-6 py-2 text-sm font-medium text-gray-400 bg-gray-200 dark:bg-gray-700 rounded-lg cursor-not-allowed"
                         >
-                          Nije poceo
+                          Nije vreme
+                        </button>
+                      )}
+                      {exam.status === 'waiting_start' && (
+                        <button
+                          disabled
+                          className="px-6 py-2 text-sm font-medium text-gray-400 bg-gray-200 dark:bg-gray-700 rounded-lg cursor-not-allowed"
+                        >
+                          Ceka start
+                        </button>
+                      )}
+                      {exam.status === 'paused' && (
+                        <button
+                          disabled
+                          className="px-6 py-2 text-sm font-medium text-yellow-700 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg cursor-not-allowed"
+                        >
+                          Pauziran
                         </button>
                       )}
                       {exam.status === 'completed' && (

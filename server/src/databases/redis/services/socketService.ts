@@ -22,6 +22,50 @@ declare module 'socket.io' {
 }
 
 export const initSocket = (io: Server) => {
+  const STATE_TTL_SECONDS = 60 * 60 * 24;
+
+  const getExamState = async (examId: string) => {
+    const [status, endTimeRaw, startTimeRaw, remainingRaw] = await redisClient.mGet([
+      `exam:${examId}:status`,
+      `exam:${examId}:end_time`,
+      `exam:${examId}:start_time`,
+      `exam:${examId}:remaining_ms`
+    ]);
+
+    const startTime = startTimeRaw ? parseInt(startTimeRaw, 10) : undefined;
+    const endTime = endTimeRaw ? parseInt(endTimeRaw, 10) : undefined;
+    const now = Date.now();
+
+    if (status === 'active' && endTime) {
+      const remaining = Math.max(0, endTime - now);
+      if (remaining === 0) {
+        await redisClient.set(`exam:${examId}:status`, 'completed', { EX: STATE_TTL_SECONDS });
+        return { examId, status: 'completed', remainingMilliseconds: 0, startTime, endTime };
+      }
+      return { examId, status: 'active', remainingMilliseconds: remaining, startTime, endTime };
+    }
+
+    if (status === 'active') {
+      return { examId, status: 'active', remainingMilliseconds: 0, startTime, endTime };
+    }
+
+    if (status === 'paused') {
+      const remaining = Math.max(0, parseInt(remainingRaw || '0', 10));
+      return { examId, status: 'paused', remainingMilliseconds: remaining, startTime };
+    }
+
+    if (status === 'completed') {
+      return { examId, status: 'completed', remainingMilliseconds: 0, startTime, endTime };
+    }
+
+    return { examId, status: 'waiting_start', remainingMilliseconds: 0, startTime };
+  };
+
+  const emitExamState = async (examId: string) => {
+    const state = await getExamState(examId);
+    io.to(examId).emit('exam_state', state);
+  };
+
   io.use((socket, next) => {
     const token = socket.handshake.auth.token || socket.handshake.headers['token'];
 
@@ -38,11 +82,12 @@ export const initSocket = (io: Server) => {
 
   io.on('connection', async (socket: Socket) => {
     const user = socket.user!;
+    const role = (user.role || '').toLowerCase();
     console.log(`Connected: ${user.email} (${user.role})`);
 
     await redisClient.set(`user:status:${user.id}`, 'online', { EX: 60 });
 
-    if (user.role === 'professor' || user.role === 'admin') {
+    if (role === 'professor' || role === 'admin') {
       socket.join('professors_room');
     }
 
@@ -50,13 +95,13 @@ export const initSocket = (io: Server) => {
       socket.join(examId);
       console.log(`${user.email} joined ${examId}`);
 
-      const endTime = await redisClient.get(`exam:${examId}:end_time`);
-      if (endTime) {
-        const remaining = Math.max(0, parseInt(endTime) - Date.now());
-        socket.emit('timer_sync', { remainingMilliseconds: remaining });
+      const state = await getExamState(examId);
+      socket.emit('exam_state', state);
+      if (state.status === 'active') {
+        socket.emit('timer_sync', { remainingMilliseconds: state.remainingMilliseconds });
       }
 
-      if (user.role === 'student') {
+      if (role === 'student') {
         io.to(examId).emit('student_status_update', {
           studentId: user.id,
           email: user.email,
@@ -82,19 +127,102 @@ export const initSocket = (io: Server) => {
     });
 
     socket.on('start_exam', async (data) => {
-      if (user.role !== 'professor') return;
+      if (role !== 'professor') return;
       const { examId, durationMinutes } = data;
-      const endTime = Date.now() + (durationMinutes * 60 * 1000);
+      const startTime = Date.now();
+      const endTime = startTime + (durationMinutes * 60 * 1000);
 
-      await redisClient.set(`exam:${examId}:end_time`, endTime.toString(), {
-        EX: durationMinutes * 60 + 3600
-      });
+      await redisClient.set(`exam:${examId}:status`, 'active', { EX: STATE_TTL_SECONDS });
+      await redisClient.set(`exam:${examId}:start_time`, startTime.toString(), { EX: STATE_TTL_SECONDS });
+      await redisClient.set(`exam:${examId}:end_time`, endTime.toString(), { EX: STATE_TTL_SECONDS });
+      await redisClient.set(`exam:${examId}:duration_seconds`, (durationMinutes * 60).toString(), { EX: STATE_TTL_SECONDS });
+      await redisClient.del(`exam:${examId}:remaining_ms`);
 
-      io.to(examId).emit('exam_started', {
-        startTime: Date.now(),
-        durationMinutes,
-        endTime
-      });
+      await emitExamState(examId);
+    });
+
+    socket.on('pause_exam', async (data) => {
+      if (role !== 'professor') return;
+      const { examId } = data;
+      const status = await redisClient.get(`exam:${examId}:status`);
+      if (status !== 'active') return;
+
+      const endTimeRaw = await redisClient.get(`exam:${examId}:end_time`);
+      const endTime = endTimeRaw ? parseInt(endTimeRaw, 10) : Date.now();
+      const remaining = Math.max(0, endTime - Date.now());
+
+      await redisClient.set(`exam:${examId}:status`, 'paused', { EX: STATE_TTL_SECONDS });
+      await redisClient.set(`exam:${examId}:remaining_ms`, remaining.toString(), { EX: STATE_TTL_SECONDS });
+      await redisClient.del(`exam:${examId}:end_time`);
+
+      await emitExamState(examId);
+    });
+
+    socket.on('resume_exam', async (data) => {
+      if (role !== 'professor') return;
+      const { examId } = data;
+      const status = await redisClient.get(`exam:${examId}:status`);
+      if (status !== 'paused') return;
+
+      const remainingRaw = await redisClient.get(`exam:${examId}:remaining_ms`);
+      const remaining = Math.max(0, parseInt(remainingRaw || '0', 10));
+      const endTime = Date.now() + remaining;
+
+      await redisClient.set(`exam:${examId}:status`, 'active', { EX: STATE_TTL_SECONDS });
+      await redisClient.set(`exam:${examId}:end_time`, endTime.toString(), { EX: STATE_TTL_SECONDS });
+      await redisClient.del(`exam:${examId}:remaining_ms`);
+
+      await emitExamState(examId);
+    });
+
+    socket.on('extend_exam', async (data) => {
+      if (role !== 'professor') return;
+      const { examId, extraMinutes } = data;
+      const extraMs = Math.max(0, Number(extraMinutes)) * 60 * 1000;
+      if (!extraMs) return;
+
+      const status = await redisClient.get(`exam:${examId}:status`);
+      if (status === 'active') {
+        const endTimeRaw = await redisClient.get(`exam:${examId}:end_time`);
+        const endTime = endTimeRaw ? parseInt(endTimeRaw, 10) : Date.now();
+        const updatedEndTime = endTime + extraMs;
+        await redisClient.set(`exam:${examId}:end_time`, updatedEndTime.toString(), { EX: STATE_TTL_SECONDS });
+      } else if (status === 'paused') {
+        const remainingRaw = await redisClient.get(`exam:${examId}:remaining_ms`);
+        const remaining = Math.max(0, parseInt(remainingRaw || '0', 10));
+        const updatedRemaining = remaining + extraMs;
+        await redisClient.set(`exam:${examId}:remaining_ms`, updatedRemaining.toString(), { EX: STATE_TTL_SECONDS });
+      } else {
+        return;
+      }
+
+      await emitExamState(examId);
+    });
+
+    socket.on('end_exam', async (data) => {
+      if (role !== 'professor') return;
+      const { examId } = data;
+
+      await redisClient.set(`exam:${examId}:status`, 'completed', { EX: STATE_TTL_SECONDS });
+      await redisClient.set(`exam:${examId}:end_time`, Date.now().toString(), { EX: STATE_TTL_SECONDS });
+      await redisClient.del(`exam:${examId}:remaining_ms`);
+
+      await emitExamState(examId);
+    });
+
+    socket.on('restart_exam', async (data) => {
+      if (role !== 'professor') return;
+      const { examId, durationMinutes } = data;
+      const startTime = Date.now();
+      const endTime = startTime + (Number(durationMinutes) * 60 * 1000);
+
+      await redisClient.set(`exam:${examId}:status`, 'active', { EX: STATE_TTL_SECONDS });
+      await redisClient.set(`exam:${examId}:start_time`, startTime.toString(), { EX: STATE_TTL_SECONDS });
+      await redisClient.set(`exam:${examId}:end_time`, endTime.toString(), { EX: STATE_TTL_SECONDS });
+      await redisClient.set(`exam:${examId}:duration_seconds`, (Number(durationMinutes) * 60).toString(), { EX: STATE_TTL_SECONDS });
+      await redisClient.del(`exam:${examId}:remaining_ms`);
+
+      await emitExamState(examId);
     });
 
     socket.on('disconnect', async () => {

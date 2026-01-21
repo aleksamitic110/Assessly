@@ -55,6 +55,17 @@ export default function ProfessorDashboard() {
   const [liveAlerts, setLiveAlerts] = useState<Alert[]>([]);
   const [monitoredExams, setMonitoredExams] = useState<Set<string>>(new Set());
 
+  const updateExamStatus = (examId: string, status: ExamType['status']) => {
+    setSubjects((prev) =>
+      prev.map((subject) => ({
+        ...subject,
+        exams: subject.exams.map((exam) =>
+          exam.id === examId ? { ...exam, status } : exam
+        ),
+      }))
+    );
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -83,9 +94,17 @@ export default function ProfessorDashboard() {
       console.log(`Status: ${data.email} -> ${data.status}`);
     });
 
+    socket.on('exam_state', (data: { examId: string; status: ExamType['status'] }) => {
+      if (!data?.examId) return;
+      if (data.status === 'active' || data.status === 'paused' || data.status === 'completed') {
+        updateExamStatus(data.examId, data.status);
+      }
+    });
+
     return () => {
       socket.off('violation_alert');
       socket.off('student_status_update');
+      socket.off('exam_state');
       disconnectSocket();
     };
   }, []);
@@ -102,7 +121,124 @@ export default function ProfessorDashboard() {
       durationMinutes: exam.durationMinutes 
     });
     
+    updateExamStatus(exam.id, 'active');
     setMessage(`Komanda za start ispita "${exam.name}" je poslata!`);
+  };
+
+  const handlePauseExam = (exam: ExamType) => {
+    socket.emit('pause_exam', { examId: exam.id });
+    updateExamStatus(exam.id, 'paused');
+    setMessage(`Ispit "${exam.name}" je pauziran.`);
+  };
+
+  const handleResumeExam = (exam: ExamType) => {
+    socket.emit('resume_exam', { examId: exam.id });
+    updateExamStatus(exam.id, 'active');
+    setMessage(`Ispit "${exam.name}" je nastavljen.`);
+  };
+
+  const handleExtendExam = (exam: ExamType) => {
+    const extra = prompt('Unesite broj minuta za produzenje:', '10');
+    const extraMinutes = extra ? parseInt(extra, 10) : 0;
+    if (!extraMinutes || Number.isNaN(extraMinutes) || extraMinutes <= 0) return;
+    socket.emit('extend_exam', { examId: exam.id, extraMinutes });
+    setMessage(`Ispit "${exam.name}" produzen za ${extraMinutes} min.`);
+  };
+
+  const handleEndExam = (exam: ExamType) => {
+    if (!confirm(`Da li ste sigurni da zelite da zavrsite ispit "${exam.name}"?`)) return;
+    socket.emit('end_exam', { examId: exam.id });
+    updateExamStatus(exam.id, 'completed');
+    setMessage(`Ispit "${exam.name}" je zavrsen.`);
+  };
+
+  const handleRestartExam = (exam: ExamType) => {
+    if (!confirm(`Da li zelite da restartujete ispit "${exam.name}"?`)) return;
+    socket.emit('restart_exam', { examId: exam.id, durationMinutes: exam.durationMinutes });
+    updateExamStatus(exam.id, 'active');
+    setMessage(`Ispit "${exam.name}" je restartovan.`);
+  };
+
+  const handleUpdateSubject = async (subject: SubjectWithExams) => {
+    const name = prompt('Unesite novi naziv predmeta:', subject.name);
+    if (name === null) return;
+    const description = prompt('Unesite novi opis predmeta:', subject.description);
+    if (description === null) return;
+
+    try {
+      const response = await api.put(`/exams/subjects/${subject.id}`, { name, description });
+      setSubjects((prev) =>
+        prev.map((item) =>
+          item.id === subject.id ? { ...item, ...response.data } : item
+        )
+      );
+      setMessage(`Predmet "${name}" je izmenjen.`);
+    } catch (err: any) {
+      console.error('Update subject error:', err);
+      setError(err.response?.data?.error || 'Greska prilikom izmene predmeta');
+    }
+  };
+
+  const handleDeleteSubject = async (subject: SubjectWithExams) => {
+    if (!confirm(`Da li ste sigurni da zelite da obrisete predmet "${subject.name}"?`)) return;
+
+    try {
+      await api.delete(`/exams/subjects/${subject.id}`);
+      setSubjects((prev) => prev.filter((item) => item.id !== subject.id));
+      setMessage(`Predmet "${subject.name}" je obrisan.`);
+    } catch (err: any) {
+      console.error('Delete subject error:', err);
+      setError(err.response?.data?.error || 'Greska prilikom brisanja predmeta');
+    }
+  };
+
+  const handleUpdateExam = async (exam: ExamType) => {
+    const name = prompt('Unesite novi naziv ispita:', exam.name);
+    if (name === null) return;
+    const startTime = prompt('Unesite novo vreme pocetka (ISO string):', exam.startTime);
+    if (startTime === null) return;
+    const durationInput = prompt('Unesite novo trajanje (min):', exam.durationMinutes.toString());
+    if (durationInput === null) return;
+    const durationMinutes = parseInt(durationInput, 10);
+    if (Number.isNaN(durationMinutes) || durationMinutes <= 0) return;
+
+    try {
+      const response = await api.put(`/exams/exams/${exam.id}`, {
+        name,
+        startTime,
+        durationMinutes
+      });
+      setSubjects((prev) =>
+        prev.map((subject) => ({
+          ...subject,
+          exams: subject.exams.map((item) =>
+            item.id === exam.id ? { ...item, ...response.data } : item
+          ),
+        }))
+      );
+      setMessage(`Ispit "${name}" je izmenjen.`);
+    } catch (err: any) {
+      console.error('Update exam error:', err);
+      setError(err.response?.data?.error || 'Greska prilikom izmene ispita');
+    }
+  };
+
+  const handleDeleteExam = async (exam: ExamType) => {
+    if (!confirm(`Da li ste sigurni da zelite da obrisete ispit "${exam.name}"?`)) return;
+
+    try {
+      await api.delete(`/exams/exams/${exam.id}`);
+      setSubjects((prev) =>
+        prev.map((subject) => ({
+          ...subject,
+          exams: subject.exams.filter((item) => item.id !== exam.id),
+        }))
+      );
+      setMessage(`Ispit "${exam.name}" je obrisan.`);
+    } catch (err: any) {
+      console.error('Delete exam error:', err);
+      setError(err.response?.data?.error || 'Greska prilikom brisanja ispita');
+    }
   };
 
   //SOCKET: Funkcija za pracenje (Join Room)
@@ -170,10 +306,14 @@ export default function ProfessorDashboard() {
     try {
       const response = await api.post('/exams/exams', examData);
       setMessage(`Ispit "${response.data.name}" uspesno kreiran! ID: ${response.data.id}`);
+      const scheduledStart = new Date(examData.startTime).getTime();
+      const isFuture = !Number.isNaN(scheduledStart) && scheduledStart > Date.now();
+      const initialStatus = isFuture ? 'wait_room' : 'waiting_start';
+
       setSubjects((prev) =>
         prev.map((subject) =>
           subject.id === examData.subjectId
-            ? { ...subject, exams: [...subject.exams, response.data] }
+            ? { ...subject, exams: [...subject.exams, { ...response.data, status: initialStatus }] }
             : subject
         )
       );
@@ -343,14 +483,24 @@ export default function ProfessorDashboard() {
                   />
                 </div>
                 <div>
-                  <input
-                    type="text"
-                    placeholder="ID predmeta"
+                  <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                    Predmet
+                  </label>
+                  <select
                     value={examData.subjectId}
                     onChange={(e) => setExamData({ ...examData, subjectId: e.target.value })}
                     required
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-                  />
+                  >
+                    <option value="" disabled>
+                      {subjects.length > 0 ? 'Izaberite predmet' : 'Nema dostupnih predmeta'}
+                    </option>
+                    {subjects.map((subject) => (
+                      <option key={subject.id} value={subject.id}>
+                        {subject.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <button
                   type="submit"
@@ -429,6 +579,9 @@ export default function ProfessorDashboard() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Opis
                     </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Akcije
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -465,6 +618,24 @@ export default function ProfessorDashboard() {
                             </button>
                           </div>
                         </td>
+                        <td className="px-6 py-4 text-right text-sm text-gray-500 dark:text-gray-400">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateSubject(subject)}
+                              className="px-3 py-1 text-xs rounded border border-indigo-300 text-indigo-600 hover:bg-indigo-50"
+                            >
+                              Izmeni
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSubject(subject)}
+                              className="px-3 py-1 text-xs rounded border border-red-300 text-red-600 hover:bg-red-50"
+                            >
+                              Obrisi
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                       {expandedSubjectId === subject.id && (
                         <tr>
@@ -478,40 +649,122 @@ export default function ProfessorDashboard() {
                               </div>
                             ) : (
                               <ul className="space-y-2">
-                                {subject.exams.map((exam) => (
-                                  <li
-                                    key={exam.id}
-                                    className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 p-3 rounded shadow-sm"
-                                  >
-                                    <div className="flex flex-col">
-                                      <span className="font-semibold">{exam.name}</span>
-                                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                                        ID: {exam.id} | Početak: {new Date(exam.startTime).toLocaleString()}
-                                      </span>
-                                    </div>
-                                    
-                                    {/*SOCKET: Actions Buttons */}
-                                    <div className="flex space-x-2">
-                                      <button 
-                                        onClick={() => handleMonitorExam(exam.id)}
-                                        className={`px-3 py-1 text-xs rounded border ${
-                                          monitoredExams.has(exam.id) 
-                                            ? 'bg-yellow-100 text-yellow-700 border-yellow-300' 
-                                            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-                                        }`}
-                                      >
-                                        {monitoredExams.has(exam.id) ? '👀 Praćenje aktivno' : 'Prati'}
-                                      </button>
+                                {subject.exams.map((exam) => {
+                                  const status = exam.status || 'waiting_start';
+
+                                  return (
+                                    <li
+                                      key={exam.id}
+                                      className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 p-3 rounded shadow-sm"
+                                    >
+                                      <div className="flex flex-col">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-semibold">{exam.name}</span>
+                                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                            status === 'active'
+                                              ? 'bg-green-100 text-green-700'
+                                              : status === 'paused'
+                                                ? 'bg-yellow-100 text-yellow-700'
+                                                : status === 'completed'
+                                                  ? 'bg-gray-200 text-gray-600'
+                                                  : 'bg-blue-100 text-blue-700'
+                                          }`}>
+                                            {status === 'active' && 'Aktivan'}
+                                            {status === 'paused' && 'Pauziran'}
+                                            {status === 'completed' && 'Zavrsen'}
+                                            {status === 'wait_room' && 'Ceka termin'}
+                                            {status === 'waiting_start' && 'Ceka start'}
+                                          </span>
+                                        </div>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                          ID: {exam.id} | Po??etak: {new Date(exam.startTime).toLocaleString()}
+                                        </span>
+                                      </div>
                                       
-                                      <button 
-                                        onClick={() => handleStartExam(exam)}
-                                        className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
-                                      >
-                                        ▶ Start
-                                      </button>
-                                    </div>
-                                  </li>
-                                ))}
+                                      {/*SOCKET: Actions Buttons */}
+                                      <div className="flex flex-wrap gap-2 justify-end">
+                                        <button 
+                                          onClick={() => handleMonitorExam(exam.id)}
+                                          className={`px-3 py-1 text-xs rounded border ${
+                                            monitoredExams.has(exam.id) 
+                                              ? 'bg-yellow-100 text-yellow-700 border-yellow-300' 
+                                              : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                          }`}
+                                        >
+                                          {monitoredExams.has(exam.id) ? 'dY`? Pra??enje aktivno' : 'Prati'}
+                                        </button>
+
+                                        {(status === 'wait_room' || status === 'waiting_start') && (
+                                          <button 
+                                            onClick={() => handleStartExam(exam)}
+                                            className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                                          >
+                                            ?- Start
+                                          </button>
+                                        )}
+
+                                        {status === 'active' && (
+                                          <button 
+                                            onClick={() => handlePauseExam(exam)}
+                                            className="px-3 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                                          >
+                                            Pauza
+                                          </button>
+                                        )}
+
+                                        {status === 'paused' && (
+                                          <button 
+                                            onClick={() => handleResumeExam(exam)}
+                                            className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                                          >
+                                            Nastavi
+                                          </button>
+                                        )}
+
+                                        {(status === 'active' || status === 'paused') && (
+                                          <button 
+                                            onClick={() => handleExtendExam(exam)}
+                                            className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                                          >
+                                            Produzi
+                                          </button>
+                                        )}
+
+                                        {(status === 'active' || status === 'paused') && (
+                                          <button 
+                                            onClick={() => handleEndExam(exam)}
+                                            className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                                          >
+                                            Zavrsi
+                                          </button>
+                                        )}
+
+                                        {status === 'completed' && (
+                                          <button 
+                                            onClick={() => handleRestartExam(exam)}
+                                            className="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                                          >
+                                            Restart
+                                          </button>
+                                        )}
+
+                                        <button 
+                                          onClick={() => handleUpdateExam(exam)}
+                                          className="px-3 py-1 text-xs border border-indigo-300 text-indigo-600 rounded hover:bg-indigo-50"
+                                        >
+                                          Izmeni
+                                        </button>
+
+                                        <button 
+                                          onClick={() => handleDeleteExam(exam)}
+                                          className="px-3 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
+                                        >
+                                          Obrisi
+                                        </button>
+                                      </div>
+                                    </li>
+                                  );
+                                })}
                               </ul>
                             )}
                           </td>

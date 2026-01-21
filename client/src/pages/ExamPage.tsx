@@ -25,6 +25,7 @@ export default function ExamPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [violations, setViolations] = useState(0);
+  const [examStatus, setExamStatus] = useState<'wait_room' | 'waiting_start' | 'active' | 'paused' | 'completed'>('wait_room');
 
   // Anti-cheat refs
   const lastActivityRef = useRef<number>(Date.now());
@@ -39,16 +40,25 @@ export default function ExamPage() {
     //Ulazimo u sobu ispita
     socket.emit('join_exam', examId);
 
-    // Slusamo sinhronizaciju vremena (Redis Backend)
-    // Server salje remainingMilliseconds, mi pretvaramo u sekunde
+    socket.on('exam_state', (data: { status: string; remainingMilliseconds?: number }) => {
+      if (!data) return;
+      if (data.status === 'active' || data.status === 'paused' || data.status === 'completed') {
+        setExamStatus(data.status);
+      }
+      if (typeof data.remainingMilliseconds === 'number') {
+        const secondsLeft = Math.floor(data.remainingMilliseconds / 1000);
+        setTimeLeft(secondsLeft > 0 ? secondsLeft : 0);
+      }
+    });
+
     socket.on('timer_sync', (data: { remainingMilliseconds: number }) => {
-      console.log('Backend Time Sync:', data.remainingMilliseconds);
       const secondsLeft = Math.floor(data.remainingMilliseconds / 1000);
       setTimeLeft(secondsLeft > 0 ? secondsLeft : 0);
     });
 
     // Ciscenje pri izlasku
     return () => {
+      socket.off('exam_state');
       socket.off('timer_sync');
       disconnectSocket();
     };
@@ -74,7 +84,15 @@ export default function ExamPage() {
         if (!isMounted) return;
 
         setExamDetails(examResponse.data);
-        setTimeLeft(examResponse.data.durationMinutes * 60);
+        const status = examResponse.data.status || 'waiting_start';
+        setExamStatus(status);
+        if (typeof examResponse.data.remainingSeconds === 'number') {
+          setTimeLeft(examResponse.data.remainingSeconds);
+        } else if (status === 'active') {
+          setTimeLeft(examResponse.data.durationMinutes * 60);
+        } else {
+          setTimeLeft(0);
+        }
 
         setTasks(taskResponse.data);
         if (taskResponse.data.length > 0) {
@@ -103,6 +121,9 @@ export default function ExamPage() {
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
+        if (examStatus !== 'active') {
+          return prev;
+        }
         if (prev <= 0) {
           clearInterval(timer);
           // handleSubmit(); // Opciono: Automatska predaja kad istekne vreme
@@ -113,7 +134,7 @@ export default function ExamPage() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [examStatus]);
 
   // Anti-cheat: Tab switch detection
   useEffect(() => {
@@ -179,7 +200,7 @@ export default function ExamPage() {
   };
 
   const handleRunCode = async () => {
-    if (!currentTask || !examId) return;
+    if (!currentTask || !examId || examStatus !== 'active') return;
     setIsRunning(true);
     setOutput('Kompajliranje i pokretanje...\n');
 
@@ -222,7 +243,7 @@ Vreme izvrsavanja: 0.003s`;
   };
 
   const handleSaveCode = async () => {
-    if (!examId || !currentTask) return;
+    if (!examId || !currentTask || examStatus !== 'active') return;
     setIsSaving(true);
     try {
       await logsService.logExecution(
@@ -241,7 +262,12 @@ Vreme izvrsavanja: 0.003s`;
   };
 
   const handleSubmit = async () => {
-    if (examId && currentTask) {
+    if (!examId || !currentTask || examStatus !== 'active') {
+      alert('Ispit nije spreman za predaju.');
+      return;
+    }
+
+    if (examId && currentTask && examStatus === 'active') {
       await logsService.logExecution(
         examId,
         currentTask.id,
@@ -251,11 +277,10 @@ Vreme izvrsavanja: 0.003s`;
       );
       alert('Ispit je uspesno predat!');
     }
-    else {
-      alert('Ispit nije uspesno predat! Greska je do: ' + (!examId ? 'nedostaje ID ispita. ' : '') + " ili " + (!currentTask ? 'nedostaje trenutni zadatak.' : ''));
-    }
     navigate('/student');
   };
+
+  const isExamLocked = examStatus !== 'active';
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
@@ -280,9 +305,18 @@ Vreme izvrsavanja: 0.003s`;
                 <span>{violations} upozorenja</span>
               </div>
             )}
-            {/* Timer */}
-            <div className={`text-lg font-mono ${timeLeft < 300 ? 'text-red-400' : 'text-green-400'}`}>
-              {formatTime(timeLeft)}
+            <div className="flex items-center space-x-3">
+              <span className="text-xs uppercase tracking-wide text-gray-400">
+                {examStatus === 'active' && 'Aktivan'}
+                {examStatus === 'paused' && 'Pauziran'}
+                {examStatus === 'wait_room' && 'Ceka termin'}
+                {examStatus === 'waiting_start' && 'Ceka start'}
+                {examStatus === 'completed' && 'Zavrsen'}
+              </span>
+              {/* Timer */}
+              <div className={`text-lg font-mono ${timeLeft < 300 ? 'text-red-400' : 'text-green-400'}`}>
+                {formatTime(timeLeft)}
+              </div>
             </div>
             {/* User info */}
             <span className="text-gray-400">
@@ -291,6 +325,7 @@ Vreme izvrsavanja: 0.003s`;
             {/* Submit button */}
             <button
               onClick={handleSubmit}
+              disabled={isExamLocked}
               className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors"
             >
               Predaj ispit
@@ -303,6 +338,14 @@ Vreme izvrsavanja: 0.003s`;
       <div className="flex-1 flex">
         {/* Left panel - Task description */}
         <div className="w-1/3 bg-gray-800 border-r border-gray-700 p-4 overflow-y-auto">
+          {isExamLocked && (
+            <div className="mb-4 rounded border border-yellow-600/40 bg-yellow-900/20 px-3 py-2 text-sm text-yellow-200">
+              {examStatus === 'wait_room' && 'Ispit jos nije usao u termin.'}
+              {examStatus === 'waiting_start' && 'Ispit jos nije pokrenut od strane profesora.'}
+              {examStatus === 'paused' && 'Ispit je trenutno pauziran.'}
+              {examStatus === 'completed' && 'Ispit je zavrsen.'}
+            </div>
+          )}
           <h2 className="text-lg font-semibold mb-4 text-indigo-400">Zadatak</h2>
           <div className="prose prose-invert">
             {isLoadingTask && (
@@ -355,7 +398,7 @@ Izlaz: [11, 12, 22, 25, 34, 64, 90]`}
               value={code}
               onChange={(value) => setCode(value || '')}
               options={{
-                readOnly: isLoadingTask || !!taskError,
+                readOnly: isLoadingTask || !!taskError || isExamLocked,
                 fontSize: 14,
                 minimap: { enabled: false },
                 scrollBeyondLastLine: false,
@@ -373,9 +416,9 @@ Izlaz: [11, 12, 22, 25, 34, 64, 90]`}
               <div className="flex items-center space-x-2">
                 <button
                   onClick={handleSaveCode}
-                  disabled={isSaving || !currentTask}
+                  disabled={isSaving || !currentTask || isExamLocked}
                   className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
-                    isSaving || !currentTask
+                    isSaving || !currentTask || isExamLocked
                       ? 'bg-gray-600 cursor-not-allowed'
                       : 'bg-blue-600 hover:bg-blue-700'
                   }`}
@@ -384,9 +427,9 @@ Izlaz: [11, 12, 22, 25, 34, 64, 90]`}
                 </button>
                 <button
                   onClick={handleRunCode}
-                  disabled={isRunning || !currentTask}
+                  disabled={isRunning || !currentTask || isExamLocked}
                   className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
-                    isRunning || !currentTask
+                    isRunning || !currentTask || isExamLocked
                       ? 'bg-gray-600 cursor-not-allowed'
                       : 'bg-green-600 hover:bg-green-700'
                   }`}

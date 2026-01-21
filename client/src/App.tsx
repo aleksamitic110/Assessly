@@ -5,6 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 // Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
+import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
 import ProfessorDashboard from './pages/ProfessorDashboard';
 import StudentDashboard from './pages/StudentDashboard';
@@ -18,6 +19,7 @@ function App() {
           {/* Public routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/verify" element={<VerifyEmail />} />
 
           {/* Protected routes */}
           <Route

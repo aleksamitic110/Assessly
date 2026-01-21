@@ -25,7 +25,6 @@ export interface RegisterRequest {
   password: string;
   firstName: string;
   lastName: string;
-  role: UserRole;
 }
 
 // Exam related types
@@ -42,6 +41,10 @@ export interface Exam {
   durationMinutes: number;
   subjectId?: string;
   subjectName?: string;
+  status?: 'wait_room' | 'waiting_start' | 'active' | 'paused' | 'completed';
+  actualStartTime?: number;
+  endTime?: number;
+  remainingSeconds?: number;
 }
 
 export interface Task {
