@@ -2,6 +2,8 @@ import { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { neo4jDriver } from '../driver.js';
 import { redisClient } from '../../redis/client.js';
+import fs from 'fs/promises';
+import path from 'path';
 
 const STATE_TTL_SECONDS = 60 * 60 * 24;
 
@@ -245,30 +247,169 @@ export const deleteExam = async (req: any, res: Response) => {
 };
 
 export const createTask = async (req: any, res: Response) => {
-  const { examId, title, description, starterCode, testCases } = req.body;
+  const { examId, title, description, starterCode, testCases, exampleInput, exampleOutput, notes } = req.body;
+  const professorId = req.user.id;
+  const pdfFile = req.file as Express.Multer.File | undefined;
+  const pdfPath = pdfFile ? `/uploads/tasks/${pdfFile.filename}` : null;
   const session = neo4jDriver.session();
 
   try {
     const id = uuidv4();
     const result = await session.run(
       `
-      MATCH (e:Exam {id: $examId})
+      MATCH (p:User {id: $professorId})-[:PREDAJE]->(:Subject)-[:SADRZI]->(e:Exam {id: $examId})
       CREATE (t:Task {
         id: $id,
         title: $title,
         description: $description,
         starterCode: $starterCode,
-        testCases: $testCases
+        testCases: $testCases,
+        pdfPath: $pdfPath,
+        exampleInput: $exampleInput,
+        exampleOutput: $exampleOutput,
+        notes: $notes
       })
       CREATE (e)-[:IMA_ZADATAK]->(t)
       RETURN t
       `,
-      { examId, id, title, description, starterCode, testCases: JSON.stringify(testCases) }
+      {
+        professorId,
+        examId,
+        id,
+        title,
+        description,
+        starterCode,
+        testCases: typeof testCases === 'string' ? testCases : JSON.stringify(testCases || []),
+        pdfPath,
+        exampleInput: exampleInput || null,
+        exampleOutput: exampleOutput || null,
+        notes: notes || null
+      }
     );
 
-    res.status(201).json(result.records[0].get('t').properties);
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: 'Exam not found' });
+    }
+
+    const task = result.records[0].get('t').properties;
+    const serverBaseUrl = process.env.SERVER_BASE_URL || 'http://localhost:3000';
+    res.status(201).json({
+      ...task,
+      pdfUrl: task.pdfPath ? `${serverBaseUrl}${task.pdfPath}` : null
+    });
   } catch (error) {
     res.status(500).json({ error: 'Error while creating task' });
+  } finally {
+    await session.close();
+  }
+};
+
+export const updateTask = async (req: any, res: Response) => {
+  const { taskId } = req.params;
+  const { title, description, starterCode, testCases, exampleInput, exampleOutput, notes } = req.body;
+  const professorId = req.user.id;
+  const pdfFile = req.file as Express.Multer.File | undefined;
+  const session = neo4jDriver.session();
+
+  try {
+    const existing = await session.run(
+      `
+      MATCH (p:User {id: $professorId})-[:PREDAJE]->(:Subject)-[:SADRZI]->(:Exam)-[:IMA_ZADATAK]->(t:Task {id: $taskId})
+      RETURN t
+      `,
+      { professorId, taskId }
+    );
+
+    if (existing.records.length === 0) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    const current = existing.records[0].get('t').properties;
+    let pdfPath = current.pdfPath || null;
+
+    if (pdfFile) {
+      if (pdfPath) {
+        const absolute = path.join(process.cwd(), pdfPath.replace(/^\//, ''));
+        await fs.unlink(absolute).catch(() => {});
+      }
+      pdfPath = `/uploads/tasks/${pdfFile.filename}`;
+    }
+
+    const result = await session.run(
+      `
+      MATCH (p:User {id: $professorId})-[:PREDAJE]->(:Subject)-[:SADRZI]->(:Exam)-[:IMA_ZADATAK]->(t:Task {id: $taskId})
+      SET t.title = COALESCE($title, t.title),
+          t.description = COALESCE($description, t.description),
+          t.starterCode = COALESCE($starterCode, t.starterCode),
+          t.testCases = COALESCE($testCases, t.testCases),
+          t.pdfPath = COALESCE($pdfPath, t.pdfPath),
+          t.exampleInput = COALESCE($exampleInput, t.exampleInput),
+          t.exampleOutput = COALESCE($exampleOutput, t.exampleOutput),
+          t.notes = COALESCE($notes, t.notes)
+      RETURN t
+      `,
+      {
+        professorId,
+        taskId,
+        title,
+        description,
+        starterCode,
+        testCases: typeof testCases === 'string' ? testCases : testCases ? JSON.stringify(testCases) : null,
+        pdfPath,
+        exampleInput: exampleInput || null,
+        exampleOutput: exampleOutput || null,
+        notes: notes || null
+      }
+    );
+
+    const task = result.records[0].get('t').properties;
+    const serverBaseUrl = process.env.SERVER_BASE_URL || 'http://localhost:3000';
+    res.json({
+      ...task,
+      pdfUrl: task.pdfPath ? `${serverBaseUrl}${task.pdfPath}` : null
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Error while updating task' });
+  } finally {
+    await session.close();
+  }
+};
+
+export const deleteTask = async (req: any, res: Response) => {
+  const { taskId } = req.params;
+  const professorId = req.user.id;
+  const session = neo4jDriver.session();
+
+  try {
+    const result = await session.run(
+      `
+      MATCH (p:User {id: $professorId})-[:PREDAJE]->(:Subject)-[:SADRZI]->(:Exam)-[:IMA_ZADATAK]->(t:Task {id: $taskId})
+      RETURN t
+      `,
+      { professorId, taskId }
+    );
+
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    const task = result.records[0].get('t').properties;
+    if (task.pdfPath) {
+      const absolute = path.join(process.cwd(), String(task.pdfPath).replace(/^\//, ''));
+      await fs.unlink(absolute).catch(() => {});
+    }
+
+    await session.run(
+      `
+      MATCH (p:User {id: $professorId})-[:PREDAJE]->(:Subject)-[:SADRZI]->(:Exam)-[:IMA_ZADATAK]->(t:Task {id: $taskId})
+      DETACH DELETE t
+      `,
+      { professorId, taskId }
+    );
+
+    res.json({ message: 'Task deleted' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error while deleting task' });
   } finally {
     await session.close();
   }
@@ -419,12 +560,17 @@ export const getExamTasks = async (req: any, res: Response) => {
 
     const tasks = result.records.map(record => {
       const task = record.get('t').properties;
+      const serverBaseUrl = process.env.SERVER_BASE_URL || 'http://localhost:3000';
       return {
         id: task.id,
         title: task.title,
         description: task.description,
         starterCode: task.starterCode,
-        testCases: task.testCases
+        testCases: task.testCases,
+        pdfUrl: task.pdfPath ? `${serverBaseUrl}${task.pdfPath}` : null,
+        exampleInput: task.exampleInput || null,
+        exampleOutput: task.exampleOutput || null,
+        notes: task.notes || null
       };
     });
 

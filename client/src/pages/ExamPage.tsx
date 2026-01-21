@@ -26,9 +26,70 @@ export default function ExamPage() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [violations, setViolations] = useState(0);
   const [examStatus, setExamStatus] = useState<'wait_room' | 'waiting_start' | 'active' | 'paused' | 'completed'>('wait_room');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showTaskList, setShowTaskList] = useState(true);
+  const [showTaskDetails, setShowTaskDetails] = useState(true);
+  const [showPdf, setShowPdf] = useState(true);
+  const [showEditor, setShowEditor] = useState(true);
+  const [showOutput, setShowOutput] = useState(true);
+  const [leftWidth, setLeftWidth] = useState(33);
+  const [outputHeight, setOutputHeight] = useState(220);
 
   // Anti-cheat refs
   const lastActivityRef = useRef<number>(Date.now());
+  const dragModeRef = useRef<'vertical' | 'horizontal' | null>(null);
+  const rightPanelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      if (!dragModeRef.current) return;
+
+      if (dragModeRef.current === 'vertical') {
+        const next = (event.clientX / window.innerWidth) * 100;
+        const clamped = Math.min(60, Math.max(20, next));
+        setLeftWidth(clamped);
+        return;
+      }
+
+      if (dragModeRef.current === 'horizontal' && rightPanelRef.current) {
+        const rect = rightPanelRef.current.getBoundingClientRect();
+        const nextHeight = rect.bottom - event.clientY;
+        const minHeight = 120;
+        const maxHeight = Math.max(minHeight, rect.height - 180);
+        setOutputHeight(Math.min(maxHeight, Math.max(minHeight, nextHeight)));
+      }
+    };
+
+    const handleMouseUp = () => {
+      dragModeRef.current = null;
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  const requestFullscreen = async () => {
+    if (document.fullscreenElement) return;
+    try {
+      await document.documentElement.requestFullscreen();
+    } catch {
+      // Ignore if browser blocks non-user-initiated fullscreen
+    }
+  };
 
   //SOCKET: Glavna logika za povezivanje i tajmer
   useEffect(() => {
@@ -63,6 +124,13 @@ export default function ExamPage() {
       disconnectSocket();
     };
   }, [examId]);
+
+  useEffect(() => {
+    if (examStatus === 'active') {
+      window.focus();
+      requestFullscreen();
+    }
+  }, [examStatus]);
 
   useEffect(() => {
     let isMounted = true;
@@ -242,6 +310,11 @@ Vreme izvrsavanja: 0.003s`;
     }, 2000);
   };
 
+  const handleSelectTask = (task: TaskType) => {
+    setCurrentTask(task);
+    setCode(task.starterCode || '');
+  };
+
   const handleSaveCode = async () => {
     if (!examId || !currentTask || examStatus !== 'active') return;
     setIsSaving(true);
@@ -322,6 +395,13 @@ Vreme izvrsavanja: 0.003s`;
             <span className="text-gray-400">
               {user?.firstName} {user?.lastName}
             </span>
+            <button
+              type="button"
+              onClick={requestFullscreen}
+              className="px-3 py-2 text-xs border border-gray-600 text-gray-300 rounded hover:bg-gray-700"
+            >
+              {isFullscreen ? 'Fullscreen ukljucen' : 'Fullscreen'}
+            </button>
             {/* Submit button */}
             <button
               onClick={handleSubmit}
@@ -337,7 +417,10 @@ Vreme izvrsavanja: 0.003s`;
       {/* Main content */}
       <div className="flex-1 flex">
         {/* Left panel - Task description */}
-        <div className="w-1/3 bg-gray-800 border-r border-gray-700 p-4 overflow-y-auto">
+        <div
+          className="bg-gray-800 border-r border-gray-700 p-4 overflow-y-auto"
+          style={{ width: `${leftWidth}%`, minWidth: '16rem', maxWidth: '70vw' }}
+        >
           {isExamLocked && (
             <div className="mb-4 rounded border border-yellow-600/40 bg-yellow-900/20 px-3 py-2 text-sm text-yellow-200">
               {examStatus === 'wait_room' && 'Ispit jos nije usao u termin.'}
@@ -346,8 +429,61 @@ Vreme izvrsavanja: 0.003s`;
               {examStatus === 'completed' && 'Ispit je zavrsen.'}
             </div>
           )}
-          <h2 className="text-lg font-semibold mb-4 text-indigo-400">Zadatak</h2>
-          <div className="prose prose-invert">
+          <div className="mb-4 rounded border border-gray-700 bg-gray-900 px-3 py-2 text-xs text-gray-300">
+            <div className="mb-2 text-gray-400 uppercase tracking-wide">Prikaz</div>
+            <div className="flex flex-wrap gap-3">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={showTaskList} onChange={() => setShowTaskList((prev) => !prev)} />
+                Zadaci
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={showTaskDetails} onChange={() => setShowTaskDetails((prev) => !prev)} />
+                Opis
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={showPdf} onChange={() => setShowPdf((prev) => !prev)} />
+                PDF
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={showEditor} onChange={() => setShowEditor((prev) => !prev)} />
+                Editor
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={showOutput} onChange={() => setShowOutput((prev) => !prev)} />
+                Output
+              </label>
+            </div>
+          </div>
+          {showTaskList && tasks.length > 1 && (
+            <div
+              className="mb-4"
+              style={{ resize: 'vertical', overflow: 'auto', minHeight: '6rem', maxHeight: '40vh' }}
+            >
+              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                Zadaci
+              </h2>
+              <div className="space-y-2">
+                {tasks.map((task) => (
+                  <button
+                    key={task.id}
+                    type="button"
+                    onClick={() => handleSelectTask(task)}
+                    className={`w-full text-left px-3 py-2 rounded border text-sm ${
+                      currentTask?.id === task.id
+                        ? 'border-indigo-500 bg-indigo-500/10 text-indigo-200'
+                        : 'border-gray-700 bg-gray-900 text-gray-300 hover:border-gray-600'
+                    }`}
+                  >
+                    {task.title}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {showTaskDetails && (
+            <>
+              <h2 className="text-lg font-semibold mb-4 text-indigo-400">Zadatak</h2>
+              <div className="prose prose-invert" style={{ resize: 'vertical', overflow: 'auto', minHeight: '10rem', maxHeight: '60vh' }}>
             {isLoadingTask && (
               <div className="text-gray-400">Ucitavanje zadatka...</div>
             )}
@@ -358,6 +494,21 @@ Vreme izvrsavanja: 0.003s`;
               <>
                 <h3 className="text-white text-xl mb-2">{currentTask.title}</h3>
                 <p className="text-gray-300 leading-relaxed">{currentTask.description}</p>
+                {showPdf && currentTask.pdfUrl && (
+                  <div
+                    className="mt-4 border border-gray-700 rounded-lg overflow-hidden bg-gray-900"
+                    style={{ resize: 'vertical', overflow: 'auto', minHeight: '12rem', maxHeight: '60vh' }}
+                  >
+                    <div className="px-3 py-2 text-xs text-gray-400 border-b border-gray-700">
+                      PDF zadatka
+                    </div>
+                    <iframe
+                      src={currentTask.pdfUrl}
+                      title="PDF zadatka"
+                      className="w-full h-72"
+                    />
+                  </div>
+                )}
               </>
             )}
             {!isLoadingTask && !taskError && !currentTask && (
@@ -366,82 +517,110 @@ Vreme izvrsavanja: 0.003s`;
 
             {currentTask && (
               <>
-                <div className="mt-6 p-4 bg-gray-700 rounded-lg">
-                  <h4 className="text-yellow-400 font-medium mb-2">Primer ulaza/izlaza:</h4>
-                  <pre className="text-sm text-gray-300 bg-gray-900 p-3 rounded">
-{`Ulaz: [64, 34, 25, 12, 22, 11, 90]
-Izlaz: [11, 12, 22, 25, 34, 64, 90]`}
-                  </pre>
-                </div>
+                {(currentTask.exampleInput || currentTask.exampleOutput) && (
+                    <div className="mt-6 p-4 bg-gray-700 rounded-lg">
+                      <h4 className="text-yellow-400 font-medium mb-2">Primer ulaza/izlaza:</h4>
+                      <pre className="text-sm text-gray-300 bg-gray-900 p-3 rounded whitespace-pre-wrap">
+{`${currentTask.exampleInput ? `Ulaz: ${currentTask.exampleInput}` : ''}${currentTask.exampleInput && currentTask.exampleOutput ? '\n' : ''}${currentTask.exampleOutput ? `Izlaz: ${currentTask.exampleOutput}` : ''}`}
+                      </pre>
+                    </div>
+                )}
 
-                <div className="mt-6 p-4 bg-blue-900/30 border border-blue-700 rounded-lg">
-                  <h4 className="text-blue-400 font-medium mb-2">Napomena:</h4>
-                  <ul className="text-gray-300 text-sm list-disc list-inside space-y-1">
-                    <li>Mozete koristiti bilo koji algoritam sortiranja</li>
-                    <li>Funkcija treba da menja originalni niz (in-place)</li>
-                    <li>Ne koristite ugradjene funkcije za sortiranje</li>
-                  </ul>
-                </div>
+                {currentTask.notes && (
+                  <div className="mt-6 p-4 bg-blue-900/30 border border-blue-700 rounded-lg">
+                    <h4 className="text-blue-400 font-medium mb-2">Napomena:</h4>
+                    <p className="text-gray-300 text-sm whitespace-pre-wrap">{currentTask.notes}</p>
+                  </div>
+                )}
               </>
             )}
-          </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Right panel - Editor and Output */}
-        <div className="flex-1 flex flex-col">
+        <div
+          className="w-1 bg-gray-700 cursor-col-resize hover:bg-gray-500"
+          onMouseDown={() => {
+            dragModeRef.current = 'vertical';
+          }}
+        />
+        <div className="flex-1 flex flex-col" ref={rightPanelRef}>
           {/* Monaco Editor */}
-          <div className="flex-1 border-b border-gray-700">
-            <Editor
-              height="100%"
-              defaultLanguage="cpp"
-              theme="vs-dark"
-              value={code}
-              onChange={(value) => setCode(value || '')}
-              options={{
-                readOnly: isLoadingTask || !!taskError || isExamLocked,
-                fontSize: 14,
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                automaticLayout: true,
-                tabSize: 4,
-                wordWrap: 'on',
+          {showEditor && (
+            <div className="flex-1 border-b border-gray-700" style={{ overflow: 'auto', minHeight: '16rem' }}>
+              <Editor
+                height="100%"
+                defaultLanguage="cpp"
+                theme="vs-dark"
+                value={code}
+                onChange={(value) => setCode(value || '')}
+                options={{
+                  readOnly: isLoadingTask || !!taskError || isExamLocked,
+                  fontSize: 14,
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  automaticLayout: true,
+                  tabSize: 4,
+                  wordWrap: 'on',
+                }}
+              />
+            </div>
+          )}
+
+          {showEditor && showOutput && (
+            <div
+              className="h-2 bg-gray-800 cursor-row-resize hover:bg-gray-700"
+              onMouseDown={() => {
+                dragModeRef.current = 'horizontal';
               }}
             />
-          </div>
+          )}
 
           {/* Output panel */}
-          <div className="h-48 bg-gray-900 border-t border-gray-700">
-            <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
-              <span className="text-sm font-medium text-gray-400">Output</span>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={handleSaveCode}
-                  disabled={isSaving || !currentTask || isExamLocked}
-                  className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
-                    isSaving || !currentTask || isExamLocked
-                      ? 'bg-gray-600 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700'
-                  }`}
-                >
-                  {isSaving ? 'Cuvanje...' : 'Sacuvaj'}
-                </button>
-                <button
-                  onClick={handleRunCode}
-                  disabled={isRunning || !currentTask || isExamLocked}
-                  className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
-                    isRunning || !currentTask || isExamLocked
-                      ? 'bg-gray-600 cursor-not-allowed'
-                      : 'bg-green-600 hover:bg-green-700'
-                  }`}
-                >
-                  {isRunning ? 'Izvrsavanje...' : 'Pokreni kod (F5)'}
-                </button>
+          {showOutput && (
+            <div
+              className="bg-gray-900 border-t border-gray-700"
+              style={{ height: `${outputHeight}px`, minHeight: '8rem' }}
+            >
+              <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
+                <span className="text-sm font-medium text-gray-400">Output</span>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={handleSaveCode}
+                    disabled={isSaving || !currentTask || isExamLocked}
+                    className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
+                      isSaving || !currentTask || isExamLocked
+                        ? 'bg-gray-600 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-700'
+                    }`}
+                  >
+                    {isSaving ? 'Cuvanje...' : 'Sacuvaj'}
+                  </button>
+                  <button
+                    onClick={handleRunCode}
+                    disabled={isRunning || !currentTask || isExamLocked}
+                    className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
+                      isRunning || !currentTask || isExamLocked
+                        ? 'bg-gray-600 cursor-not-allowed'
+                        : 'bg-green-600 hover:bg-green-700'
+                    }`}
+                  >
+                    {isRunning ? 'Izvrsavanje...' : 'Pokreni kod (F5)'}
+                  </button>
+                </div>
               </div>
+              <pre className="p-4 text-sm text-gray-300 font-mono overflow-auto h-full">
+                {output || 'Kliknite "Pokreni kod" da vidite rezultat...'}
+              </pre>
             </div>
-            <pre className="p-4 text-sm text-gray-300 font-mono overflow-auto h-full">
-              {output || 'Kliknite "Pokreni kod" da vidite rezultat...'}
-            </pre>
-          </div>
+          )}
+          {!showEditor && !showOutput && (
+            <div className="flex-1 flex items-center justify-center text-sm text-gray-500">
+              Editor i output su sakriveni u prikazu.
+            </div>
+          )}
         </div>
       </div>
     </div>

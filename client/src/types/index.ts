@@ -53,6 +53,10 @@ export interface Task {
   description: string;
   starterCode: string;
   testCases: string; // JSON string
+  pdfUrl?: string | null;
+  exampleInput?: string | null;
+  exampleOutput?: string | null;
+  notes?: string | null;
 }
 
 // Cassandra log types

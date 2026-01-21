@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { socket, connectSocket, disconnectSocket } from '../services/socket';
-import type { Exam as ExamType } from '../types';
+import type { Exam as ExamType, Task as TaskType } from '../types';
 
 interface Subject {
   id: string;
@@ -54,6 +54,21 @@ export default function ProfessorDashboard() {
   //SOCKET STATES
   const [liveAlerts, setLiveAlerts] = useState<Alert[]>([]);
   const [monitoredExams, setMonitoredExams] = useState<Set<string>>(new Set());
+  const [taskExamId, setTaskExamId] = useState<string | null>(null);
+  const [tasksByExam, setTasksByExam] = useState<Record<string, TaskType[]>>({});
+  const [isLoadingTasks, setIsLoadingTasks] = useState(false);
+  const [taskError, setTaskError] = useState('');
+  const [editingTask, setEditingTask] = useState<TaskType | null>(null);
+  const [taskForm, setTaskForm] = useState({
+    title: '',
+    description: '',
+    starterCode: '',
+    testCases: '[]',
+    exampleInput: '',
+    exampleOutput: '',
+    notes: '',
+    pdfFile: null as File | null,
+  });
 
   const updateExamStatus = (examId: string, status: ExamType['status']) => {
     setSubjects((prev) =>
@@ -157,6 +172,134 @@ export default function ProfessorDashboard() {
     socket.emit('restart_exam', { examId: exam.id, durationMinutes: exam.durationMinutes });
     updateExamStatus(exam.id, 'active');
     setMessage(`Ispit "${exam.name}" je restartovan.`);
+  };
+
+  const resetTaskForm = () => {
+    setTaskForm({
+      title: '',
+      description: '',
+      starterCode: '',
+      testCases: '[]',
+      exampleInput: '',
+      exampleOutput: '',
+      notes: '',
+      pdfFile: null,
+    });
+    setEditingTask(null);
+  };
+
+  const loadTasks = async (examId: string) => {
+    setIsLoadingTasks(true);
+    setTaskError('');
+    try {
+      const response = await api.get<TaskType[]>(`/exams/${examId}/tasks`);
+      setTasksByExam((prev) => ({ ...prev, [examId]: response.data }));
+    } catch (err: any) {
+      setTaskError(err.response?.data?.error || 'Greska prilikom ucitavanja zadataka');
+    } finally {
+      setIsLoadingTasks(false);
+    }
+  };
+
+  const toggleTaskPanel = async (examId: string) => {
+    if (taskExamId === examId) {
+      setTaskExamId(null);
+      resetTaskForm();
+      return;
+    }
+    setTaskExamId(examId);
+    await loadTasks(examId);
+  };
+
+  const handleTaskInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setTaskForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleTaskFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setTaskForm((prev) => ({ ...prev, pdfFile: file }));
+  };
+
+  const handleEditTask = (task: TaskType) => {
+    setEditingTask(task);
+    setTaskForm({
+      title: task.title || '',
+      description: task.description || '',
+      starterCode: task.starterCode || '',
+      testCases: task.testCases || '[]',
+      exampleInput: task.exampleInput || '',
+      exampleOutput: task.exampleOutput || '',
+      notes: task.notes || '',
+      pdfFile: null,
+    });
+  };
+
+  const handleSubmitTask = async (e: React.FormEvent, examId: string) => {
+    e.preventDefault();
+    setTaskError('');
+    try {
+      JSON.parse(taskForm.testCases || '[]');
+    } catch {
+      setTaskError('Test cases moraju biti validan JSON.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('title', taskForm.title);
+    formData.append('description', taskForm.description);
+    formData.append('starterCode', taskForm.starterCode);
+    formData.append('testCases', taskForm.testCases);
+    formData.append('exampleInput', taskForm.exampleInput);
+    formData.append('exampleOutput', taskForm.exampleOutput);
+    formData.append('notes', taskForm.notes);
+    if (taskForm.pdfFile) {
+      formData.append('pdf', taskForm.pdfFile);
+    }
+
+    try {
+      if (editingTask) {
+        const response = await api.put(`/exams/tasks/${editingTask.id}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        setTasksByExam((prev) => ({
+          ...prev,
+          [examId]: (prev[examId] || []).map((task) =>
+            task.id === editingTask.id ? response.data : task
+          ),
+        }));
+        setMessage(`Zadatak "${response.data.title}" je izmenjen.`);
+      } else {
+        formData.append('examId', examId);
+        const response = await api.post('/exams/tasks', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        setTasksByExam((prev) => ({
+          ...prev,
+          [examId]: [...(prev[examId] || []), response.data],
+        }));
+        setMessage(`Zadatak "${response.data.title}" je dodat.`);
+      }
+      resetTaskForm();
+    } catch (err: any) {
+      setTaskError(err.response?.data?.error || 'Greska prilikom cuvanja zadatka');
+    }
+  };
+
+  const handleDeleteTask = async (examId: string, task: TaskType) => {
+    if (!confirm(`Da li ste sigurni da zelite da obrisete zadatak "${task.title}"?`)) return;
+    try {
+      await api.delete(`/exams/tasks/${task.id}`);
+      setTasksByExam((prev) => ({
+        ...prev,
+        [examId]: (prev[examId] || []).filter((item) => item.id !== task.id),
+      }));
+      setMessage(`Zadatak "${task.title}" je obrisan.`);
+    } catch (err: any) {
+      setTaskError(err.response?.data?.error || 'Greska prilikom brisanja zadatka');
+    }
   };
 
   const handleUpdateSubject = async (subject: SubjectWithExams) => {
@@ -639,7 +782,7 @@ export default function ProfessorDashboard() {
                       </tr>
                       {expandedSubjectId === subject.id && (
                         <tr>
-                          <td colSpan={3} className="px-6 py-4 bg-gray-50 dark:bg-gray-900/30">
+                          <td colSpan={4} className="px-6 py-4 bg-gray-50 dark:bg-gray-900/30">
                             <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                               Subject ID: <span className="text-gray-800 dark:text-gray-200">{subject.id}</span>
                             </div>
@@ -653,11 +796,11 @@ export default function ProfessorDashboard() {
                                   const status = exam.status || 'waiting_start';
 
                                   return (
-                                    <li
-                                      key={exam.id}
-                                      className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 p-3 rounded shadow-sm"
-                                    >
-                                      <div className="flex flex-col">
+                                    <Fragment key={exam.id}>
+                                      <li
+                                        className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 p-3 rounded shadow-sm"
+                                      >
+                                        <div className="flex flex-col">
                                         <div className="flex items-center gap-2">
                                           <span className="font-semibold">{exam.name}</span>
                                           <span className={`text-xs px-2 py-0.5 rounded-full ${
@@ -761,8 +904,169 @@ export default function ProfessorDashboard() {
                                         >
                                           Obrisi
                                         </button>
+
+
+                                        <button
+                                          onClick={() => toggleTaskPanel(exam.id)}
+                                          className="px-3 py-1 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-50"
+                                        >
+                                          Zadaci
+                                        </button>
                                       </div>
                                     </li>
+                                    {taskExamId === exam.id && (
+                                      <li className="bg-gray-50 dark:bg-gray-900/40 rounded p-3 border border-gray-200 dark:border-gray-700">
+                                        <div className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">
+                                          {editingTask ? 'Izmena zadatka' : 'Novi zadatak'}
+                                        </div>
+
+                                        {taskError && (
+                                          <div className="mb-3 text-xs text-red-600 dark:text-red-400">
+                                            {taskError}
+                                          </div>
+                                        )}
+
+                                        <form
+                                          className="grid grid-cols-1 gap-3"
+                                          onSubmit={(e) => handleSubmitTask(e, exam.id)}
+                                        >
+                                          <input
+                                            name="title"
+                                            value={taskForm.title}
+                                            onChange={handleTaskInputChange}
+                                            placeholder="Naziv zadatka"
+                                            required
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                          />
+                                          <textarea
+                                            name="description"
+                                            value={taskForm.description}
+                                            onChange={handleTaskInputChange}
+                                            placeholder="Opis zadatka"
+                                            rows={3}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                          />
+
+                                          <textarea
+                                            name="exampleInput"
+                                            value={taskForm.exampleInput}
+                                            onChange={handleTaskInputChange}
+                                            placeholder="Primer ulaza"
+                                            rows={2}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white font-mono"
+                                          />
+                                          <textarea
+                                            name="exampleOutput"
+                                            value={taskForm.exampleOutput}
+                                            onChange={handleTaskInputChange}
+                                            placeholder="Primer izlaza"
+                                            rows={2}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white font-mono"
+                                          />
+                                          <textarea
+                                            name="notes"
+                                            value={taskForm.notes}
+                                            onChange={handleTaskInputChange}
+                                            placeholder="Napomene"
+                                            rows={2}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                          />
+                                          <textarea
+                                            name="starterCode"
+                                            value={taskForm.starterCode}
+                                            onChange={handleTaskInputChange}
+                                            placeholder="Starter kod"
+                                            rows={3}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white font-mono"
+                                          />
+                                          <textarea
+                                            name="testCases"
+                                            value={taskForm.testCases}
+                                            onChange={handleTaskInputChange}
+                                            placeholder='Test cases JSON (npr. [{"input":"1","output":"2"}])'
+                                            rows={3}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white font-mono"
+                                          />
+                                          <input
+                                            type="file"
+                                            accept="application/pdf"
+                                            onChange={handleTaskFileChange}
+                                            className="text-sm text-gray-600 dark:text-gray-300"
+                                          />
+                                          <div className="flex gap-2">
+                                            <button
+                                              type="submit"
+                                              className="px-3 py-2 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                                            >
+                                              {editingTask ? 'Sacuvaj izmene' : 'Dodaj zadatak'}
+                                            </button>
+                                            {editingTask && (
+                                              <button
+                                                type="button"
+                                                onClick={resetTaskForm}
+                                                className="px-3 py-2 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-100"
+                                              >
+                                                Otkazi
+                                              </button>
+                                            )}
+                                          </div>
+                                        </form>
+
+                                        <div className="mt-4">
+                                          <div className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                                            Postojeci zadaci
+                                          </div>
+                                          {isLoadingTasks ? (
+                                            <div className="text-xs text-gray-500">Ucitavanje...</div>
+                                          ) : (
+                                            <div className="space-y-2">
+                                              {(tasksByExam[exam.id] || []).length === 0 && (
+                                                <div className="text-xs text-gray-500">Nema zadataka.</div>
+                                              )}
+                                              {(tasksByExam[exam.id] || []).map((task) => (
+                                                <div
+                                                  key={task.id}
+                                                  className="flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-xs"
+                                                >
+                                                  <div className="flex flex-col">
+                                                    <span className="font-semibold text-gray-700 dark:text-gray-200">
+                                                      {task.title}
+                                                    </span>
+                                                    {task.pdfUrl && (
+                                                      <a
+                                                        href={task.pdfUrl}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="text-indigo-600 hover:text-indigo-500"
+                                                      >
+                                                        PDF zadatka
+                                                      </a>
+                                                    )}
+                                                  </div>
+                                                  <div className="flex gap-2">
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => handleEditTask(task)}
+                                                      className="px-2 py-1 text-xs border border-indigo-300 text-indigo-600 rounded hover:bg-indigo-50"
+                                                    >
+                                                      Izmeni
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => handleDeleteTask(exam.id, task)}
+                                                      className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
+                                                    >
+                                                      Obrisi
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </li>
+                                    )}
+                                    </Fragment>
                                   );
                                 })}
                               </ul>

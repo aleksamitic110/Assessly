@@ -9,6 +9,7 @@ import express from 'express';
 import http from 'http';
 import cors from 'cors';
 import { Server } from 'socket.io';
+import path from 'path';
 
 import authRoutes from './databases/neo4j/routes/authRoutes.js';
 import examRoutes from './databases/neo4j/routes/examRoutes.js';
@@ -28,6 +29,7 @@ const server = http.createServer(app);
 
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 const io = new Server(server, {
   cors: {
