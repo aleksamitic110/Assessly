@@ -58,6 +58,14 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/exam/:examId/review"
+            element={
+              <ProtectedRoute allowedRoles={['STUDENT']}>
+                <ExamPage />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Default redirect */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

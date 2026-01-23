@@ -3,11 +3,17 @@ import {
   createSubject,
   updateSubject,
   deleteSubject,
+  enrollSubject,
+  unenrollSubject,
+  getStudentSubjects,
   getAvailableExams,
   getProfessorSubjects,
   getExamTasks,
   getExamById,
   withdrawExam,
+  saveSubmission,
+  getMySubmissions,
+  getStudentSubmissions,
   createExam,
   updateExam,
   deleteExam,
@@ -23,6 +29,9 @@ const router = Router();
 router.post('/subjects', authenticateJWT, createSubject);
 router.put('/subjects/:subjectId', authenticateJWT, updateSubject);
 router.delete('/subjects/:subjectId', authenticateJWT, deleteSubject);
+router.post('/subjects/enroll', authenticateJWT, enrollSubject);
+router.delete('/subjects/:subjectId/unenroll', authenticateJWT, unenrollSubject);
+router.get('/subjects/enrolled', authenticateJWT, getStudentSubjects);
 router.post('/exams', authenticateJWT, createExam);
 router.put('/exams/:examId', authenticateJWT, updateExam);
 router.delete('/exams/:examId', authenticateJWT, deleteExam);
@@ -33,6 +42,9 @@ router.get('/', authenticateJWT, getAvailableExams);
 router.get('/subjects', authenticateJWT, getProfessorSubjects);
 router.get('/:examId', authenticateJWT, getExamById);
 router.get('/:examId/tasks', authenticateJWT, getExamTasks);
+router.post('/:examId/submissions', authenticateJWT, saveSubmission);
+router.get('/:examId/submissions', authenticateJWT, getMySubmissions);
+router.get('/:examId/submissions/:studentId', authenticateJWT, getStudentSubmissions);
 router.post('/:examId/withdraw', authenticateJWT, withdrawExam);
 
 export default router;

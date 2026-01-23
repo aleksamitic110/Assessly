@@ -13,5 +13,5 @@ COPY . .
 # Eksponiramo port koji server koristi
 EXPOSE 3000
 
-# Pokrećemo server u dev modu
+# Start server in dev mode
 CMD ["npm", "run", "dev"]

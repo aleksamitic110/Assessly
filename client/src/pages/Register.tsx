@@ -28,12 +28,12 @@ export default function Register() {
 
     // Validation
     if (formData.password !== formData.confirmPassword) {
-      setError('Lozinke se ne poklapaju');
+      setError('Passwords do not match');
       return;
     }
 
     if (formData.password.length < 6) {
-      setError('Lozinka mora imati najmanje 6 karaktera');
+      setError('Password must be at least 6 characters');
       return;
     }
 
@@ -46,7 +46,7 @@ export default function Register() {
         firstName: formData.firstName,
         lastName: formData.lastName,
       });
-      setSuccess('Registracija uspesna. Proverite email da biste verifikovali nalog.');
+      setSuccess('Registration successful. Check your email to verify your account.');
       setFormData({
         email: '',
         password: '',
@@ -55,7 +55,7 @@ export default function Register() {
         lastName: '',
       });
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Greska prilikom registracije');
+      setError(err.response?.data?.error || 'Registration failed');
     } finally {
       setIsLoading(false);
     }
@@ -70,10 +70,10 @@ export default function Register() {
             Assessly
           </h1>
           <h2 className="mt-4 text-2xl font-semibold text-gray-900 dark:text-white">
-            Registracija
+            Create account
           </h2>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
-            Kreirajte novi nalog
+            Create a new account
           </p>
         </div>
 
@@ -99,7 +99,7 @@ export default function Register() {
                   htmlFor="firstName"
                   className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  Ime
+                  First name
                 </label>
                 <input
                   id="firstName"
@@ -109,7 +109,7 @@ export default function Register() {
                   value={formData.firstName}
                   onChange={handleChange}
                   className="mt-1 block w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
-                  placeholder="Petar"
+                  placeholder="Alex"
                 />
               </div>
               <div>
@@ -117,7 +117,7 @@ export default function Register() {
                   htmlFor="lastName"
                   className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  Prezime
+                  Last name
                 </label>
                 <input
                   id="lastName"
@@ -127,7 +127,7 @@ export default function Register() {
                   value={formData.lastName}
                   onChange={handleChange}
                   className="mt-1 block w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
-                  placeholder="Petrovic"
+                  placeholder="Johnson"
                 />
               </div>
             </div>
@@ -138,7 +138,7 @@ export default function Register() {
                 htmlFor="email"
                 className="block text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                Email adresa
+                Email address
               </label>
               <input
                 id="email"
@@ -149,7 +149,7 @@ export default function Register() {
                 value={formData.email}
                 onChange={handleChange}
                 className="mt-1 block w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
-                placeholder="vas@email.com"
+                placeholder="you@example.com"
               />
             </div>
 
@@ -159,7 +159,7 @@ export default function Register() {
                 htmlFor="password"
                 className="block text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                Lozinka
+                Password
               </label>
               <input
                 id="password"
@@ -178,7 +178,7 @@ export default function Register() {
                 htmlFor="confirmPassword"
                 className="block text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                Potvrdite lozinku
+                Confirm password
               </label>
               <input
                 id="confirmPassword"
@@ -198,17 +198,17 @@ export default function Register() {
               disabled={isLoading}
               className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {isLoading ? 'Registracija u toku...' : 'Registruj se'}
+              {isLoading ? 'Create account u toku...' : 'Create account'}
             </button>
 
             {/* Login link */}
             <p className="text-center text-sm text-gray-600 dark:text-gray-400">
-              Vec imate nalog?{' '}
+              Already have an account?{' '}
               <Link
                 to="/login"
                 className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
               >
-                Prijavite se
+                Sign in
               </Link>
             </p>
           </div>

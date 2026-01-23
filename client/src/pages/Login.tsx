@@ -20,7 +20,7 @@ export default function Login() {
       await login({ email, password });
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Greska prilikom prijave');
+      setError(err.response?.data?.error || 'Login failed');
     } finally {
       setIsLoading(false);
     }
@@ -35,10 +35,10 @@ export default function Login() {
             Assessly
           </h1>
           <h2 className="mt-4 text-2xl font-semibold text-gray-900 dark:text-white">
-            Prijava
+            Sign in
           </h2>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
-            Unesite vase kredencijale
+            Enter your credentials
           </p>
         </div>
 
@@ -58,7 +58,7 @@ export default function Login() {
                 htmlFor="email"
                 className="block text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                Email adresa
+                Email address
               </label>
               <input
                 id="email"
@@ -69,7 +69,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="mt-1 block w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
-                placeholder="vas@email.com"
+                placeholder="you@example.com"
               />
             </div>
 
@@ -79,7 +79,7 @@ export default function Login() {
                 htmlFor="password"
                 className="block text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                Lozinka
+                Password
               </label>
               <input
                 id="password"
@@ -100,17 +100,17 @@ export default function Login() {
               disabled={isLoading}
               className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {isLoading ? 'Prijava u toku...' : 'Prijavi se'}
+              {isLoading ? 'Sign in u toku...' : 'Sign in'}
             </button>
 
             {/* Register link */}
             <p className="text-center text-sm text-gray-600 dark:text-gray-400">
-              Nemate nalog?{' '}
+              No account?{' '}
               <Link
                 to="/register"
                 className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
               >
-                Registrujte se
+                Create one
               </Link>
             </p>
           </div>

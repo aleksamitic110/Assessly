@@ -1,7 +1,9 @@
 import dotenv from 'dotenv';
 import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
+import { v4 as uuidv4 } from 'uuid';
 import { redisClient } from '../client.js';
+import { neo4jDriver } from '../../neo4j/driver.js';
 
 dotenv.config();
 
@@ -24,6 +26,25 @@ declare module 'socket.io' {
 export const initSocket = (io: Server) => {
   const STATE_TTL_SECONDS = 60 * 60 * 24;
   const WITHDRAWN_KEY_PREFIX = (examId: string) => `exam:${examId}:withdrawn:`;
+  const SESSION_KEY = (examId: string) => `exam:${examId}:session_id`;
+
+  const examHasTasks = async (examId: string) => {
+    const session = neo4jDriver.session();
+    try {
+      const result = await session.run(
+        `
+        MATCH (e:Exam {id: $examId})-[:IMA_ZADATAK]->(t:Task)
+        RETURN count(t) AS taskCount
+        `,
+        { examId }
+      );
+      const countRaw = result.records[0]?.get('taskCount');
+      const count = typeof countRaw?.toNumber === 'function' ? countRaw.toNumber() : Number(countRaw || 0);
+      return count > 0;
+    } finally {
+      await session.close();
+    }
+  };
 
   const clearWithdrawnForExam = async (examId: string) => {
     const pattern = `${WITHDRAWN_KEY_PREFIX(examId)}*`;
@@ -143,14 +164,22 @@ export const initSocket = (io: Server) => {
     socket.on('start_exam', async (data) => {
       if (role !== 'professor') return;
       const { examId, durationMinutes } = data;
+      const hasTasks = await examHasTasks(examId);
+      if (!hasTasks) {
+        socket.emit('exam_start_error', { examId, reason: 'NO_TASKS' });
+        return;
+      }
       const startTime = Date.now();
       const endTime = startTime + (durationMinutes * 60 * 1000);
+      const sessionId = uuidv4();
 
       await redisClient.set(`exam:${examId}:status`, 'active', { EX: STATE_TTL_SECONDS });
       await redisClient.set(`exam:${examId}:start_time`, startTime.toString(), { EX: STATE_TTL_SECONDS });
       await redisClient.set(`exam:${examId}:end_time`, endTime.toString(), { EX: STATE_TTL_SECONDS });
       await redisClient.set(`exam:${examId}:duration_seconds`, (durationMinutes * 60).toString(), { EX: STATE_TTL_SECONDS });
       await redisClient.del(`exam:${examId}:remaining_ms`);
+      await redisClient.set(SESSION_KEY(examId), sessionId, { EX: STATE_TTL_SECONDS });
+      await clearWithdrawnForExam(examId);
 
       await emitExamState(examId);
     });
@@ -227,14 +256,21 @@ export const initSocket = (io: Server) => {
     socket.on('restart_exam', async (data) => {
       if (role !== 'professor') return;
       const { examId, durationMinutes } = data;
+      const hasTasks = await examHasTasks(examId);
+      if (!hasTasks) {
+        socket.emit('exam_start_error', { examId, reason: 'NO_TASKS' });
+        return;
+      }
       const startTime = Date.now();
       const endTime = startTime + (Number(durationMinutes) * 60 * 1000);
+      const sessionId = uuidv4();
 
       await redisClient.set(`exam:${examId}:status`, 'active', { EX: STATE_TTL_SECONDS });
       await redisClient.set(`exam:${examId}:start_time`, startTime.toString(), { EX: STATE_TTL_SECONDS });
       await redisClient.set(`exam:${examId}:end_time`, endTime.toString(), { EX: STATE_TTL_SECONDS });
       await redisClient.set(`exam:${examId}:duration_seconds`, (Number(durationMinutes) * 60).toString(), { EX: STATE_TTL_SECONDS });
       await redisClient.del(`exam:${examId}:remaining_ms`);
+      await redisClient.set(SESSION_KEY(examId), sessionId, { EX: STATE_TTL_SECONDS });
       await clearWithdrawnForExam(examId);
 
       await emitExamState(examId);

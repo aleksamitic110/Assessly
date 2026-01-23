@@ -17,36 +17,36 @@
 </head>
 <body>
     <div class="panel">
-        <h1>🕵️‍♂️ Assessly Monitor</h1>
+        <h1> Assessly Monitor</h1>
         
         <div class="box">
             <h3>1. Identitet</h3>
             <input type="text" id="token" placeholder="Paste JWT Token here" style="width: 100%;">
             <br><br>
-            <button onclick="connect()">🔌 CONNECT</button>
+            <button onclick="connect()"> CONNECT</button>
             <span id="status" style="margin-left: 10px; color: red;">OFFLINE</span>
         </div>
 
         <div class="box">
             <h3>2. Ispitna Soba</h3>
             <input type="text" id="examId" value="ispit-123" placeholder="Exam ID">
-            <button onclick="joinExam()">👉 JOIN ROOM</button>
+            <button onclick="joinExam()"> JOIN ROOM</button>
         </div>
 
         <div class="box" style="border-color: #ff5555;">
-            <h3 class="red">3. 😈 Cheat Simulator (Student)</h3>
-            <button onclick="simulateCheat('tab_switch')" class="red">👀 ALT+TAB (Blur)</button>
-            <button onclick="simulateCheat('copy_paste')" class="red">📋 COPY/PASTE</button>
+            <h3 class="red">3.  Cheat Simulator (Student)</h3>
+            <button onclick="simulateCheat('tab_switch')" class="red"> ALT+TAB (Blur)</button>
+            <button onclick="simulateCheat('copy_paste')" class="red"> COPY/PASTE</button>
         </div>
 
         <div class="box" style="border-color: #ffff55;">
             <h3 class="yellow">4. Professor Controls</h3>
-            <button onclick="startExam()">⏱️ START EXAM (60m)</button>
+            <button onclick="startExam()"> START EXAM (60m)</button>
         </div>
     </div>
 
     <div class="panel">
-        <h3>📡 Live Logs & Alerts</h3>
+        <h3> Live Logs & Alerts</h3>
         <div id="logs"></div>
     </div>
 
@@ -56,7 +56,7 @@
 
         function log(msg, type = 'info') {
             const div = document.createElement('div');
-            div.innerHTML = type === 'alert' ? `🚨 <b>${msg}</b>` : `> ${msg}`;
+            div.innerHTML = type === 'alert' ? ` <b>${msg}</b>` : `> ${msg}`;
             if(type === 'alert') div.className = 'violation-card';
             document.getElementById('logs').prepend(div);
         }
@@ -72,35 +72,35 @@
             socket.on('connect', () => {
                 document.getElementById('status').innerText = "ONLINE";
                 document.getElementById('status').style.color = "lime";
-                log("✅ Connected successfully");
+                log(" Connected successfully");
             });
 
-            // Slušamo ALARME (Ovo vidi profesor)
+            // Sluamo ALARME (Ovo vidi profesor)
             socket.on('violation_alert', (data) => {
-                log(`PREKRŠAJ! Student: ${data.email} | Tip: ${data.type} | Ukupno: ${data.count}`, 'alert');
+                log(`PREKRAJ! Student: ${data.email} | Tip: ${data.type} | Ukupno: ${data.count}`, 'alert');
             });
 
             socket.on('student_status_update', (data) => {
-                log(`ℹ️ Status Update: ${data.email} is now ${data.status.toUpperCase()}`);
+                log(` Status Update: ${data.email} is now ${data.status.toUpperCase()}`);
             });
 
-            socket.on('exam_started', () => log("🏁 Exam STARTED!"));
-            socket.on('timer_sync', (d) => log(`⏱️ Timer Synced: ${Math.floor(d.remainingMilliseconds/1000)}s left`));
+            socket.on('exam_started', () => log(" Exam STARTED!"));
+            socket.on('timer_sync', (d) => log(` Timer Synced: ${Math.floor(d.remainingMilliseconds/1000)}s left`));
         }
 
         function joinExam() {
             socket.emit('join_exam', examIdInput.value);
-            log(`➡️ Joining ${examIdInput.value}...`);
+            log(` Joining ${examIdInput.value}...`);
         }
 
         function simulateCheat(type) {
             if(!socket) return alert("Nisi konektovan!");
-            // Šaljemo serveru da smo varali
+            // aljemo serveru da smo varali
             socket.emit('violation', { 
                 examId: examIdInput.value, 
                 type: type 
             });
-            log(`📤 Sending violation: ${type}...`);
+            log(` Sending violation: ${type}...`);
         }
 
         function startExam() {

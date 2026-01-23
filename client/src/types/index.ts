@@ -42,6 +42,7 @@ export interface Exam {
   subjectId?: string;
   subjectName?: string;
   status?: 'wait_room' | 'waiting_start' | 'active' | 'paused' | 'completed' | 'withdrawn';
+  taskCount?: number;
   actualStartTime?: number;
   endTime?: number;
   remainingSeconds?: number;
@@ -70,6 +71,14 @@ export interface ExecutionLog {
   sourceCode: string;
   output: string;
   status: ExecutionStatus;
+}
+
+export interface Submission {
+  taskId: string;
+  taskTitle?: string;
+  sourceCode: string;
+  output: string;
+  updatedAt?: string | null;
 }
 
 export interface SecurityEvent {

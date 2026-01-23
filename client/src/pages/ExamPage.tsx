@@ -1,22 +1,32 @@
-import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import { useAuth } from '../context/AuthContext';
 import logsService from '../services/logs';
 import api from '../services/api';
-//Importujemo socket servis
 import { socket, connectSocket, disconnectSocket } from '../services/socket';
 import type { Exam, Task as TaskType } from '../types';
+
+interface Submission {
+  taskId: string;
+  taskTitle?: string;
+  sourceCode: string;
+  output: string;
+  updatedAt?: string | null;
+}
 
 export default function ExamPage() {
   const { examId } = useParams<{ examId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isReviewMode = useMemo(() => location.pathname.endsWith('/review'), [location.pathname]);
 
-  // Exam state
   const [tasks, setTasks] = useState<TaskType[]>([]);
   const [currentTask, setCurrentTask] = useState<TaskType | null>(null);
   const [code, setCode] = useState('');
+  const [codeByTaskId, setCodeByTaskId] = useState<Record<string, string>>({});
+  const [outputByTaskId, setOutputByTaskId] = useState<Record<string, string>>({});
   const [isLoadingTask, setIsLoadingTask] = useState(true);
   const [taskError, setTaskError] = useState('');
   const [examDetails, setExamDetails] = useState<Exam | null>(null);
@@ -35,56 +45,56 @@ export default function ExamPage() {
   const [leftWidth, setLeftWidth] = useState(33);
   const [outputHeight, setOutputHeight] = useState(220);
 
-  // Anti-cheat refs
-  const lastActivityRef = useRef<number>(Date.now());
   const dragModeRef = useRef<'vertical' | 'horizontal' | null>(null);
-  const dragStartRef = useRef<{ x: number; leftWidth: number; y: number; outputHeight: number }>({
-    x: 0,
-    leftWidth: 33,
-    y: 0,
-    outputHeight: 220,
-  });
   const rightPanelRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (examStatus === 'withdrawn') {
-      alert('Odustali ste od ovog ispita.');
-      navigate('/student');
+    if (isReviewMode) {
+      return;
     }
-    if (examStatus === 'active' && examId) {
+    if (examStatus === 'withdrawn') {
+      const timeoutId = window.setTimeout(() => {
+        alert('You have withdrawn from this exam.');
+        navigate('/student');
+      }, 800);
+      return () => window.clearTimeout(timeoutId);
+    }
+    if (examStatus !== 'withdrawn' && examId) {
       localStorage.removeItem(`exam_withdrawn:${examId}`);
     }
-  }, [examStatus, navigate]);
+  }, [examStatus, examId, isReviewMode, navigate]);
 
   useEffect(() => {
+    if (isReviewMode) return;
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
+  }, [isReviewMode]);
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
       if (!dragModeRef.current) return;
 
-      if (dragModeRef.current === 'vertical') {
-        const delta = ((event.clientX - dragStartRef.current.x) / window.innerWidth) * 100;
-        const next = dragStartRef.current.leftWidth + delta;
-        const clamped = Math.min(60, Math.max(20, next));
+      if (dragModeRef.current === 'vertical' && containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const relativeX = event.clientX - rect.left;
+        const percent = (relativeX / rect.width) * 100;
+        const clamped = Math.min(70, Math.max(20, percent));
         setLeftWidth(clamped);
         return;
       }
 
       if (dragModeRef.current === 'horizontal' && rightPanelRef.current) {
         const rect = rightPanelRef.current.getBoundingClientRect();
-        const delta = dragStartRef.current.y - event.clientY;
-        const nextHeight = dragStartRef.current.outputHeight + delta;
         const minHeight = 120;
         const maxHeight = Math.max(minHeight, rect.height - 180);
-        const clampedHeight = Math.min(maxHeight, Math.max(minHeight, nextHeight));
-        setOutputHeight(clampedHeight);
+        const relative = rect.bottom - event.clientY;
+        const nextHeight = Math.min(maxHeight, Math.max(minHeight, relative));
+        setOutputHeight(nextHeight);
       }
     };
 
@@ -102,7 +112,7 @@ export default function ExamPage() {
   }, []);
 
   const requestFullscreen = async () => {
-    if (document.fullscreenElement) return;
+    if (document.fullscreenElement || isReviewMode) return;
     try {
       await document.documentElement.requestFullscreen();
     } catch {
@@ -110,14 +120,10 @@ export default function ExamPage() {
     }
   };
 
-  //SOCKET: Glavna logika za povezivanje i tajmer
   useEffect(() => {
-    if (!examId) return;
+    if (!examId || isReviewMode) return;
 
-    //Konektujemo se na socket
     connectSocket();
-
-    //Ulazimo u sobu ispita
     socket.emit('join_exam', examId);
 
     socket.on('exam_state', (data: { status: string; remainingMilliseconds?: number }) => {
@@ -136,36 +142,37 @@ export default function ExamPage() {
       setTimeLeft(secondsLeft > 0 ? secondsLeft : 0);
     });
 
-    // Ciscenje pri izlasku
     return () => {
       socket.off('exam_state');
       socket.off('timer_sync');
       disconnectSocket();
     };
-  }, [examId]);
+  }, [examId, isReviewMode]);
 
   useEffect(() => {
+    if (isReviewMode) return;
     if (examStatus === 'active') {
       window.focus();
       requestFullscreen();
     }
-  }, [examStatus]);
+  }, [examStatus, isReviewMode]);
 
   useEffect(() => {
     let isMounted = true;
 
     const loadTasks = async () => {
       if (!examId) {
-        setTaskError('Nedostaje ID ispita');
+        setTaskError('Missing exam ID');
         setIsLoadingTask(false);
         return;
       }
       setIsLoadingTask(true);
       setTaskError('');
       try {
-        const [examResponse, taskResponse] = await Promise.all([
+        const [examResponse, taskResponse, submissionsResponse] = await Promise.all([
           api.get<Exam>(`/exams/${examId}`),
-          api.get<TaskType[]>(`/exams/${examId}/tasks`)
+          api.get<TaskType[]>(`/exams/${examId}/tasks`),
+          api.get<Submission[]>(`/exams/${examId}/submissions`).catch(() => ({ data: [] as Submission[] }))
         ]);
 
         if (!isMounted) return;
@@ -186,16 +193,38 @@ export default function ExamPage() {
           setTimeLeft(0);
         }
 
-        setTasks(taskResponse.data);
-        if (taskResponse.data.length > 0) {
-          setCurrentTask(taskResponse.data[0]);
-          setCode(taskResponse.data[0].starterCode || '');
+        const tasksData = taskResponse.data;
+        const submissions = submissionsResponse.data || [];
+        const submissionByTask = submissions.reduce<Record<string, Submission>>((acc, item) => {
+          acc[item.taskId] = item;
+          return acc;
+        }, {});
+
+        const nextCodeByTask: Record<string, string> = {};
+        const nextOutputByTask: Record<string, string> = {};
+        tasksData.forEach((task) => {
+          const submission = submissionByTask[task.id];
+          nextCodeByTask[task.id] = submission?.sourceCode || task.starterCode || '';
+          nextOutputByTask[task.id] = submission?.output || '';
+        });
+
+        setTasks(tasksData);
+        setCodeByTaskId(nextCodeByTask);
+        setOutputByTaskId(nextOutputByTask);
+
+        if (tasksData.length > 0) {
+          const firstTask = tasksData[0];
+          setCurrentTask(firstTask);
+          setCode(nextCodeByTask[firstTask.id] || '');
+          setOutput(nextOutputByTask[firstTask.id] || '');
         } else {
           setCurrentTask(null);
+          setCode('');
+          setOutput('');
         }
       } catch (err: any) {
         if (!isMounted) return;
-        setTaskError(err.response?.data?.error || 'Greska prilikom ucitavanja zadataka');
+        setTaskError(err.response?.data?.error || 'Failed to load tasks');
       } finally {
         if (isMounted) {
           setIsLoadingTask(false);
@@ -209,8 +238,8 @@ export default function ExamPage() {
     };
   }, [examId]);
 
-  // Timer (Lokalni ticker - sluzi da odbrojava sekunde izmedju sync-ova)
   useEffect(() => {
+    if (isReviewMode) return;
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (examStatus !== 'active') {
@@ -218,7 +247,6 @@ export default function ExamPage() {
         }
         if (prev <= 0) {
           clearInterval(timer);
-          // handleSubmit(); // Opciono: Automatska predaja kad istekne vreme
           return 0;
         }
         return prev - 1;
@@ -226,21 +254,17 @@ export default function ExamPage() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [examStatus]);
+  }, [examStatus, isReviewMode]);
 
-  // Anti-cheat: Tab switch detection
   useEffect(() => {
+    if (isReviewMode) return;
     const handleVisibilityChange = () => {
       if (document.hidden && examId) {
         setViolations((prev) => prev + 1);
-        
-        //Cassandra Log
         logsService.logSecurityEvent(examId, 'TAB_SWITCH', {
           timestamp: new Date().toISOString(),
           violations: violations + 1,
         });
-
-        //SOCKET Live Professor Alert
         socket.emit('violation', { examId, type: 'tab_switch' });
       }
     };
@@ -248,13 +272,9 @@ export default function ExamPage() {
     const handleBlur = () => {
       if (examId) {
         setViolations((prev) => prev + 1);
-        
-        // Cassandra Log
         logsService.logSecurityEvent(examId, 'BLUR', {
           timestamp: new Date().toISOString(),
         });
-
-        // SOCKET Tvoj Alarm
         socket.emit('violation', { examId, type: 'tab_blur' });
       }
     };
@@ -262,14 +282,10 @@ export default function ExamPage() {
     const handleCopyPaste = (e: ClipboardEvent) => {
       if (examId && e.type === 'paste') {
         setViolations((prev) => prev + 1);
-        
-        // Cassandra Log
         logsService.logSecurityEvent(examId, 'COPY_PASTE', {
           timestamp: new Date().toISOString(),
           type: e.type,
         });
-
-        //SOCKET Alarm
         socket.emit('violation', { examId, type: 'copy_paste' });
       }
     };
@@ -283,7 +299,7 @@ export default function ExamPage() {
       window.removeEventListener('blur', handleBlur);
       document.removeEventListener('paste', handleCopyPaste);
     };
-  }, [examId, violations]);
+  }, [examId, violations, isReviewMode]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -292,17 +308,16 @@ export default function ExamPage() {
   };
 
   const handleRunCode = async () => {
-    if (!currentTask || !examId || examStatus !== 'active') return;
+    if (!currentTask || !examId || examStatus !== 'active' || isReviewMode) return;
     setIsRunning(true);
-    setOutput('Kompajliranje i pokretanje...\n');
+    setOutput('Compiling and running...\n');
 
-    // Log execution to Cassandra
     if (examId) {
       try {
         await logsService.logExecution(
           examId,
           code,
-          'Kod pokrenut',
+          'Code executed',
           'RUNNING'
         );
       } catch (err) {
@@ -310,17 +325,18 @@ export default function ExamPage() {
       }
     }
 
-    // Simulate code execution
     setTimeout(() => {
-      const mockOutput = `Pre sortiranja: 64 34 25 12 22 11 90
-Posle sortiranja: 11 12 22 25 34 64 90
+      const mockOutput = `Before sort: 64 34 25 12 22 11 90
+After sort: 11 12 22 25 34 64 90
 
-Program uspesno izvrsen.
-Vreme izvrsavanja: 0.003s`;
+Program finished.
+Execution time: 0.003s`;
       setOutput(mockOutput);
       setIsRunning(false);
+      if (currentTask) {
+        setOutputByTaskId((prev) => ({ ...prev, [currentTask.id]: mockOutput }));
+      }
 
-      // Log successful execution
       if (examId) {
         logsService.logExecution(
           examId,
@@ -334,20 +350,38 @@ Vreme izvrsavanja: 0.003s`;
 
   const handleSelectTask = (task: TaskType) => {
     setCurrentTask(task);
-    setCode(task.starterCode || '');
+    setCode(codeByTaskId[task.id] || task.starterCode || '');
+    setOutput(outputByTaskId[task.id] || '');
+  };
+
+  const saveSubmission = async (taskId: string, sourceCode: string, outputText: string) => {
+    if (!examId) return;
+    try {
+      await api.post(`/exams/${examId}/submissions`, {
+        taskId,
+        sourceCode,
+        output: outputText,
+      });
+    } catch (err) {
+      console.error('Failed to save submission:', err);
+    }
   };
 
   const handleSaveCode = async () => {
-    if (!examId || !currentTask || examStatus !== 'active') return;
+    if (!examId || !currentTask || examStatus !== 'active' || isReviewMode) return;
     setIsSaving(true);
+    const currentCode = codeByTaskId[currentTask.id] ?? code;
+    const currentOutput = outputByTaskId[currentTask.id] ?? output;
     try {
       await logsService.logExecution(
         examId,
-        code,
-        'Kod sacuvan',
+        currentCode,
+        'Code saved',
         'SUCCESS'
       );
-      setOutput((prev) => (prev ? `${prev}\nKod sacuvan.` : 'Kod sacuvan.'));
+      await saveSubmission(currentTask.id, currentCode, currentOutput);
+      setOutput((prev) => (prev ? `${prev}
+Code saved.` : 'Code saved.'));
     } catch (err) {
       console.error('Failed to save code:', err);
     } finally {
@@ -356,25 +390,34 @@ Vreme izvrsavanja: 0.003s`;
   };
 
   const handleSubmit = async () => {
-    if (!examId || !currentTask || examStatus !== 'active') {
-      alert('Ispit nije spreman za predaju.');
+    if (!examId || !currentTask || examStatus !== 'active' || isReviewMode) {
+      alert('Exam is not ready for submission.');
       return;
     }
+
+    await Promise.all(
+      tasks.map((task) => {
+        const taskCode = codeByTaskId[task.id] ?? task.starterCode ?? '';
+        const taskOutput = outputByTaskId[task.id] ?? '';
+        return saveSubmission(task.id, taskCode, taskOutput);
+      })
+    );
 
     if (examId && currentTask && examStatus === 'active') {
       await logsService.logExecution(
         examId,
         code,
-        'Ispit predat',
+        'Exam submitted',
         'SUCCESS'
       );
-      alert('Ispit je uspesno predat!');
+      alert('Exam submitted successfully!');
     }
     navigate('/student');
   };
 
   const handleCancelExam = async () => {
-    if (!confirm('Da li ste sigurni da zelite da odustanete od ispita?')) return;
+    if (isReviewMode) return;
+    if (!confirm('Are you sure you want to withdraw from this exam?')) return;
     if (examId) {
       try {
         await api.post(`/exams/${examId}/withdraw`);
@@ -387,99 +430,125 @@ Vreme izvrsavanja: 0.003s`;
     }
   };
 
-  const isExamLocked = examStatus !== 'active';
+  const isExamLocked = examStatus !== 'active' || isReviewMode;
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col">
-      {/* Header */}
+    <div className={`min-h-screen bg-gray-900 text-white flex flex-col ${!isReviewMode ? 'pb-20 md:pb-0' : ''}`}
+      ref={containerRef}
+    >
       <header className="bg-gray-800 border-b border-gray-700 px-4 py-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center space-x-4">
             <h1 className="text-xl font-bold text-indigo-400">Assessly</h1>
             <span className="text-gray-400">|</span>
-            <span className="text-gray-300">{currentTask?.title || 'Ispit'}</span>
+            <span className="text-gray-300">{currentTask?.title || 'Exam'}</span>
             {examDetails && (
               <span className="text-gray-500 text-sm">({examDetails.subjectName})</span>
             )}
           </div>
-          <div className="flex items-center space-x-6">
-            {/* Violations counter */}
-            {violations > 0 && (
+          <div className="flex flex-wrap items-center gap-3">
+            {violations > 0 && !isReviewMode && (
               <div className="flex items-center space-x-2 text-red-400">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                <span>{violations} upozorenja</span>
+                <span>{violations} warnings</span>
               </div>
             )}
             <div className="flex items-center space-x-3">
-            <span className="text-xs uppercase tracking-wide text-gray-400">
-              {examStatus === 'active' && 'Aktivan'}
-              {examStatus === 'paused' && 'Pauziran'}
-              {examStatus === 'wait_room' && 'Ceka termin'}
-              {examStatus === 'waiting_start' && 'Ceka start'}
-              {examStatus === 'completed' && 'Zavrsen'}
-              {examStatus === 'withdrawn' && 'Odustao'}
-            </span>
-              {/* Timer */}
-              <div className={`text-lg font-mono ${timeLeft < 300 ? 'text-red-400' : 'text-green-400'}`}>
-                {formatTime(timeLeft)}
-              </div>
+              <span className="text-xs uppercase tracking-wide text-gray-400">
+                {examStatus === 'active' && 'Active'}
+                {examStatus === 'paused' && 'Paused'}
+                {examStatus === 'wait_room' && 'Not scheduled'}
+                {examStatus === 'waiting_start' && 'Waiting for professor'}
+                {examStatus === 'completed' && 'Completed'}
+                {examStatus === 'withdrawn' && 'Withdrawn'}
+              </span>
+              {!isReviewMode && (
+                <div className={`text-lg font-mono ${timeLeft < 300 ? 'text-red-400' : 'text-green-400'}`}>
+                  {formatTime(timeLeft)}
+                </div>
+              )}
             </div>
-            {/* User info */}
             <span className="text-gray-400">
               {user?.firstName} {user?.lastName}
             </span>
-            <button
-              type="button"
-              onClick={requestFullscreen}
-              className="px-3 py-2 text-xs border border-gray-600 text-gray-300 rounded hover:bg-gray-700"
-            >
-              {isFullscreen ? 'Fullscreen ukljucen' : 'Fullscreen'}
-            </button>
-            {/* Submit button */}
-            <button
-              onClick={handleSubmit}
-              disabled={isExamLocked}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors"
-            >
-              Predaj ispit
-            </button>
-            <button
-              onClick={handleCancelExam}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition-colors"
-            >
-              Odustani
-            </button>
+            {!isReviewMode && (
+              <button
+                type="button"
+                onClick={requestFullscreen}
+                className="px-3 py-2 text-xs border border-gray-600 text-gray-300 rounded hover:bg-gray-700"
+              >
+                {isFullscreen ? 'Fullscreen on' : 'Fullscreen'}
+              </button>
+            )}
+            {!isReviewMode && (
+              <div className="hidden md:flex items-center gap-2">
+                <button
+                  onClick={handleSubmit}
+                  disabled={isExamLocked}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors"
+                >
+                  Submit exam
+                </button>
+                <button
+                  onClick={handleCancelExam}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition-colors"
+                >
+                  Withdraw
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Main content */}
+      {!isReviewMode && (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 px-4 py-3 flex gap-2">
+          <button
+            onClick={handleSubmit}
+            disabled={isExamLocked}
+            className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors"
+          >
+            Submit exam
+          </button>
+          <button
+            onClick={handleCancelExam}
+            className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition-colors"
+          >
+            Withdraw
+          </button>
+        </div>
+      )}
+
       <div className="flex-1 flex">
-        {/* Left panel - Task description */}
         <div
           className="bg-gray-800 border-r border-gray-700 p-4 overflow-y-auto"
           style={{ width: `${leftWidth}%`, minWidth: '16rem', maxWidth: '70vw' }}
         >
-          {isExamLocked && (
+          {isExamLocked && !isReviewMode && (
             <div className="mb-4 rounded border border-yellow-600/40 bg-yellow-900/20 px-3 py-2 text-sm text-yellow-200">
-              {examStatus === 'wait_room' && 'Ispit jos nije usao u termin.'}
-              {examStatus === 'waiting_start' && 'Ispit jos nije pokrenut od strane profesora.'}
-              {examStatus === 'paused' && 'Ispit je trenutno pauziran.'}
-              {examStatus === 'completed' && 'Ispit je zavrsen.'}
+              {examStatus === 'wait_room' && 'Exam is not scheduled yet.'}
+              {examStatus === 'waiting_start' && 'Waiting for the professor to start the exam.'}
+              {examStatus === 'paused' && 'The exam is currently paused.'}
+              {examStatus === 'completed' && 'The exam is completed.'}
+            </div>
+          )}
+          {isReviewMode && (
+            <div className="mb-4 rounded border border-blue-600/40 bg-blue-900/20 px-3 py-2 text-sm text-blue-200">
+              Review mode: read-only view of your work.
             </div>
           )}
           <div className="mb-4 rounded border border-gray-700 bg-gray-900 px-3 py-2 text-xs text-gray-300">
-            <div className="mb-2 text-gray-400 uppercase tracking-wide">Prikaz</div>
+            <div className="mb-2 text-gray-400 uppercase tracking-wide">View</div>
             <div className="flex flex-wrap gap-3">
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={showTaskList} onChange={() => setShowTaskList((prev) => !prev)} />
-                Zadaci
+                Tasks
               </label>
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={showTaskDetails} onChange={() => setShowTaskDetails((prev) => !prev)} />
-                Opis
+                Details
               </label>
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={showPdf} onChange={() => setShowPdf((prev) => !prev)} />
@@ -496,12 +565,9 @@ Vreme izvrsavanja: 0.003s`;
             </div>
           </div>
           {showTaskList && tasks.length > 1 && (
-            <div
-              className="mb-4"
-              style={{ resize: 'vertical', overflow: 'auto', minHeight: '6rem', maxHeight: '40vh' }}
-            >
+            <div className="mb-4" style={{ resize: 'vertical', overflow: 'auto', minHeight: '6rem', maxHeight: '40vh' }}>
               <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                Zadaci
+                Tasks
               </h2>
               <div className="space-y-2">
                 {tasks.map((task) => (
@@ -523,78 +589,71 @@ Vreme izvrsavanja: 0.003s`;
           )}
           {showTaskDetails && (
             <>
-              <h2 className="text-lg font-semibold mb-4 text-indigo-400">Zadatak</h2>
+              <h2 className="text-lg font-semibold mb-4 text-indigo-400">Task</h2>
               <div className="prose prose-invert" style={{ resize: 'vertical', overflow: 'auto', minHeight: '10rem', maxHeight: '60vh' }}>
-            {isLoadingTask && (
-              <div className="text-gray-400">Ucitavanje zadatka...</div>
-            )}
-            {!isLoadingTask && taskError && (
-              <div className="text-red-400">{taskError}</div>
-            )}
-            {!isLoadingTask && !taskError && currentTask && (
-              <>
-                <h3 className="text-white text-xl mb-2">{currentTask.title}</h3>
-                <p className="text-gray-300 leading-relaxed">{currentTask.description}</p>
-                {showPdf && currentTask.pdfUrl && (
-                  <div
-                    className="mt-4 border border-gray-700 rounded-lg overflow-hidden bg-gray-900"
-                    style={{ resize: 'vertical', overflow: 'auto', minHeight: '12rem', maxHeight: '60vh' }}
-                  >
-                    <div className="px-3 py-2 text-xs text-gray-400 border-b border-gray-700">
-                      PDF zadatka
-                    </div>
-                    <iframe
-                      src={currentTask.pdfUrl}
-                      title="PDF zadatka"
-                      className="w-full h-72"
-                    />
-                  </div>
+                {isLoadingTask && (
+                  <div className="text-gray-400">Loading task...</div>
                 )}
-              </>
-            )}
-            {!isLoadingTask && !taskError && !currentTask && (
-              <div className="text-gray-400">Nema dostupnih zadataka.</div>
-            )}
-
-            {currentTask && (
-              <>
-                {(currentTask.exampleInput || currentTask.exampleOutput) && (
-                    <div className="mt-6 p-4 bg-gray-700 rounded-lg">
-                      <h4 className="text-yellow-400 font-medium mb-2">Primer ulaza/izlaza:</h4>
-                      <pre className="text-sm text-gray-300 bg-gray-900 p-3 rounded whitespace-pre-wrap">
-{`${currentTask.exampleInput ? `Ulaz: ${currentTask.exampleInput}` : ''}${currentTask.exampleInput && currentTask.exampleOutput ? '\n' : ''}${currentTask.exampleOutput ? `Izlaz: ${currentTask.exampleOutput}` : ''}`}
-                      </pre>
-                    </div>
+                {!isLoadingTask && taskError && (
+                  <div className="text-red-400">{taskError}</div>
+                )}
+                {!isLoadingTask && !taskError && currentTask && (
+                  <>
+                    <h3 className="text-white text-xl mb-2">{currentTask.title}</h3>
+                    <p className="text-gray-300 leading-relaxed">{currentTask.description}</p>
+                    {showPdf && currentTask.pdfUrl && (
+                      <div
+                        className="mt-4 border border-gray-700 rounded-lg overflow-hidden bg-gray-900"
+                        style={{ resize: 'vertical', overflow: 'auto', minHeight: '12rem', maxHeight: '60vh' }}
+                      >
+                        <div className="px-3 py-2 text-xs text-gray-400 border-b border-gray-700">
+                          Task PDF
+                        </div>
+                        <iframe
+                          src={currentTask.pdfUrl}
+                          title="Task PDF"
+                          className="w-full h-72"
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+                {!isLoadingTask && !taskError && !currentTask && (
+                  <div className="text-gray-400">No tasks available.</div>
                 )}
 
-                {currentTask.notes && (
-                  <div className="mt-6 p-4 bg-blue-900/30 border border-blue-700 rounded-lg">
-                    <h4 className="text-blue-400 font-medium mb-2">Napomena:</h4>
-                    <p className="text-gray-300 text-sm whitespace-pre-wrap">{currentTask.notes}</p>
-                  </div>
+                {currentTask && (
+                  <>
+                    {(currentTask.exampleInput || currentTask.exampleOutput) && (
+                      <div className="mt-6 p-4 bg-gray-700 rounded-lg">
+                        <h4 className="text-yellow-400 font-medium mb-2">Example input/output:</h4>
+                        <pre className="text-sm text-gray-300 bg-gray-900 p-3 rounded whitespace-pre-wrap">
+{`${currentTask.exampleInput ? `Input: ${currentTask.exampleInput}` : ''}${currentTask.exampleInput && currentTask.exampleOutput ? '\n' : ''}${currentTask.exampleOutput ? `Output: ${currentTask.exampleOutput}` : ''}`}
+                        </pre>
+                      </div>
+                    )}
+
+                    {currentTask.notes && (
+                      <div className="mt-6 p-4 bg-blue-900/30 border border-blue-700 rounded-lg">
+                        <h4 className="text-blue-400 font-medium mb-2">Notes:</h4>
+                        <p className="text-gray-300 text-sm whitespace-pre-wrap">{currentTask.notes}</p>
+                      </div>
+                    )}
+                  </>
                 )}
-              </>
-            )}
               </div>
             </>
           )}
         </div>
 
-        {/* Right panel - Editor and Output */}
         <div
           className="w-1 bg-gray-700 cursor-col-resize hover:bg-gray-500"
           onMouseDown={(event) => {
             event.preventDefault();
             dragModeRef.current = 'vertical';
-            dragStartRef.current = {
-              ...dragStartRef.current,
-              x: event.clientX,
-              leftWidth,
-            };
           }}
         />
         <div className="flex-1 flex flex-col" ref={rightPanelRef}>
-          {/* Monaco Editor */}
           {showEditor && (
             <div className="flex-1 border-b border-gray-700" style={{ overflow: 'auto', minHeight: '16rem' }}>
               <Editor
@@ -602,7 +661,13 @@ Vreme izvrsavanja: 0.003s`;
                 defaultLanguage="cpp"
                 theme="vs-dark"
                 value={code}
-                onChange={(value) => setCode(value || '')}
+                onChange={(value) => {
+                  const next = value || '';
+                  setCode(next);
+                  if (currentTask) {
+                    setCodeByTaskId((prev) => ({ ...prev, [currentTask.id]: next }));
+                  }
+                }}
                 options={{
                   readOnly: isLoadingTask || !!taskError || isExamLocked,
                   fontSize: 14,
@@ -622,16 +687,10 @@ Vreme izvrsavanja: 0.003s`;
               onMouseDown={(event) => {
                 event.preventDefault();
                 dragModeRef.current = 'horizontal';
-                dragStartRef.current = {
-                  ...dragStartRef.current,
-                  y: event.clientY,
-                  outputHeight,
-                };
               }}
             />
           )}
 
-          {/* Output panel */}
           {showOutput && (
             <div
               className="bg-gray-900 border-t border-gray-700"
@@ -639,39 +698,41 @@ Vreme izvrsavanja: 0.003s`;
             >
               <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
                 <span className="text-sm font-medium text-gray-400">Output</span>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={handleSaveCode}
-                    disabled={isSaving || !currentTask || isExamLocked}
-                    className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
-                      isSaving || !currentTask || isExamLocked
-                        ? 'bg-gray-600 cursor-not-allowed'
-                        : 'bg-blue-600 hover:bg-blue-700'
-                    }`}
-                  >
-                    {isSaving ? 'Cuvanje...' : 'Sacuvaj'}
-                  </button>
-                  <button
-                    onClick={handleRunCode}
-                    disabled={isRunning || !currentTask || isExamLocked}
-                    className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
-                      isRunning || !currentTask || isExamLocked
-                        ? 'bg-gray-600 cursor-not-allowed'
-                        : 'bg-green-600 hover:bg-green-700'
-                    }`}
-                  >
-                    {isRunning ? 'Izvrsavanje...' : 'Pokreni kod (F5)'}
-                  </button>
-                </div>
+                {!isReviewMode && (
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={handleSaveCode}
+                      disabled={isSaving || !currentTask || isExamLocked}
+                      className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
+                        isSaving || !currentTask || isExamLocked
+                          ? 'bg-gray-600 cursor-not-allowed'
+                          : 'bg-blue-600 hover:bg-blue-700'
+                      }`}
+                    >
+                      {isSaving ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      onClick={handleRunCode}
+                      disabled={isRunning || !currentTask || isExamLocked}
+                      className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
+                        isRunning || !currentTask || isExamLocked
+                          ? 'bg-gray-600 cursor-not-allowed'
+                          : 'bg-green-600 hover:bg-green-700'
+                      }`}
+                    >
+                      {isRunning ? 'Running...' : 'Run code (F5)'}
+                    </button>
+                  </div>
+                )}
               </div>
               <pre className="p-4 text-sm text-gray-300 font-mono overflow-auto h-full">
-                {output || 'Kliknite "Pokreni kod" da vidite rezultat...'}
+                {output || 'Click "Run code" to see output...'}
               </pre>
             </div>
           )}
           {!showEditor && !showOutput && (
             <div className="flex-1 flex items-center justify-center text-sm text-gray-500">
-              Editor i output su sakriveni u prikazu.
+              Editor and output are hidden in view settings.
             </div>
           )}
         </div>

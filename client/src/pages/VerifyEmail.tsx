@@ -5,13 +5,13 @@ import api from '../services/api';
 export default function VerifyEmail() {
   const [searchParams] = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [message, setMessage] = useState('Verifikacija u toku...');
+  const [message, setMessage] = useState('Verifying email...');
 
   useEffect(() => {
     const token = searchParams.get('token');
     if (!token) {
       setStatus('error');
-      setMessage('Nedostaje verifikacioni token.');
+      setMessage('Verification token is missing.');
       return;
     }
 
@@ -19,10 +19,10 @@ export default function VerifyEmail() {
       try {
         const response = await api.get(`/auth/verify?token=${token}`);
         setStatus('success');
-        setMessage(response.data?.message || 'Email uspesno verifikovan.');
+        setMessage(response.data?.message || 'Email verified successfully.');
       } catch (err: any) {
         setStatus('error');
-        setMessage(err.response?.data?.error || 'Greska prilikom verifikacije.');
+        setMessage(err.response?.data?.error || 'Verification failed.');
       }
     };
 
@@ -33,7 +33,7 @@ export default function VerifyEmail() {
     <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 px-4 py-8">
       <div className="max-w-md w-full space-y-6 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-8 text-center">
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-          Verifikacija naloga
+          Account verification
         </h1>
         <p
           className={`text-sm ${
@@ -51,7 +51,7 @@ export default function VerifyEmail() {
             to="/login"
             className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
           >
-            Prijavi se
+            Sign in
           </Link>
         </div>
       </div>
