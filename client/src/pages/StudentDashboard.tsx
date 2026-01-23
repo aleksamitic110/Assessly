@@ -22,6 +22,7 @@ export default function StudentDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const isMountedRef = useRef(true);
+  const joinedExamIdsRef = useRef<Set<string>>(new Set());
 
   const updateExamStatus = useCallback((examId: string, status: AvailableExam['status']) => {
     if (status === 'active') {
@@ -32,19 +33,23 @@ export default function StudentDashboard() {
     );
   }, []);
 
-  const getExamStatus = (startTime: string, durationMinutes: number): AvailableExam['status'] => {
-    const start = new Date(startTime).getTime();
-    if (Number.isNaN(start)) {
-      return 'waiting_start';
-    }
-    const end = start + durationMinutes * 60 * 1000;
-    const now = Date.now();
-    if (now < start) return 'wait_room';
-    if (now <= end) return 'active';
-    return 'completed';
-  };
+  const getExamStatus = useCallback(
+    (startTime: string, durationMinutes: number): AvailableExam['status'] => {
+      const start = new Date(startTime).getTime();
+      if (Number.isNaN(start)) {
+        return 'waiting_start';
+      }
+      const end = start + durationMinutes * 60 * 1000;
+      const now = Date.now();
+      if (now < start) return 'wait_room';
+      if (now <= end) return 'active';
+      return 'completed';
+    },
+    []
+  );
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
     };
@@ -120,7 +125,10 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     exams.forEach((exam) => {
-      socket.emit('join_exam', exam.id);
+      if (!joinedExamIdsRef.current.has(exam.id)) {
+        socket.emit('join_exam', exam.id);
+        joinedExamIdsRef.current.add(exam.id);
+      }
     });
   }, [exams]);
 
