@@ -48,13 +48,14 @@ export default function ExamPage() {
   const dragModeRef = useRef<'vertical' | 'horizontal' | null>(null);
   const rightPanelRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const autoSubmittedRef = useRef(false);
+
+  useEffect(() => {
+    autoSubmittedRef.current = false;
+  }, [examId]);
 
   useEffect(() => {
     if (isReviewMode) {
-      return;
-    }
-    if (examStatus === 'submitted' && examId) {
-      navigate(`/exam/${examId}/review`);
       return;
     }
     if (examStatus === 'withdrawn') {
@@ -263,6 +264,62 @@ export default function ExamPage() {
     return () => clearInterval(timer);
   }, [examStatus, isReviewMode]);
 
+  const submitExam = async (options?: { silent?: boolean; reason?: string; redirect?: 'dashboard' | 'review' }) => {
+    if (!examId || isReviewMode || autoSubmittedRef.current) return;
+    if (examStatus === 'withdrawn' || examStatus === 'submitted') return;
+
+    autoSubmittedRef.current = true;
+
+    await Promise.all(
+      tasks.map((task) => {
+        const taskCode = codeByTaskId[task.id] ?? task.starterCode ?? '';
+        const taskOutput = outputByTaskId[task.id] ?? '';
+        return saveSubmission(task.id, taskCode, taskOutput);
+      })
+    );
+
+    try {
+      await logsService.logExecution(
+        examId,
+        code,
+        options?.reason ? `Exam auto-submitted (${options.reason})` : 'Exam submitted',
+        'SUCCESS'
+      );
+    } catch (err) {
+      console.error('Failed to log submit:', err);
+    }
+
+    try {
+      await api.post(`/exams/${examId}/submit`);
+      setExamStatus('submitted');
+      if (!options?.silent) {
+        alert('Exam submitted.');
+      }
+      if (options?.redirect === 'review') {
+        navigate(`/exam/${examId}/review`);
+      } else {
+        navigate('/student');
+      }
+    } catch (err) {
+      console.error('Failed to submit exam:', err);
+      autoSubmittedRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    if (isReviewMode) return;
+    if (examStatus === 'completed') {
+      void submitExam({ silent: true, reason: 'professor_end', redirect: 'review' });
+    }
+  }, [examStatus, isReviewMode]);
+
+  useEffect(() => {
+    if (isReviewMode) return;
+    if (examStatus === 'active' && timeLeft === 0) {
+      void submitExam({ silent: true, reason: 'time_expired', redirect: 'review' });
+    }
+  }, [examStatus, timeLeft, isReviewMode]);
+
   useEffect(() => {
     if (isReviewMode) return;
     const handleVisibilityChange = () => {
@@ -401,26 +458,8 @@ Code saved.` : 'Code saved.'));
       alert('Exam is not ready for submission.');
       return;
     }
-
-    await Promise.all(
-      tasks.map((task) => {
-        const taskCode = codeByTaskId[task.id] ?? task.starterCode ?? '';
-        const taskOutput = outputByTaskId[task.id] ?? '';
-        return saveSubmission(task.id, taskCode, taskOutput);
-      })
-    );
-
-    if (examId && currentTask && examStatus === 'active') {
-      await logsService.logExecution(
-        examId,
-        code,
-        'Exam submitted',
-        'SUCCESS'
-      );
-      await api.post(`/exams/${examId}/submit`);
-      alert('Exam submitted successfully!');
-    }
-    navigate('/student');
+    autoSubmittedRef.current = false;
+    await submitExam({ silent: false, redirect: 'dashboard' });
   };
 
   const handleCancelExam = async () => {

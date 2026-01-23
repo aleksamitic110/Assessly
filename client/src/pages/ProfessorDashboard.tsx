@@ -33,6 +33,19 @@ export default function ProfessorDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
+  const toIsoString = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toISOString();
+  };
+
+  const toDateTimeLocal = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    const pad = (num: number) => String(num).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
   // State for creating subject
   const [showSubjectForm, setShowSubjectForm] = useState(false);
   const [subjectData, setSubjectData] = useState({ name: '', description: '', password: '' });
@@ -72,6 +85,19 @@ export default function ProfessorDashboard() {
     exampleOutput: '',
     notes: '',
     pdfFile: null as File | null,
+  });
+  const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
+  const [subjectEditForm, setSubjectEditForm] = useState({
+    name: '',
+    description: '',
+    password: '',
+    invalidateEnrollments: false,
+  });
+  const [editingExamId, setEditingExamId] = useState<string | null>(null);
+  const [examEditForm, setExamEditForm] = useState({
+    name: '',
+    startTime: '',
+    durationMinutes: 60,
   });
 
   const alertsByExam = useMemo(() => {
@@ -145,8 +171,6 @@ export default function ProfessorDashboard() {
       if (!data?.examId) return;
       if (data.reason === 'NO_TASKS') {
         setError('Cannot start exam. Add at least one task first.');
-      } else {
-        setError('Unable to start exam.');
       }
     });
 
@@ -374,30 +398,56 @@ export default function ProfessorDashboard() {
     }
   };
 
-  const handleUpdateSubject = async (subject: SubjectWithExams) => {
-    const name = prompt('Enter new subject name:', subject.name);
-    if (name === null) return;
-    const description = prompt('Enter new subject description:', subject.description);
-    if (description === null) return;
-    const password = prompt('Enter new subject password (leave blank to keep current):', '');
-    if (password === null) return;
-    const invalidateEnrollments = password
-      ? confirm('Remove existing enrollments for this subjectc')
-      : false;
+  const startEditSubject = (subject: SubjectWithExams) => {
+    setEditingSubjectId(subject.id);
+    setSubjectEditForm({
+      name: subject.name || '',
+      description: subject.description || '',
+      password: '',
+      invalidateEnrollments: false,
+    });
+  };
 
+  const cancelEditSubject = () => {
+    setEditingSubjectId(null);
+    setSubjectEditForm({
+      name: '',
+      description: '',
+      password: '',
+      invalidateEnrollments: false,
+    });
+  };
+
+  const handleSubjectEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    if (type === 'checkbox') {
+      const target = e.target as HTMLInputElement;
+      setSubjectEditForm((prev) => ({ ...prev, [name]: target.checked }));
+      return;
+    }
+    setSubjectEditForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSaveSubject = async (subjectId: string) => {
+    setError('');
+    setMessage('');
     try {
-      const response = await api.put(`/exams/subjects/${subject.id}`, {
-        name,
-        description,
-        password: password || undefined,
-        invalidateEnrollments
-      });
+      const payload: any = {
+        name: subjectEditForm.name,
+        description: subjectEditForm.description,
+      };
+      if (subjectEditForm.password.trim()) {
+        payload.password = subjectEditForm.password.trim();
+        payload.invalidateEnrollments = subjectEditForm.invalidateEnrollments;
+      }
+      const response = await api.put(`/exams/subjects/${subjectId}`, payload);
       setSubjects((prev) =>
         prev.map((item) =>
-          item.id === subject.id ? { ...item, ...response.data } : item
+          item.id === subjectId ? { ...item, ...response.data } : item
         )
       );
-      setMessage(`Subject "${name}" updated.`);
+      setMessage(`Subject "${response.data.name}" updated.`);
+      cancelEditSubject();
     } catch (err: any) {
       console.error('Update subject error:', err);
       setError(err.response?.data?.error || 'Error while updating subject');
@@ -417,31 +467,56 @@ export default function ProfessorDashboard() {
     }
   };
 
-  const handleUpdateExam = async (exam: ExamType) => {
-    const name = prompt('Enter new exam name:', exam.name);
-    if (name === null) return;
-    const startTime = prompt('Enter new start time (ISO string):', exam.startTime);
-    if (startTime === null) return;
-    const durationInput = prompt('Enter new duration (minutes):', exam.durationMinutes.toString());
-    if (durationInput === null) return;
-    const durationMinutes = parseInt(durationInput, 10);
-    if (Number.isNaN(durationMinutes) || durationMinutes <= 0) return;
+  const startEditExam = (exam: ExamType) => {
+    setEditingExamId(exam.id);
+    setExamEditForm({
+      name: exam.name || '',
+      startTime: exam.startTime ? toDateTimeLocal(exam.startTime) : '',
+      durationMinutes: exam.durationMinutes || 60,
+    });
+  };
 
+  const cancelEditExam = () => {
+    setEditingExamId(null);
+    setExamEditForm({
+      name: '',
+      startTime: '',
+      durationMinutes: 60,
+    });
+  };
+
+  const handleExamEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setExamEditForm((prev) => ({
+      ...prev,
+      [name]: name === 'durationMinutes' ? Number(value) : value,
+    }));
+  };
+
+  const handleSaveExam = async (examId: string) => {
+    setError('');
+    setMessage('');
+    const durationMinutes = Number(examEditForm.durationMinutes);
+    if (!examEditForm.name.trim() || !examEditForm.startTime.trim() || !durationMinutes || durationMinutes <= 0) {
+      setError('Please provide a valid name, start time, and duration.');
+      return;
+    }
     try {
-      const response = await api.put(`/exams/exams/${exam.id}`, {
-        name,
-        startTime,
-        durationMinutes
+      const response = await api.put(`/exams/exams/${examId}`, {
+        name: examEditForm.name.trim(),
+        startTime: toIsoString(examEditForm.startTime.trim()),
+        durationMinutes,
       });
       setSubjects((prev) =>
         prev.map((subject) => ({
           ...subject,
           exams: subject.exams.map((item) =>
-            item.id === exam.id ? { ...item, ...response.data } : item
+            item.id === examId ? { ...item, ...response.data } : item
           ),
         }))
       );
-      setMessage(`Exam "${name}" updated.`);
+      setMessage(`Exam "${response.data.name}" updated.`);
+      cancelEditExam();
     } catch (err: any) {
       console.error('Update exam error:', err);
       setError(err.response?.data?.error || 'Error while updating exam');
@@ -541,9 +616,12 @@ export default function ProfessorDashboard() {
     setMessage('');
 
     try {
-      const response = await api.post('/exams/exams', examData);
+      const response = await api.post('/exams/exams', {
+        ...examData,
+        startTime: toIsoString(examData.startTime),
+      });
       setMessage(`Exam "${response.data.name}" created. ID: ${response.data.id}`);
-      const scheduledStart = new Date(examData.startTime).getTime();
+      const scheduledStart = new Date(toIsoString(examData.startTime)).getTime();
       const isFuture = !Number.isNaN(scheduledStart) && scheduledStart > Date.now();
       const initialStatus = isFuture ? 'wait_room' : 'waiting_start';
 
@@ -884,10 +962,14 @@ export default function ProfessorDashboard() {
                           <div className="flex justify-end gap-2">
                             <button
                               type="button"
-                              onClick={() => handleUpdateSubject(subject)}
+                              onClick={() =>
+                                editingSubjectId === subject.id
+                                  ? cancelEditSubject()
+                                  : startEditSubject(subject)
+                              }
                               className="px-3 py-1 text-xs rounded border border-indigo-300 text-indigo-600 hover:bg-indigo-50"
                             >
-                              Edit
+                              {editingSubjectId === subject.id ? 'Close edit' : 'Edit'}
                             </button>
                             <button
                               type="button"
@@ -899,6 +981,65 @@ export default function ProfessorDashboard() {
                           </div>
                         </td>
                       </tr>
+                      {editingSubjectId === subject.id && (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-4 bg-indigo-50/60 dark:bg-indigo-900/20">
+                            <div className="text-sm font-semibold text-indigo-700 dark:text-indigo-200 mb-3">
+                              Edit subject
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <input
+                                name="name"
+                                value={subjectEditForm.name}
+                                onChange={handleSubjectEditChange}
+                                placeholder="Subject name"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                              />
+                              <input
+                                name="description"
+                                value={subjectEditForm.description}
+                                onChange={handleSubjectEditChange}
+                                placeholder="Subject description"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                              />
+                              <input
+                                name="password"
+                                type="password"
+                                value={subjectEditForm.password}
+                                onChange={handleSubjectEditChange}
+                                placeholder="New subject password (optional)"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                              />
+                              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <input
+                                  type="checkbox"
+                                  name="invalidateEnrollments"
+                                  checked={subjectEditForm.invalidateEnrollments}
+                                  onChange={handleSubjectEditChange}
+                                  disabled={!subjectEditForm.password.trim()}
+                                />
+                                Invalidate current enrollments
+                              </label>
+                            </div>
+                            <div className="mt-3 flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleSaveSubject(subject.id)}
+                                className="px-4 py-2 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                              >
+                                Save subject
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelEditSubject}
+                                className="px-4 py-2 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-100"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
                       {expandedSubjectId === subject.id && (
                         <tr>
                           <td colSpan={4} className="px-6 py-4 bg-gray-50 dark:bg-gray-900/30">
@@ -937,8 +1078,8 @@ export default function ProfessorDashboard() {
                                             {status === 'active' && 'Active'}
                                             {status === 'paused' && 'Paused'}
                                             {status === 'completed' && 'Completed'}
-                                            {status === 'wait_room' && 'Not scheduled'}
-                                            {status === 'waiting_start' && 'Waiting for professor'}
+                                            {status === 'wait_room' && 'Inactive (scheduled)'}
+                                            {status === 'waiting_start' && 'Waiting to start'}
                                           </span>
                                         </div>
                                         <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -1028,10 +1169,14 @@ export default function ProfessorDashboard() {
                                         )}
 
                                         <button 
-                                          onClick={() => handleUpdateExam(exam)}
+                                          onClick={() =>
+                                            editingExamId === exam.id
+                                              ? cancelEditExam()
+                                              : startEditExam(exam)
+                                          }
                                           className="px-3 py-1 text-xs border border-indigo-300 text-indigo-600 rounded hover:bg-indigo-50"
                                         >
-                                          Edit
+                                          {editingExamId === exam.id ? 'Close edit' : 'Edit'}
                                         </button>
 
                                         <button 
@@ -1050,6 +1195,54 @@ export default function ProfessorDashboard() {
                                         </button>
                                       </div>
                                     </li>
+                                    {editingExamId === exam.id && (
+                                      <li className="bg-indigo-50/70 dark:bg-indigo-900/20 rounded p-3 border border-indigo-200 dark:border-indigo-800">
+                                        <div className="text-sm font-semibold text-indigo-700 dark:text-indigo-200 mb-3">
+                                          Edit exam
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                          <input
+                                            name="name"
+                                            value={examEditForm.name}
+                                            onChange={handleExamEditChange}
+                                            placeholder="Exam name"
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                          />
+                                          <input
+                                            name="startTime"
+                                            type="datetime-local"
+                                            value={examEditForm.startTime}
+                                            onChange={handleExamEditChange}
+                                            placeholder="Start time (YYYY-MM-DDTHH:mm)"
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                          />
+                                          <input
+                                            name="durationMinutes"
+                                            type="number"
+                                            min="1"
+                                            value={examEditForm.durationMinutes}
+                                            onChange={handleExamEditChange}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                          />
+                                        </div>
+                                        <div className="mt-3 flex gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleSaveExam(exam.id)}
+                                            className="px-4 py-2 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                                          >
+                                            Save exam
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={cancelEditExam}
+                                            className="px-4 py-2 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-100"
+                                          >
+                                            Cancel
+                                          </button>
+                                        </div>
+                                      </li>
+                                    )}
                                     {taskExamId === exam.id && (
                                       <li className="bg-gray-50 dark:bg-gray-900/40 rounded p-3 border border-gray-200 dark:border-gray-700">
                                         <div className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">

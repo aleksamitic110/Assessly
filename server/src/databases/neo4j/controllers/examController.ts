@@ -4,6 +4,8 @@ import bcrypt from 'bcrypt';
 import { neo4jDriver } from '../driver.js';
 import { redisClient } from '../../redis/client.js';
 import { logUserActivity } from '../../cassandra/services/logsService.js';
+import { autoSubmitExam } from '../services/autoSubmitService.js';
+import { emitExamChanged } from '../../redis/services/socketService.js';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -26,6 +28,9 @@ const resolveExamState = async (examId: string, scheduledStartTime?: string) => 
     const remainingMs = Math.max(0, endTime - now);
     if (remainingMs === 0) {
       await redisClient.set(`exam:${examId}:status`, 'completed', { EX: STATE_TTL_SECONDS });
+      void autoSubmitExam(examId).catch((error) => {
+        console.error('Auto submit failed:', error);
+      });
       return { status: 'completed', actualStartTime: startTime, endTime, remainingSeconds: 0 };
     }
     return { status: 'active', actualStartTime: startTime, endTime, remainingSeconds: Math.ceil(remainingMs / 1000) };
@@ -109,6 +114,7 @@ export const createSubject = async (req: any, res: Response) => {
     const subject = result.records[0].get('s').properties;
     delete subject.passwordHash;
     res.status(201).json(subject);
+    emitExamChanged(subject.id, 'subject_created');
   } catch (error) {
     res.status(500).json({ error: 'Error while creating subject' });
   } finally {
@@ -152,6 +158,7 @@ export const updateSubject = async (req: any, res: Response) => {
     const subject = result.records[0].get('s').properties;
     delete subject.passwordHash;
     res.json(subject);
+    emitExamChanged(subject.id, 'subject_updated');
   } catch (error) {
     res.status(500).json({ error: 'Error while updating subject' });
   } finally {
@@ -204,6 +211,7 @@ export const deleteSubject = async (req: any, res: Response) => {
     );
 
     res.json({ message: 'Subject deleted' });
+    emitExamChanged(subjectId, 'subject_deleted');
   } catch (error) {
     res.status(500).json({ error: 'Error while deleting subject' });
   } finally {
@@ -386,6 +394,7 @@ export const createExam = async (req: any, res: Response) => {
     );
 
     res.status(201).json(result.records[0].get('e').properties);
+    emitExamChanged(subjectId, 'exam_created');
   } catch (error) {
     res.status(500).json({ error: 'Error while creating exam' });
   } finally {
@@ -416,6 +425,7 @@ export const updateExam = async (req: any, res: Response) => {
     }
 
     res.json(result.records[0].get('e').properties);
+    emitExamChanged(examId, 'exam_updated');
   } catch (error) {
     res.status(500).json({ error: 'Error while updating exam' });
   } finally {
@@ -453,6 +463,7 @@ export const deleteExam = async (req: any, res: Response) => {
     );
 
     res.json({ message: 'Exam deleted' });
+    emitExamChanged(examId, 'exam_deleted');
   } catch (error) {
     res.status(500).json({ error: 'Error while deleting exam' });
   } finally {

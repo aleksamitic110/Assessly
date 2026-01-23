@@ -34,6 +34,9 @@ export default function StudentDashboard() {
   const [hasUpdates, setHasUpdates] = useState(false);
   const [lastUpdateAt, setLastUpdateAt] = useState<number | null>(null);
   const isMountedRef = useRef(true);
+  const loadStartedAtRef = useRef<number | null>(null);
+  const lastUpdateAtRef = useRef<number | null>(null);
+  const lastRefreshAtRef = useRef<number>(0);
 
   const allExams = useMemo(
     () => subjects.flatMap((subject) => subject.exams || []),
@@ -48,6 +51,8 @@ export default function StudentDashboard() {
   }, []);
 
   const loadSubjects = useCallback(async () => {
+    const startedAt = Date.now();
+    loadStartedAtRef.current = startedAt;
     setIsLoading(true);
     setError('');
     try {
@@ -65,8 +70,13 @@ export default function StudentDashboard() {
       }));
       if (isMountedRef.current) {
         setSubjects(mapped);
-        setHasUpdates(false);
-        setLastUpdateAt(null);
+        lastRefreshAtRef.current = Date.now();
+        const lastUpdate = lastUpdateAtRef.current ?? 0;
+        if (lastUpdate <= startedAt) {
+          setHasUpdates(false);
+          setLastUpdateAt(null);
+          lastUpdateAtRef.current = null;
+        }
       }
     } catch (err: any) {
       if (isMountedRef.current) {
@@ -92,12 +102,25 @@ export default function StudentDashboard() {
       setHasUpdates(true);
       if (payload.timestamp) {
         setLastUpdateAt(payload.timestamp);
+        lastUpdateAtRef.current = payload.timestamp;
+      }
+    };
+
+    const handleChangesSnapshot = (payload: { lastChange: number | null }) => {
+      if (!payload || !payload.lastChange) return;
+      if (payload.lastChange > lastRefreshAtRef.current) {
+        setHasUpdates(true);
+        setLastUpdateAt(payload.lastChange);
+        lastUpdateAtRef.current = payload.lastChange;
       }
     };
 
     socket.on('exam_changed', handleExamChanged);
+    socket.on('changes_snapshot', handleChangesSnapshot);
+    socket.emit('request_changes_snapshot');
     return () => {
       socket.off('exam_changed', handleExamChanged);
+      socket.off('changes_snapshot', handleChangesSnapshot);
       disconnectSocket();
     };
   }, [user]);
@@ -151,13 +174,13 @@ export default function StudentDashboard() {
       case 'wait_room':
         return (
           <span className="px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-            Not scheduled yet
+            Inactive (scheduled)
           </span>
         );
       case 'waiting_start':
         return (
           <span className="px-3 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
-            Waiting for professor
+            Waiting to start
           </span>
         );
       case 'active':
@@ -431,7 +454,7 @@ export default function StudentDashboard() {
                                 disabled
                                 className="px-6 py-2 text-sm font-medium text-gray-400 bg-gray-200 dark:bg-gray-700 rounded-lg cursor-not-allowed"
                               >
-                                Not scheduled
+                                Inactive
                               </button>
                             )}
                             {exam.status === 'waiting_start' && (
@@ -439,7 +462,7 @@ export default function StudentDashboard() {
                                 disabled
                                 className="px-6 py-2 text-sm font-medium text-gray-400 bg-gray-200 dark:bg-gray-700 rounded-lg cursor-not-allowed"
                               >
-                                Waiting for professor
+                                Waiting to start
                               </button>
                             )}
                             {exam.status === 'paused' && (
