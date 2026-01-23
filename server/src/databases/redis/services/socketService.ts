@@ -8,7 +8,7 @@ import { autoSubmitExam } from '../../neo4j/services/autoSubmitService.js';
 
 dotenv.config();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'tvoj_tajni_kljuc';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 interface UserPayload {
   id: string;
@@ -155,6 +155,7 @@ export const initSocket = (io: Server) => {
     const token = socket.handshake.auth.token || socket.handshake.headers['token'];
 
     if (!token) return next(new Error('Authentication error: No token provided'));
+    if (!JWT_SECRET) return next(new Error('Authentication error: Server misconfigured'));
 
     try {
       const decoded = jwt.verify(token as string, JWT_SECRET) as UserPayload;

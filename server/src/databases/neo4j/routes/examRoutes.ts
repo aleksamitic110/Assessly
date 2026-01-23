@@ -22,31 +22,33 @@ import {
   updateTask,
   deleteTask
 } from '../controllers/examController.js';
-import { authenticateJWT } from '../middleware/authMiddleware.js';
+import { authenticateJWT, requireRole } from '../middleware/authMiddleware.js';
 import { taskUpload } from '../../../middleware/upload.js';
+import { validate } from '../../../middleware/validate.js';
+import { uuidParam, subjectSchemas, examSchemas, taskSchemas, submissionSchemas } from '../../../validation/schemas.js';
 
 const router = Router();
 
-router.post('/subjects', authenticateJWT, createSubject);
-router.put('/subjects/:subjectId', authenticateJWT, updateSubject);
-router.delete('/subjects/:subjectId', authenticateJWT, deleteSubject);
-router.post('/subjects/enroll', authenticateJWT, enrollSubject);
-router.delete('/subjects/:subjectId/unenroll', authenticateJWT, unenrollSubject);
-router.get('/subjects/enrolled', authenticateJWT, getStudentSubjects);
-router.post('/exams', authenticateJWT, createExam);
-router.put('/exams/:examId', authenticateJWT, updateExam);
-router.delete('/exams/:examId', authenticateJWT, deleteExam);
-router.post('/tasks', authenticateJWT, taskUpload.single('pdf'), createTask);
-router.put('/tasks/:taskId', authenticateJWT, taskUpload.single('pdf'), updateTask);
-router.delete('/tasks/:taskId', authenticateJWT, deleteTask);
+router.post('/subjects', authenticateJWT, requireRole('PROFESSOR'), validate({ body: subjectSchemas.create }), createSubject);
+router.put('/subjects/:subjectId', authenticateJWT, requireRole('PROFESSOR'), validate({ params: uuidParam, body: subjectSchemas.update }), updateSubject);
+router.delete('/subjects/:subjectId', authenticateJWT, requireRole('PROFESSOR'), validate({ params: uuidParam }), deleteSubject);
+router.post('/subjects/enroll', authenticateJWT, requireRole('STUDENT'), validate({ body: subjectSchemas.enroll }), enrollSubject);
+router.delete('/subjects/:subjectId/unenroll', authenticateJWT, requireRole('STUDENT'), validate({ params: uuidParam }), unenrollSubject);
+router.get('/subjects/enrolled', authenticateJWT, requireRole('STUDENT'), getStudentSubjects);
+router.post('/exams', authenticateJWT, requireRole('PROFESSOR'), validate({ body: examSchemas.create }), createExam);
+router.put('/exams/:examId', authenticateJWT, requireRole('PROFESSOR'), validate({ params: uuidParam, body: examSchemas.update }), updateExam);
+router.delete('/exams/:examId', authenticateJWT, requireRole('PROFESSOR'), validate({ params: uuidParam }), deleteExam);
+router.post('/tasks', authenticateJWT, requireRole('PROFESSOR'), taskUpload.single('pdf'), validate({ body: taskSchemas.create }), createTask);
+router.put('/tasks/:taskId', authenticateJWT, requireRole('PROFESSOR'), taskUpload.single('pdf'), validate({ params: uuidParam, body: taskSchemas.update }), updateTask);
+router.delete('/tasks/:taskId', authenticateJWT, requireRole('PROFESSOR'), validate({ params: uuidParam }), deleteTask);
 router.get('/', authenticateJWT, getAvailableExams);
-router.get('/subjects', authenticateJWT, getProfessorSubjects);
-router.get('/:examId', authenticateJWT, getExamById);
-router.get('/:examId/tasks', authenticateJWT, getExamTasks);
-router.post('/:examId/submissions', authenticateJWT, saveSubmission);
-router.get('/:examId/submissions', authenticateJWT, getMySubmissions);
-router.get('/:examId/submissions/:studentId', authenticateJWT, getStudentSubmissions);
-router.post('/:examId/submit', authenticateJWT, submitExam);
-router.post('/:examId/withdraw', authenticateJWT, withdrawExam);
+router.get('/subjects', authenticateJWT, requireRole('PROFESSOR'), getProfessorSubjects);
+router.get('/:examId', authenticateJWT, validate({ params: uuidParam }), getExamById);
+router.get('/:examId/tasks', authenticateJWT, validate({ params: uuidParam }), getExamTasks);
+router.post('/:examId/submissions', authenticateJWT, requireRole('STUDENT'), validate({ params: uuidParam, body: submissionSchemas.save }), saveSubmission);
+router.get('/:examId/submissions', authenticateJWT, requireRole('STUDENT'), validate({ params: uuidParam }), getMySubmissions);
+router.get('/:examId/submissions/:studentId', authenticateJWT, requireRole('PROFESSOR'), validate({ params: uuidParam }), getStudentSubmissions);
+router.post('/:examId/submit', authenticateJWT, requireRole('STUDENT'), validate({ params: uuidParam }), submitExam);
+router.post('/:examId/withdraw', authenticateJWT, requireRole('STUDENT'), validate({ params: uuidParam }), withdrawExam);
 
 export default router;

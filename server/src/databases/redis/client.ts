@@ -3,11 +3,14 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const redisUrl = process.env.REDIS_URL || '';
+const useTls = redisUrl.startsWith('rediss://') || String(process.env.REDIS_TLS || '').toLowerCase() === 'true';
+
 export const redisClient = createClient({
-  url: process.env.REDIS_URL,
+  url: redisUrl,
   socket: {
-    tls: true,
-    rejectUnauthorized: false
+    tls: useTls,
+    rejectUnauthorized: String(process.env.REDIS_TLS_REJECT_UNAUTHORIZED || '').toLowerCase() !== 'false'
   }
 });
 

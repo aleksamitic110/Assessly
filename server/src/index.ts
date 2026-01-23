@@ -8,6 +8,9 @@ dotenv.config();
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
+import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
+import morgan from 'morgan';
 import { Server } from 'socket.io';
 import path from 'path';
 
@@ -21,21 +24,57 @@ import { redisClient } from './databases/redis/client.js';
 import { initSocket } from './databases/redis/services/socketService.js';
 import { neo4jDriver } from './databases/neo4j/driver.js';
 import { cassandraClient } from './databases/cassandra/client.js';
+import { apiLimiter } from './middleware/rateLimit.js';
+import { errorHandler } from './middleware/errorHandler.js';
+import { env, getCorsOrigins } from './config/env.js';
 
 const PORT = process.env.PORT || 3000;
 
 const app = express();
 const server = http.createServer(app);
 
-app.use(cors());
-app.use(express.json());
+if (env.TRUST_PROXY) {
+  app.set('trust proxy', 1);
+}
+
+const corsOrigins = getCorsOrigins();
+const corsOptions: cors.CorsOptions = {
+  origin: corsOrigins.length
+    ? (origin, callback) => {
+        if (!origin || corsOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      }
+    : true,
+  credentials: true
+};
+
+app.disable('x-powered-by');
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'none'"],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
+      connectSrc: ["'self'", ...corsOrigins]
+    }
+  }
+}));
+app.use(cors(corsOptions));
+app.use(cookieParser());
+app.use(morgan(':method :url :status - :response-time ms'));
+app.use(apiLimiter);
+app.use(express.json({ limit: env.REQUEST_SIZE_LIMIT || '512kb' }));
+app.use(express.urlencoded({ extended: true, limit: env.REQUEST_SIZE_LIMIT || '512kb' }));
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 const io = new Server(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  }
+  cors: corsOptions
 });
 
 initSocket(io);
@@ -51,6 +90,8 @@ app.use('/status/cassandra', cassandraStatusRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/exams', examRoutes);
 app.use('/api/logs', logsRoutes);
+
+app.use(errorHandler);
 
 async function initializeDatabases() {
   console.log('Initializing databases...');

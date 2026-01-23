@@ -44,3 +44,21 @@ export const sendVerificationEmail = async (to: string, token: string) => {
     html: `<p>Click the link to verify your account:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p>`
   });
 };
+
+export const sendPasswordResetEmail = async (to: string, resetUrl: string) => {
+  if (!hasSmtpConfig) {
+    console.log(`[email] Password reset link for ${to}: ${resetUrl}`);
+    return;
+  }
+
+  const transporter = getTransporter();
+  if (!transporter) return;
+
+  await transporter.sendMail({
+    from: SMTP_FROM,
+    to,
+    subject: 'Reset your Assessly password',
+    text: `Use the link to reset your password: ${resetUrl}`,
+    html: `<p>Use the link to reset your password:</p><p><a href="${resetUrl}">${resetUrl}</a></p>`
+  });
+};
