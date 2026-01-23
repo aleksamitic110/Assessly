@@ -101,6 +101,14 @@ export const initSocket = (io: Server) => {
     io.to(examId).emit('exam_state', state);
   };
 
+  const notifyExamChanged = (examId: string, status: string) => {
+    io.emit('exam_changed', {
+      examId,
+      status,
+      timestamp: Date.now()
+    });
+  };
+
   io.use((socket, next) => {
     const token = socket.handshake.auth.token || socket.handshake.headers['token'];
 
@@ -197,6 +205,7 @@ export const initSocket = (io: Server) => {
       await clearWithdrawnForExam(examId);
 
       await emitExamState(examId);
+      notifyExamChanged(examId, 'active');
     });
 
     socket.on('pause_exam', async (data) => {
@@ -214,6 +223,7 @@ export const initSocket = (io: Server) => {
       await redisClient.del(`exam:${examId}:end_time`);
 
       await emitExamState(examId);
+      notifyExamChanged(examId, 'paused');
     });
 
     socket.on('resume_exam', async (data) => {
@@ -231,6 +241,7 @@ export const initSocket = (io: Server) => {
       await redisClient.del(`exam:${examId}:remaining_ms`);
 
       await emitExamState(examId);
+      notifyExamChanged(examId, 'active');
     });
 
     socket.on('extend_exam', async (data) => {
@@ -255,6 +266,7 @@ export const initSocket = (io: Server) => {
       }
 
       await emitExamState(examId);
+      notifyExamChanged(examId, status || 'active');
     });
 
     socket.on('end_exam', async (data) => {
@@ -266,6 +278,7 @@ export const initSocket = (io: Server) => {
       await redisClient.del(`exam:${examId}:remaining_ms`);
 
       await emitExamState(examId);
+      notifyExamChanged(examId, 'completed');
     });
 
     socket.on('restart_exam', async (data) => {
@@ -289,6 +302,7 @@ export const initSocket = (io: Server) => {
       await clearWithdrawnForExam(examId);
 
       await emitExamState(examId);
+      notifyExamChanged(examId, 'active');
     });
 
     socket.on('disconnect', async () => {

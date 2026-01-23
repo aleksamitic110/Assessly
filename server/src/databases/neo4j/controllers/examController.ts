@@ -322,7 +322,8 @@ export const getStudentSubjects = async (req: any, res: Response) => {
       { studentId }
     );
 
-    const subjects = await Promise.all(result.records.map(async record => {
+    const subjects = [];
+    for (const record of result.records) {
       const subject = record.get('s').properties;
       const exams = (record.get('exams') || [])
         .filter((exam: any) => exam)
@@ -335,29 +336,30 @@ export const getStudentSubjects = async (req: any, res: Response) => {
           subjectName: subject.name
         }));
 
-      const examsWithStatus = await Promise.all(
-        exams.map(async (exam) => {
-          const state = await resolveExamState(exam.id, exam.startTime);
-          const submitted = await hasSubmittedExam(session, exam.id, studentId);
-          if (submitted) {
-            return { ...exam, status: 'submitted', remainingSeconds: 0 };
-          }
-          const withdrawn = await shouldTreatAsWithdrawn(exam.id, studentId);
-          if (withdrawn) {
-            return { ...exam, status: 'withdrawn', remainingSeconds: 0 };
-          }
-          return { ...exam, ...state };
-        })
-      );
+      const examsWithStatus = [];
+      for (const exam of exams) {
+        const state = await resolveExamState(exam.id, exam.startTime);
+        const submitted = await hasSubmittedExam(session, exam.id, studentId);
+        if (submitted) {
+          examsWithStatus.push({ ...exam, status: 'submitted', remainingSeconds: 0 });
+          continue;
+        }
+        const withdrawn = await shouldTreatAsWithdrawn(exam.id, studentId);
+        if (withdrawn) {
+          examsWithStatus.push({ ...exam, status: 'withdrawn', remainingSeconds: 0 });
+          continue;
+        }
+        examsWithStatus.push({ ...exam, ...state });
+      }
 
       delete subject.passwordHash;
-      return {
+      subjects.push({
         id: subject.id,
         name: subject.name,
         description: subject.description,
         exams: examsWithStatus
-      };
-    }));
+      });
+    }
 
     res.json(subjects);
   } catch (error) {
@@ -660,22 +662,23 @@ export const getAvailableExams = async (req: any, res: Response) => {
       };
     });
 
-    const examsWithStatus = await Promise.all(
-      exams.map(async (exam) => {
-        const state = await resolveExamState(exam.id, exam.startTime);
-        if (req.user?.role === 'STUDENT' && req.user?.id) {
-          const submitted = await hasSubmittedExam(session, exam.id, req.user.id);
-          if (submitted) {
-            return { ...exam, status: 'submitted', remainingSeconds: 0 };
-          }
-          const withdrawn = await shouldTreatAsWithdrawn(exam.id, req.user.id);
-          if (withdrawn) {
-            return { ...exam, status: 'withdrawn', remainingSeconds: 0 };
-          }
+    const examsWithStatus = [];
+    for (const exam of exams) {
+      const state = await resolveExamState(exam.id, exam.startTime);
+      if (req.user?.role === 'STUDENT' && req.user?.id) {
+        const submitted = await hasSubmittedExam(session, exam.id, req.user.id);
+        if (submitted) {
+          examsWithStatus.push({ ...exam, status: 'submitted', remainingSeconds: 0 });
+          continue;
         }
-        return { ...exam, ...state };
-      })
-    );
+        const withdrawn = await shouldTreatAsWithdrawn(exam.id, req.user.id);
+        if (withdrawn) {
+          examsWithStatus.push({ ...exam, status: 'withdrawn', remainingSeconds: 0 });
+          continue;
+        }
+      }
+      examsWithStatus.push({ ...exam, ...state });
+    }
 
     res.json(examsWithStatus);
   } catch (error) {

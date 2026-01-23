@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { socket, connectSocket, disconnectSocket } from '../services/socket';
 import type { Exam } from '../types';
 
 interface AvailableExam {
@@ -30,6 +31,8 @@ export default function StudentDashboard() {
   const [enrollPassword, setEnrollPassword] = useState('');
   const [enrollMessage, setEnrollMessage] = useState('');
   const [enrollError, setEnrollError] = useState('');
+  const [hasUpdates, setHasUpdates] = useState(false);
+  const [lastUpdateAt, setLastUpdateAt] = useState<number | null>(null);
   const isMountedRef = useRef(true);
 
   const allExams = useMemo(
@@ -62,6 +65,8 @@ export default function StudentDashboard() {
       }));
       if (isMountedRef.current) {
         setSubjects(mapped);
+        setHasUpdates(false);
+        setLastUpdateAt(null);
       }
     } catch (err: any) {
       if (isMountedRef.current) {
@@ -78,6 +83,25 @@ export default function StudentDashboard() {
     loadSubjects();
   }, [loadSubjects]);
 
+  useEffect(() => {
+    if (!user) return;
+
+    connectSocket();
+    const handleExamChanged = (payload: { examId: string; status: string; timestamp: number }) => {
+      if (!payload?.examId) return;
+      setHasUpdates(true);
+      if (payload.timestamp) {
+        setLastUpdateAt(payload.timestamp);
+      }
+    };
+
+    socket.on('exam_changed', handleExamChanged);
+    return () => {
+      socket.off('exam_changed', handleExamChanged);
+      disconnectSocket();
+    };
+  }, [user]);
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -89,6 +113,10 @@ export default function StudentDashboard() {
 
   const handleViewWork = (examId: string) => {
     navigate(`/exam/${examId}/review`);
+  };
+
+  const handleRefresh = async () => {
+    await loadSubjects();
   };
 
   const handleEnroll = async () => {
@@ -203,6 +231,26 @@ export default function StudentDashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {hasUpdates && (
+          <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-blue-800 shadow-sm dark:border-blue-900 dark:bg-blue-900/30 dark:text-blue-100">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm font-medium">
+                Updates available. Refresh to see the latest exam changes.
+                {lastUpdateAt ? (
+                  <span className="ml-2 text-xs text-blue-700/80 dark:text-blue-200/80">
+                    Last change: {new Date(lastUpdateAt).toLocaleTimeString('en-US')}
+                  </span>
+                ) : null}
+              </div>
+              <button
+                onClick={handleRefresh}
+                className="px-3 py-2 text-xs font-semibold text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-100 dark:border-blue-700 dark:text-blue-100 dark:hover:bg-blue-900/60 transition-colors"
+              >
+                Refresh now
+              </button>
+            </div>
+          </div>
+        )}
         <div className="bg-gradient-to-r from-indigo-500 to-blue-600 rounded-lg shadow-lg p-6 mb-8 text-white">
           <h2 className="text-2xl font-bold mb-2">
             Welcome, {user?.firstName}!
