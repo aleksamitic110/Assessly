@@ -7,6 +7,7 @@ import {
   getProfessorSubjects,
   getExamTasks,
   getExamById,
+  withdrawExam,
   createExam,
   updateExam,
   deleteExam,
@@ -32,5 +33,6 @@ router.get('/', authenticateJWT, getAvailableExams);
 router.get('/subjects', authenticateJWT, getProfessorSubjects);
 router.get('/:examId', authenticateJWT, getExamById);
 router.get('/:examId/tasks', authenticateJWT, getExamTasks);
+router.post('/:examId/withdraw', authenticateJWT, withdrawExam);
 
 export default router;

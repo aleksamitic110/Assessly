@@ -23,6 +23,20 @@ declare module 'socket.io' {
 
 export const initSocket = (io: Server) => {
   const STATE_TTL_SECONDS = 60 * 60 * 24;
+  const WITHDRAWN_KEY_PREFIX = (examId: string) => `exam:${examId}:withdrawn:`;
+
+  const clearWithdrawnForExam = async (examId: string) => {
+    const pattern = `${WITHDRAWN_KEY_PREFIX(examId)}*`;
+    let cursor = 0;
+    do {
+      const result = await redisClient.scan(cursor, { MATCH: pattern, COUNT: 100 });
+      cursor = Number(result.cursor);
+      const keys = result.keys;
+      if (keys.length > 0) {
+        await redisClient.del(keys);
+      }
+    } while (cursor !== 0);
+  };
 
   const getExamState = async (examId: string) => {
     const [status, endTimeRaw, startTimeRaw, remainingRaw] = await redisClient.mGet([
@@ -221,6 +235,7 @@ export const initSocket = (io: Server) => {
       await redisClient.set(`exam:${examId}:end_time`, endTime.toString(), { EX: STATE_TTL_SECONDS });
       await redisClient.set(`exam:${examId}:duration_seconds`, (Number(durationMinutes) * 60).toString(), { EX: STATE_TTL_SECONDS });
       await redisClient.del(`exam:${examId}:remaining_ms`);
+      await clearWithdrawnForExam(examId);
 
       await emitExamState(examId);
     });

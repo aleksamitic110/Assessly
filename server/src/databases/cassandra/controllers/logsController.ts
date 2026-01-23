@@ -19,18 +19,18 @@ interface AuthenticatedRequest extends Request {
 
 export async function createExecutionLog(req: AuthenticatedRequest, res: Response) {
   try {
-    const { examId, taskId, sourceCode, output, status } = req.body as LogExecutionRequest;
+    const { examId, sourceCode, output, status } = req.body as LogExecutionRequest;
     const studentId = req.user?.id;
 
     if (!studentId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    if (!examId || !taskId || !sourceCode || !status) {
-      return res.status(400).json({ error: 'Missing required fields: examId, taskId, sourceCode, status' });
+    if (!examId || !sourceCode || !status) {
+      return res.status(400).json({ error: 'Missing required fields: examId, sourceCode, status' });
     }
 
-    await logExecution(examId, studentId, taskId, sourceCode, output || '', status);
+    await logExecution(examId, studentId, sourceCode, output || '', status);
     res.status(201).json({ message: 'Execution logged successfully' });
   } catch (error) {
     console.error('Error logging execution:', error);

@@ -1,11 +1,10 @@
 export type ExecutionStatus = 'SUCCESS' | 'ERROR' | 'TIMEOUT' | 'RUNNING';
 export type SecurityEventType = 'TAB_SWITCH' | 'COPY_PASTE' | 'BLUR' | 'FOCUS' | 'SUSPICIOUS_ACTIVITY';
-export type UserActivityEventType = 'REGISTER' | 'LOGIN';
+export type UserActivityEventType = 'REGISTER' | 'LOGIN' | 'EXAM_WITHDRAW';
 
 export interface ExecutionLog {
   examId: string;
   studentId: string;
-  taskId: string;
   timestamp: Date;
   sourceCode: string;
   output: string;
@@ -29,7 +28,6 @@ export interface UserActivityLog {
 
 export interface LogExecutionRequest {
   examId: string;
-  taskId: string;
   sourceCode: string;
   output: string;
   status: ExecutionStatus;
@@ -44,7 +42,6 @@ export interface LogSecurityEventRequest {
 export interface ExecutionLogResponse {
   examId: string;
   studentId: string;
-  taskId: string;
   timestamp: string;
   sourceCode: string;
   output: string;

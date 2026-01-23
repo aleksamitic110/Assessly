@@ -25,7 +25,7 @@ export default function ExamPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [violations, setViolations] = useState(0);
-  const [examStatus, setExamStatus] = useState<'wait_room' | 'waiting_start' | 'active' | 'paused' | 'completed'>('wait_room');
+  const [examStatus, setExamStatus] = useState<'wait_room' | 'waiting_start' | 'active' | 'paused' | 'completed' | 'withdrawn'>('wait_room');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showTaskList, setShowTaskList] = useState(true);
   const [showTaskDetails, setShowTaskDetails] = useState(true);
@@ -38,7 +38,23 @@ export default function ExamPage() {
   // Anti-cheat refs
   const lastActivityRef = useRef<number>(Date.now());
   const dragModeRef = useRef<'vertical' | 'horizontal' | null>(null);
+  const dragStartRef = useRef<{ x: number; leftWidth: number; y: number; outputHeight: number }>({
+    x: 0,
+    leftWidth: 33,
+    y: 0,
+    outputHeight: 220,
+  });
   const rightPanelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (examStatus === 'withdrawn') {
+      alert('Odustali ste od ovog ispita.');
+      navigate('/student');
+    }
+    if (examStatus === 'active' && examId) {
+      localStorage.removeItem(`exam_withdrawn:${examId}`);
+    }
+  }, [examStatus, navigate]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -54,7 +70,8 @@ export default function ExamPage() {
       if (!dragModeRef.current) return;
 
       if (dragModeRef.current === 'vertical') {
-        const next = (event.clientX / window.innerWidth) * 100;
+        const delta = ((event.clientX - dragStartRef.current.x) / window.innerWidth) * 100;
+        const next = dragStartRef.current.leftWidth + delta;
         const clamped = Math.min(60, Math.max(20, next));
         setLeftWidth(clamped);
         return;
@@ -62,10 +79,12 @@ export default function ExamPage() {
 
       if (dragModeRef.current === 'horizontal' && rightPanelRef.current) {
         const rect = rightPanelRef.current.getBoundingClientRect();
-        const nextHeight = rect.bottom - event.clientY;
+        const delta = dragStartRef.current.y - event.clientY;
+        const nextHeight = dragStartRef.current.outputHeight + delta;
         const minHeight = 120;
         const maxHeight = Math.max(minHeight, rect.height - 180);
-        setOutputHeight(Math.min(maxHeight, Math.max(minHeight, nextHeight)));
+        const clampedHeight = Math.min(maxHeight, Math.max(minHeight, nextHeight));
+        setOutputHeight(clampedHeight);
       }
     };
 
@@ -154,6 +173,11 @@ export default function ExamPage() {
         setExamDetails(examResponse.data);
         const status = examResponse.data.status || 'waiting_start';
         setExamStatus(status);
+        if (status === 'withdrawn') {
+          localStorage.setItem(`exam_withdrawn:${examId}`, 'true');
+        } else {
+          localStorage.removeItem(`exam_withdrawn:${examId}`);
+        }
         if (typeof examResponse.data.remainingSeconds === 'number') {
           setTimeLeft(examResponse.data.remainingSeconds);
         } else if (status === 'active') {
@@ -277,7 +301,6 @@ export default function ExamPage() {
       try {
         await logsService.logExecution(
           examId,
-          currentTask.id,
           code,
           'Kod pokrenut',
           'RUNNING'
@@ -301,7 +324,6 @@ Vreme izvrsavanja: 0.003s`;
       if (examId) {
         logsService.logExecution(
           examId,
-          currentTask.id,
           code,
           mockOutput,
           'SUCCESS'
@@ -321,7 +343,6 @@ Vreme izvrsavanja: 0.003s`;
     try {
       await logsService.logExecution(
         examId,
-        currentTask.id,
         code,
         'Kod sacuvan',
         'SUCCESS'
@@ -343,7 +364,6 @@ Vreme izvrsavanja: 0.003s`;
     if (examId && currentTask && examStatus === 'active') {
       await logsService.logExecution(
         examId,
-        currentTask.id,
         code,
         'Ispit predat',
         'SUCCESS'
@@ -351,6 +371,20 @@ Vreme izvrsavanja: 0.003s`;
       alert('Ispit je uspesno predat!');
     }
     navigate('/student');
+  };
+
+  const handleCancelExam = async () => {
+    if (!confirm('Da li ste sigurni da zelite da odustanete od ispita?')) return;
+    if (examId) {
+      try {
+        await api.post(`/exams/${examId}/withdraw`);
+      } catch (error) {
+        console.error('Failed to withdraw:', error);
+      } finally {
+        localStorage.setItem(`exam_withdrawn:${examId}`, 'true');
+        navigate('/student');
+      }
+    }
   };
 
   const isExamLocked = examStatus !== 'active';
@@ -379,13 +413,14 @@ Vreme izvrsavanja: 0.003s`;
               </div>
             )}
             <div className="flex items-center space-x-3">
-              <span className="text-xs uppercase tracking-wide text-gray-400">
-                {examStatus === 'active' && 'Aktivan'}
-                {examStatus === 'paused' && 'Pauziran'}
-                {examStatus === 'wait_room' && 'Ceka termin'}
-                {examStatus === 'waiting_start' && 'Ceka start'}
-                {examStatus === 'completed' && 'Zavrsen'}
-              </span>
+            <span className="text-xs uppercase tracking-wide text-gray-400">
+              {examStatus === 'active' && 'Aktivan'}
+              {examStatus === 'paused' && 'Pauziran'}
+              {examStatus === 'wait_room' && 'Ceka termin'}
+              {examStatus === 'waiting_start' && 'Ceka start'}
+              {examStatus === 'completed' && 'Zavrsen'}
+              {examStatus === 'withdrawn' && 'Odustao'}
+            </span>
               {/* Timer */}
               <div className={`text-lg font-mono ${timeLeft < 300 ? 'text-red-400' : 'text-green-400'}`}>
                 {formatTime(timeLeft)}
@@ -409,6 +444,12 @@ Vreme izvrsavanja: 0.003s`;
               className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors"
             >
               Predaj ispit
+            </button>
+            <button
+              onClick={handleCancelExam}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition-colors"
+            >
+              Odustani
             </button>
           </div>
         </div>
@@ -542,8 +583,14 @@ Vreme izvrsavanja: 0.003s`;
         {/* Right panel - Editor and Output */}
         <div
           className="w-1 bg-gray-700 cursor-col-resize hover:bg-gray-500"
-          onMouseDown={() => {
+          onMouseDown={(event) => {
+            event.preventDefault();
             dragModeRef.current = 'vertical';
+            dragStartRef.current = {
+              ...dragStartRef.current,
+              x: event.clientX,
+              leftWidth,
+            };
           }}
         />
         <div className="flex-1 flex flex-col" ref={rightPanelRef}>
@@ -572,8 +619,14 @@ Vreme izvrsavanja: 0.003s`;
           {showEditor && showOutput && (
             <div
               className="h-2 bg-gray-800 cursor-row-resize hover:bg-gray-700"
-              onMouseDown={() => {
+              onMouseDown={(event) => {
+                event.preventDefault();
                 dragModeRef.current = 'horizontal';
+                dragStartRef.current = {
+                  ...dragStartRef.current,
+                  y: event.clientY,
+                  outputHeight,
+                };
               }}
             />
           )}

@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { neo4jDriver } from '../driver.js';
 import { redisClient } from '../../redis/client.js';
+import { logUserActivity } from '../../cassandra/services/logsService.js';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -48,6 +49,8 @@ const resolveExamState = async (examId: string, scheduledStartTime?: string) => 
 
   return { status: 'waiting_start', actualStartTime: startTime, endTime, remainingSeconds: 0 };
 };
+
+const getWithdrawnKey = (examId: string, studentId: string) => `exam:${examId}:withdrawn:${studentId}`;
 
 export const createSubject = async (req: any, res: Response) => {
   const { name, description } = req.body;
@@ -441,10 +444,16 @@ export const getAvailableExams = async (req: any, res: Response) => {
     });
 
     const examsWithStatus = await Promise.all(
-      exams.map(async (exam) => ({
-        ...exam,
-        ...(await resolveExamState(exam.id, exam.startTime))
-      }))
+      exams.map(async (exam) => {
+        const state = await resolveExamState(exam.id, exam.startTime);
+        if (req.user?.role === 'STUDENT' && req.user?.id) {
+          const withdrawn = await redisClient.get(getWithdrawnKey(exam.id, req.user.id));
+          if (withdrawn) {
+            return { ...exam, status: 'withdrawn', remainingSeconds: 0 };
+          }
+        }
+        return { ...exam, ...state };
+      })
     );
 
     res.json(examsWithStatus);
@@ -476,6 +485,21 @@ export const getExamById = async (req: any, res: Response) => {
     const subject = result.records[0].get('s').properties;
 
     const state = await resolveExamState(exam.id, exam.startTime);
+    if (req.user?.role === 'STUDENT' && req.user?.id) {
+      const withdrawn = await redisClient.get(getWithdrawnKey(exam.id, req.user.id));
+      if (withdrawn) {
+        return res.json({
+          id: exam.id,
+          name: exam.name,
+          startTime: exam.startTime,
+          durationMinutes: Number(exam.durationMinutes),
+          subjectId: subject.id,
+          subjectName: subject.name,
+          status: 'withdrawn',
+          remainingSeconds: 0
+        });
+      }
+    }
 
     res.json({
       id: exam.id,
@@ -579,5 +603,26 @@ export const getExamTasks = async (req: any, res: Response) => {
     res.status(500).json({ error: 'Error while fetching tasks' });
   } finally {
     await session.close();
+  }
+};
+
+export const withdrawExam = async (req: any, res: Response) => {
+  const { examId } = req.params;
+  const studentId = req.user?.id;
+  if (!studentId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  if (req.user?.role !== 'STUDENT') {
+    return res.status(403).json({ error: 'Only students can withdraw' });
+  }
+
+  try {
+    await redisClient.set(getWithdrawnKey(examId, studentId), 'true', { EX: STATE_TTL_SECONDS });
+    await logUserActivity(studentId, 'EXAM_WITHDRAW', {
+      examId
+    });
+    res.json({ message: 'Withdrawn' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error while withdrawing from exam' });
   }
 };

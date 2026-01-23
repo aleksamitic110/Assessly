@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { socket, connectSocket, disconnectSocket } from '../services/socket';
 import type { Exam } from '../types';
 
 interface AvailableExam {
@@ -10,7 +11,7 @@ interface AvailableExam {
   subjectName: string;
   startTime: string;
   durationMinutes: number;
-  status: 'wait_room' | 'waiting_start' | 'active' | 'paused' | 'completed';
+  status: 'wait_room' | 'waiting_start' | 'active' | 'paused' | 'completed' | 'withdrawn';
 }
 
 export default function StudentDashboard() {
@@ -20,6 +21,16 @@ export default function StudentDashboard() {
   const [exams, setExams] = useState<AvailableExam[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const isMountedRef = useRef(true);
+
+  const updateExamStatus = useCallback((examId: string, status: AvailableExam['status']) => {
+    if (status === 'active') {
+      localStorage.removeItem(`exam_withdrawn:${examId}`);
+    }
+    setExams((prev) =>
+      prev.map((exam) => (exam.id === examId ? { ...exam, status } : exam))
+    );
+  }, []);
 
   const getExamStatus = (startTime: string, durationMinutes: number): AvailableExam['status'] => {
     const start = new Date(startTime).getTime();
@@ -34,40 +45,84 @@ export default function StudentDashboard() {
   };
 
   useEffect(() => {
-    let isMounted = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
-    const loadExams = async () => {
+  const loadExams = useCallback(async (silent = false) => {
+    if (!silent) {
       setIsLoading(true);
-      setError('');
-      try {
-        const response = await api.get<Exam[]>('/exams');
-        const mapped = response.data.map((exam) => ({
+    }
+    setError('');
+    try {
+      const response = await api.get<Exam[]>('/exams');
+      const mapped = response.data.map((exam) => {
+        const serverStatus = exam.status || getExamStatus(exam.startTime, exam.durationMinutes);
+        const withdrawn = serverStatus === 'withdrawn';
+        if (!withdrawn) {
+          localStorage.removeItem(`exam_withdrawn:${exam.id}`);
+        } else {
+          localStorage.setItem(`exam_withdrawn:${exam.id}`, 'true');
+        }
+        return {
           id: exam.id,
           name: exam.name,
           subjectName: exam.subjectName || 'Nepoznat predmet',
           startTime: exam.startTime,
           durationMinutes: exam.durationMinutes,
-          status: exam.status || getExamStatus(exam.startTime, exam.durationMinutes),
-        }));
-        if (isMounted) {
-          setExams(mapped);
-        }
-      } catch (err: any) {
-        if (isMounted) {
-          setError(err.response?.data?.error || 'Greska prilikom ucitavanja ispita');
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+          status: withdrawn ? 'withdrawn' : serverStatus,
+        };
+      });
+      if (isMountedRef.current) {
+        setExams(mapped);
       }
+    } catch (err: any) {
+      if (isMountedRef.current) {
+        setError(err.response?.data?.error || 'Greska prilikom ucitavanja ispita');
+      }
+    } finally {
+      if (isMountedRef.current && !silent) {
+        setIsLoading(false);
+      }
+    }
+  }, [getExamStatus]);
+
+  useEffect(() => {
+    loadExams(false);
+  }, [loadExams]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      loadExams(true);
+    }, 10000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [loadExams]);
+
+  useEffect(() => {
+    connectSocket();
+
+    const handleExamState = (data: { examId: string; status?: AvailableExam['status'] }) => {
+      if (!data?.examId || !data.status) return;
+      updateExamStatus(data.examId, data.status);
     };
 
-    loadExams();
+    socket.on('exam_state', handleExamState);
+
     return () => {
-      isMounted = false;
+      socket.off('exam_state', handleExamState);
+      disconnectSocket();
     };
-  }, []);
+  }, [updateExamStatus]);
+
+  useEffect(() => {
+    exams.forEach((exam) => {
+      socket.emit('join_exam', exam.id);
+    });
+  }, [exams]);
 
   const handleLogout = () => {
     logout();
@@ -108,6 +163,12 @@ export default function StudentDashboard() {
         return (
           <span className="px-3 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
             Zavrsen
+          </span>
+        );
+      case 'withdrawn':
+        return (
+          <span className="px-3 py-1 text-xs font-medium rounded-full bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+            Odustao
           </span>
         );
     }
@@ -207,7 +268,7 @@ export default function StudentDashboard() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Zavrseni ispiti</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {exams.filter(e => e.status === 'completed').length}
+                  {exams.filter(e => e.status === 'completed' || e.status === 'withdrawn').length}
                 </p>
               </div>
             </div>
@@ -306,16 +367,24 @@ export default function StudentDashboard() {
                           Pauziran
                         </button>
                       )}
-                      {exam.status === 'completed' && (
-                        <button
-                          className="px-6 py-2 text-sm font-medium text-indigo-600 border border-indigo-600 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
-                        >
-                          Vidi rezultate
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                              {exam.status === 'completed' && (
+                                <button
+                                  className="px-6 py-2 text-sm font-medium text-indigo-600 border border-indigo-600 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+                                >
+                                  Vidi rezultate
+                                </button>
+                              )}
+                              {exam.status === 'withdrawn' && (
+                                <button
+                                  disabled
+                                  className="px-6 py-2 text-sm font-medium text-gray-500 bg-gray-200 dark:bg-gray-700 rounded-lg cursor-not-allowed"
+                                >
+                                  Odustao
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
               ))}
             </div>
           ) : null}

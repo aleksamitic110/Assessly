@@ -41,7 +41,7 @@ export interface Exam {
   durationMinutes: number;
   subjectId?: string;
   subjectName?: string;
-  status?: 'wait_room' | 'waiting_start' | 'active' | 'paused' | 'completed';
+  status?: 'wait_room' | 'waiting_start' | 'active' | 'paused' | 'completed' | 'withdrawn';
   actualStartTime?: number;
   endTime?: number;
   remainingSeconds?: number;
@@ -66,7 +66,6 @@ export type SecurityEventType = 'TAB_SWITCH' | 'COPY_PASTE' | 'BLUR' | 'FOCUS' |
 export interface ExecutionLog {
   examId: string;
   studentId: string;
-  taskId: string;
   timestamp: string;
   sourceCode: string;
   output: string;

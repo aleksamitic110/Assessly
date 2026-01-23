@@ -11,14 +11,13 @@ import type {
 export async function logExecution(
   examId: string,
   studentId: string,
-  taskId: string,
   sourceCode: string,
   output: string,
   status: ExecutionStatus
 ): Promise<void> {
   const query = `
-    INSERT INTO execution_logs (exam_id, student_id, task_id, timestamp, source_code, output, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO execution_logs (exam_id, student_id, timestamp, source_code, output, status)
+    VALUES (?, ?, ?, ?, ?, ?)
   `;
 
   await cassandraClient.execute(
@@ -26,7 +25,6 @@ export async function logExecution(
     [
       types.Uuid.fromString(examId),
       types.Uuid.fromString(studentId),
-      types.Uuid.fromString(taskId),
       new Date(),
       sourceCode,
       output,
@@ -42,7 +40,7 @@ export async function getExecutionLogs(
   limit: number = 50
 ): Promise<ExecutionLogResponse[]> {
   const query = `
-    SELECT exam_id, student_id, task_id, timestamp, source_code, output, status
+    SELECT exam_id, student_id, timestamp, source_code, output, status
     FROM execution_logs
     WHERE exam_id = ? AND student_id = ?
     LIMIT ?
@@ -61,46 +59,11 @@ export async function getExecutionLogs(
   return result.rows.map(row => ({
     examId: row.exam_id.toString(),
     studentId: row.student_id.toString(),
-    taskId: row.task_id.toString(),
     timestamp: row.timestamp.toISOString(),
     sourceCode: row.source_code,
     output: row.output,
     status: row.status as ExecutionStatus
   }));
-}
-
-export async function getExecutionLogsForTask(
-  examId: string,
-  studentId: string,
-  taskId: string
-): Promise<ExecutionLogResponse[]> {
-  const query = `
-    SELECT exam_id, student_id, task_id, timestamp, source_code, output, status
-    FROM execution_logs
-    WHERE exam_id = ? AND student_id = ?
-    ALLOW FILTERING
-  `;
-
-  const result = await cassandraClient.execute(
-    query,
-    [
-      types.Uuid.fromString(examId),
-      types.Uuid.fromString(studentId)
-    ],
-    { prepare: true }
-  );
-
-  return result.rows
-    .filter(row => row.task_id.toString() === taskId)
-    .map(row => ({
-      examId: row.exam_id.toString(),
-      studentId: row.student_id.toString(),
-      taskId: row.task_id.toString(),
-      timestamp: row.timestamp.toISOString(),
-      sourceCode: row.source_code,
-      output: row.output,
-      status: row.status as ExecutionStatus
-    }));
 }
 
 export async function logSecurityEvent(
