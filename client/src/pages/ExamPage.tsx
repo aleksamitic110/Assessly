@@ -35,7 +35,7 @@ export default function ExamPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [violations, setViolations] = useState(0);
-  const [examStatus, setExamStatus] = useState<'wait_room' | 'waiting_start' | 'active' | 'paused' | 'completed' | 'withdrawn'>('wait_room');
+  const [examStatus, setExamStatus] = useState<'wait_room' | 'waiting_start' | 'active' | 'paused' | 'completed' | 'withdrawn' | 'submitted'>('wait_room');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showTaskList, setShowTaskList] = useState(true);
   const [showTaskDetails, setShowTaskDetails] = useState(true);
@@ -51,6 +51,10 @@ export default function ExamPage() {
 
   useEffect(() => {
     if (isReviewMode) {
+      return;
+    }
+    if (examStatus === 'submitted' && examId) {
+      navigate(`/exam/${examId}/review`);
       return;
     }
     if (examStatus === 'withdrawn') {
@@ -180,6 +184,9 @@ export default function ExamPage() {
         setExamDetails(examResponse.data);
         const status = examResponse.data.status || 'waiting_start';
         setExamStatus(status);
+        if (status === 'submitted' && !isReviewMode) {
+          navigate(`/exam/${examId}/review`);
+        }
         if (status === 'withdrawn') {
           localStorage.setItem(`exam_withdrawn:${examId}`, 'true');
         } else {
@@ -410,6 +417,7 @@ Code saved.` : 'Code saved.'));
         'Exam submitted',
         'SUCCESS'
       );
+      await api.post(`/exams/${examId}/submit`);
       alert('Exam submitted successfully!');
     }
     navigate('/student');
@@ -462,6 +470,7 @@ Code saved.` : 'Code saved.'));
                 {examStatus === 'wait_room' && 'Not scheduled'}
                 {examStatus === 'waiting_start' && 'Waiting for professor'}
                 {examStatus === 'completed' && 'Completed'}
+                {examStatus === 'submitted' && 'Submitted'}
                 {examStatus === 'withdrawn' && 'Withdrawn'}
               </span>
               {!isReviewMode && (
@@ -532,6 +541,7 @@ Code saved.` : 'Code saved.'));
               {examStatus === 'waiting_start' && 'Waiting for the professor to start the exam.'}
               {examStatus === 'paused' && 'The exam is currently paused.'}
               {examStatus === 'completed' && 'The exam is completed.'}
+              {examStatus === 'submitted' && 'You already submitted this exam.'}
             </div>
           )}
           {isReviewMode && (

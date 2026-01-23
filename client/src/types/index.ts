@@ -41,7 +41,7 @@ export interface Exam {
   durationMinutes: number;
   subjectId?: string;
   subjectName?: string;
-  status?: 'wait_room' | 'waiting_start' | 'active' | 'paused' | 'completed' | 'withdrawn';
+  status?: 'wait_room' | 'waiting_start' | 'active' | 'paused' | 'completed' | 'withdrawn' | 'submitted';
   taskCount?: number;
   actualStartTime?: number;
   endTime?: number;

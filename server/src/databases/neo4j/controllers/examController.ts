@@ -54,6 +54,19 @@ const resolveExamState = async (examId: string, scheduledStartTime?: string) => 
 const getWithdrawnKey = (examId: string, studentId: string) => `exam:${examId}:withdrawn:${studentId}`;
 const getSessionKey = (examId: string) => `exam:${examId}:session_id`;
 
+const hasSubmittedExam = async (session: any, examId: string, studentId: string) => {
+  const result = await session.run(
+    `
+    MATCH (u:User {id: $studentId})-[r:SUBMITTED_EXAM]->(e:Exam {id: $examId})
+    RETURN count(r) AS submitCount
+    `,
+    { studentId, examId }
+  );
+  const countRaw = result.records[0]?.get('submitCount');
+  const count = typeof countRaw?.toNumber === 'function' ? countRaw.toNumber() : Number(countRaw || 0);
+  return count > 0;
+};
+
 const shouldTreatAsWithdrawn = async (examId: string, studentId: string) => {
   const [withdrawnRaw, sessionId] = await redisClient.mGet([
     getWithdrawnKey(examId, studentId),
@@ -325,6 +338,10 @@ export const getStudentSubjects = async (req: any, res: Response) => {
       const examsWithStatus = await Promise.all(
         exams.map(async (exam) => {
           const state = await resolveExamState(exam.id, exam.startTime);
+          const submitted = await hasSubmittedExam(session, exam.id, studentId);
+          if (submitted) {
+            return { ...exam, status: 'submitted', remainingSeconds: 0 };
+          }
           const withdrawn = await shouldTreatAsWithdrawn(exam.id, studentId);
           if (withdrawn) {
             return { ...exam, status: 'withdrawn', remainingSeconds: 0 };
@@ -647,6 +664,10 @@ export const getAvailableExams = async (req: any, res: Response) => {
       exams.map(async (exam) => {
         const state = await resolveExamState(exam.id, exam.startTime);
         if (req.user?.role === 'STUDENT' && req.user?.id) {
+          const submitted = await hasSubmittedExam(session, exam.id, req.user.id);
+          if (submitted) {
+            return { ...exam, status: 'submitted', remainingSeconds: 0 };
+          }
           const withdrawn = await shouldTreatAsWithdrawn(exam.id, req.user.id);
           if (withdrawn) {
             return { ...exam, status: 'withdrawn', remainingSeconds: 0 };
@@ -701,6 +722,19 @@ export const getExamById = async (req: any, res: Response) => {
 
     const state = await resolveExamState(exam.id, exam.startTime);
     if (req.user?.role === 'STUDENT' && req.user?.id) {
+      const submitted = await hasSubmittedExam(session, exam.id, req.user.id);
+      if (submitted) {
+        return res.json({
+          id: exam.id,
+          name: exam.name,
+          startTime: exam.startTime,
+          durationMinutes: Number(exam.durationMinutes),
+          subjectId: subject.id,
+          subjectName: subject.name,
+          status: 'submitted',
+          remainingSeconds: 0
+        });
+      }
       const withdrawn = await shouldTreatAsWithdrawn(exam.id, req.user.id);
       if (withdrawn) {
         return res.json({
@@ -1008,6 +1042,49 @@ export const getStudentSubmissions = async (req: any, res: Response) => {
     res.json(submissions);
   } catch (error) {
     res.status(500).json({ error: 'Error while fetching submissions' });
+  } finally {
+    await session.close();
+  }
+};
+
+export const submitExam = async (req: any, res: Response) => {
+  const { examId } = req.params;
+  const studentId = req.user?.id;
+
+  if (!studentId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  if (req.user?.role !== 'STUDENT') {
+    return res.status(403).json({ error: 'Only students can submit exams' });
+  }
+
+  const session = neo4jDriver.session();
+  try {
+    const access = await session.run(
+      `
+      MATCH (u:User {id: $studentId})-[:ENROLLED_IN]->(:Subject)-[:SADRZI]->(e:Exam {id: $examId})
+      RETURN count(e) AS examCount
+      `,
+      { studentId, examId }
+    );
+    const countRaw = access.records[0]?.get('examCount');
+    const count = typeof countRaw?.toNumber === 'function' ? countRaw.toNumber() : Number(countRaw || 0);
+    if (!count) {
+      return res.status(403).json({ error: 'You are not enrolled in this subject' });
+    }
+
+    await session.run(
+      `
+      MATCH (u:User {id: $studentId}), (e:Exam {id: $examId})
+      MERGE (u)-[r:SUBMITTED_EXAM]->(e)
+      SET r.submittedAt = datetime()
+      `,
+      { studentId, examId }
+    );
+
+    res.json({ message: 'Submitted' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error while submitting exam' });
   } finally {
     await session.close();
   }

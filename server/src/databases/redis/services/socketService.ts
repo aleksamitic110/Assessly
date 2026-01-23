@@ -141,7 +141,21 @@ export const initSocket = (io: Server) => {
           studentId: user.id,
           email: user.email,
           status: 'online',
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          examId
+        });
+      }
+    });
+
+    socket.on('leave_exam', async (examId: string) => {
+      socket.leave(examId);
+      if (role === 'student') {
+        io.to(examId).emit('student_status_update', {
+          studentId: user.id,
+          email: user.email,
+          status: 'offline',
+          timestamp: Date.now(),
+          examId
         });
       }
     });
@@ -157,7 +171,8 @@ export const initSocket = (io: Server) => {
         email: user.email,
         type: data.type,
         count,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        examId: data.examId
       });
     });
 
@@ -286,7 +301,8 @@ export const initSocket = (io: Server) => {
             studentId: user.id,
             email: user.email,
             status: 'offline',
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            examId: room
           });
         }
       }

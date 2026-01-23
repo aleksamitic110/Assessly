@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
@@ -73,6 +73,27 @@ export default function ProfessorDashboard() {
     notes: '',
     pdfFile: null as File | null,
   });
+
+  const alertsByExam = useMemo(() => {
+    return liveAlerts.reduce<Record<string, Alert[]>>((acc, alert) => {
+      const key = alert.examId || 'unknown';
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(alert);
+      return acc;
+    }, {});
+  }, [liveAlerts]);
+
+  const examNameById = useMemo(() => {
+    const map: Record<string, string> = {};
+    subjects.forEach((subject) => {
+      subject.exams.forEach((exam) => {
+        map[exam.id] = `${exam.name} (${subject.name})`;
+      });
+    });
+    return map;
+  }, [subjects]);
 
   const updateExamStatus = (examId: string, status: ExamType['status']) => {
     setSubjects((prev) =>
@@ -447,11 +468,23 @@ export default function ProfessorDashboard() {
 
   //SOCKET: Funkcija za pracenje (Join Room)
   const handleMonitorExam = (examId: string) => {
-    if (monitoredExams.has(examId)) return;
-
     socket.emit('join_exam', examId);
-    setMonitoredExams(prev => new Set(prev).add(examId));
+    setMonitoredExams((prev) => {
+      const next = new Set(prev);
+      next.add(examId);
+      return next;
+    });
     setMessage(`Monitoring enabled for exam ID: ${examId.substring(0, 8)}...`);
+  };
+
+  const handleStopMonitorExam = (examId: string) => {
+    socket.emit('leave_exam', examId);
+    setMonitoredExams((prev) => {
+      const next = new Set(prev);
+      next.delete(examId);
+      return next;
+    });
+    setMessage(`Monitoring disabled for exam ID: ${examId.substring(0, 8)}...`);
   };
 
 
@@ -744,18 +777,33 @@ export default function ProfessorDashboard() {
               {liveAlerts.length === 0 ? (
                 <p className="text-center text-gray-500 mt-10">No active alerts.</p>
               ) : (
-                <div className="space-y-2">
-                  {liveAlerts.map((alert, idx) => (
-                    <div key={idx} className="p-2 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 rounded text-sm">
-                      <div className="flex justify-between font-bold text-red-700 dark:text-red-400">
-                        <span>{alert.email}</span>
-                        <span>{new Date(alert.timestamp).toLocaleTimeString()}</span>
+                <div className="space-y-4">
+                  {Object.entries(alertsByExam)
+                    .sort((a, b) => {
+                      const aLatest = a[1][0]?.timestamp || 0;
+                      const bLatest = b[1][0]?.timestamp || 0;
+                      return bLatest - aLatest;
+                    })
+                    .map(([examId, alerts]) => (
+                      <div key={examId} className="rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                        <div className="px-3 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
+                          {examNameById[examId] || `Exam ${examId.substring(0, 8)}...`}
+                        </div>
+                        <div className="p-2 space-y-2">
+                          {alerts.map((alert, idx) => (
+                            <div key={`${alert.studentId}-${idx}`} className="p-2 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 rounded text-sm">
+                              <div className="flex justify-between font-bold text-red-700 dark:text-red-400">
+                                <span>{alert.email}</span>
+                                <span>{new Date(alert.timestamp).toLocaleTimeString()}</span>
+                              </div>
+                              <div className="text-gray-600 dark:text-gray-300">
+                                Type: {alert.type} | Count: {alert.count}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <div className="text-gray-600 dark:text-gray-300">
-                        Type: {alert.type} | Count: {alert.count}
-                      </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               )}
             </div>
@@ -794,7 +842,7 @@ export default function ProfessorDashboard() {
                       Description
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Akcije
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -901,7 +949,11 @@ export default function ProfessorDashboard() {
                                       {/*SOCKET: Actions Buttons */}
                                       <div className="flex flex-wrap gap-2 justify-end">
                                         <button 
-                                          onClick={() => handleMonitorExam(exam.id)}
+                                          onClick={() =>
+                                            monitoredExams.has(exam.id)
+                                              ? handleStopMonitorExam(exam.id)
+                                              : handleMonitorExam(exam.id)
+                                          }
                                           className={`px-3 py-1 text-xs rounded border ${
                                             monitoredExams.has(exam.id) 
                                               ? 'bg-yellow-100 text-yellow-700 border-yellow-300' 

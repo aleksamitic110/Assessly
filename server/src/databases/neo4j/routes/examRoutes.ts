@@ -14,6 +14,7 @@ import {
   saveSubmission,
   getMySubmissions,
   getStudentSubmissions,
+  submitExam,
   createExam,
   updateExam,
   deleteExam,
@@ -45,6 +46,7 @@ router.get('/:examId/tasks', authenticateJWT, getExamTasks);
 router.post('/:examId/submissions', authenticateJWT, saveSubmission);
 router.get('/:examId/submissions', authenticateJWT, getMySubmissions);
 router.get('/:examId/submissions/:studentId', authenticateJWT, getStudentSubmissions);
+router.post('/:examId/submit', authenticateJWT, submitExam);
 router.post('/:examId/withdraw', authenticateJWT, withdrawExam);
 
 export default router;
