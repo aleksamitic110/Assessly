@@ -5,8 +5,12 @@ import {
   logSecurityEvent,
   getSecurityEvents,
   getSecurityEventsForStudent,
-  countSecurityEvents
+  countSecurityEvents,
+  addExamComment,
+  getExamComments,
+  deleteExamComment
 } from '../services/logsService.js';
+import { v4 as uuidv4 } from 'uuid';
 import type { LogExecutionRequest, LogSecurityEventRequest } from '../types.js';
 
 interface AuthenticatedRequest extends Request {
@@ -135,5 +139,117 @@ export async function getViolationCount(req: AuthenticatedRequest, res: Response
   } catch (error) {
     console.error('Error counting violations:', error);
     res.status(500).json({ error: 'Failed to count violations' });
+  }
+}
+
+// Exam Comments
+export async function createExamComment(req: AuthenticatedRequest, res: Response) {
+  try {
+    const { examId, studentId } = req.params;
+    const { line, message } = req.body;
+    const authorId = req.user?.id;
+    const authorName = `${req.user?.email || 'Unknown'}`;
+
+    if (!authorId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (req.user?.role !== 'PROFESSOR') {
+      return res.status(403).json({ error: 'Only professors can add comments' });
+    }
+
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    // Parse line number - handle null, undefined, NaN, and invalid values
+    let parsedLine: number | null = null;
+    if (line !== null && line !== undefined) {
+      const numLine = typeof line === 'number' ? line : parseInt(String(line), 10);
+      if (!Number.isNaN(numLine) && Number.isFinite(numLine) && numLine > 0) {
+        parsedLine = numLine;
+      }
+    }
+
+    const commentId = uuidv4();
+
+    console.log('Adding comment with:', {
+      examId,
+      studentId,
+      commentId,
+      parsedLine,
+      message: message.substring(0, 50),
+      authorId,
+      authorName
+    });
+
+    await addExamComment(
+      examId,
+      studentId,
+      commentId,
+      parsedLine,
+      message,
+      authorId,
+      authorName
+    );
+
+    res.status(201).json({
+      commentId,
+      examId,
+      studentId,
+      line: parsedLine,
+      message,
+      authorId,
+      authorName,
+      createdAt: new Date().toISOString()
+    });
+  } catch (error: any) {
+    console.error('Error creating exam comment:', error.message);
+    console.error('Full error stack:', error.stack);
+    res.status(500).json({ error: 'Failed to create comment', details: error.message });
+  }
+}
+
+export async function fetchExamComments(req: AuthenticatedRequest, res: Response) {
+  try {
+    const { examId, studentId } = req.params;
+    const userId = req.user?.id;
+    const userRole = req.user?.role;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Students can only view their own comments
+    if (userRole === 'STUDENT' && studentId !== userId) {
+      return res.status(403).json({ error: 'You can only view your own comments' });
+    }
+
+    const comments = await getExamComments(examId, studentId);
+    res.json(comments);
+  } catch (error) {
+    console.error('Error fetching exam comments:', error);
+    res.status(500).json({ error: 'Failed to fetch comments' });
+  }
+}
+
+export async function removeExamComment(req: AuthenticatedRequest, res: Response) {
+  try {
+    const { examId, studentId, commentId } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (req.user?.role !== 'PROFESSOR') {
+      return res.status(403).json({ error: 'Only professors can delete comments' });
+    }
+
+    await deleteExamComment(examId, studentId, commentId);
+    res.json({ message: 'Comment deleted' });
+  } catch (error) {
+    console.error('Error deleting exam comment:', error);
+    res.status(500).json({ error: 'Failed to delete comment' });
   }
 }

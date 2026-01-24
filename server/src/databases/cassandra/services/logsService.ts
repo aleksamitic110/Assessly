@@ -175,3 +175,103 @@ export async function logUserActivity(
     { prepare: true }
   );
 }
+
+// Exam Comments
+export interface ExamComment {
+  examId: string;
+  studentId: string;
+  commentId: string;
+  line: number | null;
+  message: string;
+  authorId: string;
+  authorName: string;
+  createdAt: string;
+}
+
+export async function addExamComment(
+  examId: string,
+  studentId: string,
+  commentId: string,
+  line: number | null,
+  message: string,
+  authorId: string,
+  authorName: string
+): Promise<void> {
+  const query = `
+    INSERT INTO exam_comments (exam_id, student_id, comment_id, line, message, author_id, author_name, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+
+  try {
+    await cassandraClient.execute(
+      query,
+      [
+        types.Uuid.fromString(examId),
+        types.Uuid.fromString(studentId),
+        types.Uuid.fromString(commentId),
+        line,
+        message,
+        types.Uuid.fromString(authorId),
+        authorName,
+        new Date()
+      ],
+      { prepare: true }
+    );
+  } catch (error: any) {
+    console.error('Cassandra addExamComment error:', error.message);
+    console.error('Full error:', error);
+    throw error;
+  }
+}
+
+export async function getExamComments(
+  examId: string,
+  studentId: string
+): Promise<ExamComment[]> {
+  const query = `
+    SELECT exam_id, student_id, comment_id, line, message, author_id, author_name, created_at
+    FROM exam_comments
+    WHERE exam_id = ? AND student_id = ?
+  `;
+
+  const result = await cassandraClient.execute(
+    query,
+    [
+      types.Uuid.fromString(examId),
+      types.Uuid.fromString(studentId)
+    ],
+    { prepare: true }
+  );
+
+  return result.rows.map(row => ({
+    examId: row.exam_id.toString(),
+    studentId: row.student_id.toString(),
+    commentId: row.comment_id.toString(),
+    line: row.line,
+    message: row.message,
+    authorId: row.author_id.toString(),
+    authorName: row.author_name,
+    createdAt: row.created_at.toISOString()
+  }));
+}
+
+export async function deleteExamComment(
+  examId: string,
+  studentId: string,
+  commentId: string
+): Promise<void> {
+  const query = `
+    DELETE FROM exam_comments
+    WHERE exam_id = ? AND student_id = ? AND comment_id = ?
+  `;
+
+  await cassandraClient.execute(
+    query,
+    [
+      types.Uuid.fromString(examId),
+      types.Uuid.fromString(studentId),
+      types.Uuid.fromString(commentId)
+    ],
+    { prepare: true }
+  );
+}

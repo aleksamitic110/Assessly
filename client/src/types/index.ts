@@ -88,3 +88,39 @@ export interface SecurityEvent {
   timestamp: string;
   details: Record<string, unknown>;
 }
+
+// Grade types
+export interface Grade {
+  examId: string;
+  studentId: string;
+  value: number;
+  comment: string;
+  professorId: string;
+  updatedAt: string | null;
+}
+
+// Exam Comment types (professor's feedback on student code)
+export interface ExamComment {
+  examId: string;
+  studentId: string;
+  commentId: string;
+  line: number | null;
+  message: string;
+  authorId: string;
+  authorName: string;
+  createdAt: string;
+}
+
+// Student with submission info (for professor's review)
+export interface ExamStudent {
+  studentId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  submittedAt: string | null;
+  grade: {
+    value: number;
+    comment: string;
+    updatedAt: string | null;
+  } | null;
+}

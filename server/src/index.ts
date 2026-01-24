@@ -23,7 +23,7 @@ import cassandraStatusRoutes from './databases/cassandra/routes/statusRoutes.js'
 import { redisClient } from './databases/redis/client.js';
 import { initSocket } from './databases/redis/services/socketService.js';
 import { neo4jDriver } from './databases/neo4j/driver.js';
-import { cassandraClient } from './databases/cassandra/client.js';
+import { cassandraClient, initCassandraTables } from './databases/cassandra/client.js';
 import { apiLimiter } from './middleware/rateLimit.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { env, getCorsOrigins } from './config/env.js';
@@ -105,6 +105,8 @@ async function initializeDatabases() {
 
   await cassandraClient.connect();
   console.log('Connected to Cassandra (Astra DB)');
+
+  await initCassandraTables();
 }
 
 const startServer = async () => {

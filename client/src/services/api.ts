@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { Grade, ExamComment, ExamStudent, Submission } from '../types';
 
 const API_URL = 'http://localhost:3000/api';
 
@@ -31,5 +32,39 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Grade API functions
+export const gradeApi = {
+  // Set or update a grade (professor only)
+  setGrade: (examId: string, studentId: string, value: number, comment: string) =>
+    api.post<Grade>(`/exams/${examId}/grade/${studentId}`, { value, comment }),
+
+  // Get a grade
+  getGrade: (examId: string, studentId: string) =>
+    api.get<Grade | null>(`/exams/${examId}/grade/${studentId}`),
+
+  // Get all students who submitted an exam (professor only)
+  getExamStudents: (examId: string) =>
+    api.get<ExamStudent[]>(`/exams/${examId}/students`),
+
+  // Get student submissions (professor only)
+  getStudentSubmissions: (examId: string, studentId: string) =>
+    api.get<Submission[]>(`/exams/${examId}/submissions/${studentId}`),
+};
+
+// Comments API functions (Cassandra)
+export const commentsApi = {
+  // Add a comment to student's exam work (professor only)
+  addComment: (examId: string, studentId: string, line: number | null, message: string) =>
+    api.post<ExamComment>(`/logs/comments/${examId}/${studentId}`, { line, message }),
+
+  // Get all comments for a student's exam work
+  getComments: (examId: string, studentId: string) =>
+    api.get<ExamComment[]>(`/logs/comments/${examId}/${studentId}`),
+
+  // Delete a comment (professor only)
+  deleteComment: (examId: string, studentId: string, commentId: string) =>
+    api.delete(`/logs/comments/${examId}/${studentId}/${commentId}`),
+};
 
 export default api;

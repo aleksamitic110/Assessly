@@ -20,7 +20,10 @@ import {
   deleteExam,
   createTask,
   updateTask,
-  deleteTask
+  deleteTask,
+  setGrade,
+  getGrade,
+  getExamStudents
 } from '../controllers/examController.js';
 import { authenticateJWT, requireRole } from '../middleware/authMiddleware.js';
 import { taskUpload } from '../../../middleware/upload.js';
@@ -50,5 +53,10 @@ router.get('/:examId/submissions', authenticateJWT, requireRole('STUDENT'), vali
 router.get('/:examId/submissions/:studentId', authenticateJWT, requireRole('PROFESSOR'), validate({ params: uuidParam }), getStudentSubmissions);
 router.post('/:examId/submit', authenticateJWT, requireRole('STUDENT'), validate({ params: uuidParam }), submitExam);
 router.post('/:examId/withdraw', authenticateJWT, requireRole('STUDENT'), validate({ params: uuidParam }), withdrawExam);
+
+// Grade routes
+router.get('/:examId/students', authenticateJWT, requireRole('PROFESSOR'), validate({ params: uuidParam }), getExamStudents);
+router.post('/:examId/grade/:studentId', authenticateJWT, requireRole('PROFESSOR'), validate({ params: uuidParam }), setGrade);
+router.get('/:examId/grade/:studentId', authenticateJWT, validate({ params: uuidParam }), getGrade);
 
 export default router;

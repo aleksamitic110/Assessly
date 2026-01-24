@@ -10,6 +10,8 @@ import Dashboard from './pages/Dashboard';
 import ProfessorDashboard from './pages/ProfessorDashboard';
 import StudentDashboard from './pages/StudentDashboard';
 import ExamPage from './pages/ExamPage';
+import ProfessorReviewPage from './pages/ProfessorReviewPage';
+import StudentWorkView from './pages/StudentWorkView';
 
 function App() {
   return (
@@ -40,6 +42,14 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/professor/exam/:examId/review"
+            element={
+              <ProtectedRoute allowedRoles={['PROFESSOR']}>
+                <ProfessorReviewPage />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Student only */}
           <Route
@@ -62,7 +72,7 @@ function App() {
             path="/exam/:examId/review"
             element={
               <ProtectedRoute allowedRoles={['STUDENT']}>
-                <ExamPage />
+                <StudentWorkView />
               </ProtectedRoute>
             }
           />

@@ -1193,6 +1193,13 @@ export default function ProfessorDashboard() {
                                         >
                                           Tasks
                                         </button>
+
+                                        <button
+                                          onClick={() => navigate(`/professor/exam/${exam.id}/review`)}
+                                          className="px-3 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
+                                        >
+                                          Review
+                                        </button>
                                       </div>
                                     </li>
                                     {editingExamId === exam.id && (

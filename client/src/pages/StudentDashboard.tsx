@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
+import api, { gradeApi } from '../services/api';
 import { socket, connectSocket, disconnectSocket } from '../services/socket';
-import type { Exam } from '../types';
+import type { Exam, Grade } from '../types';
 
 interface AvailableExam {
   id: string;
@@ -12,6 +12,7 @@ interface AvailableExam {
   startTime: string;
   durationMinutes: number;
   status: 'wait_room' | 'waiting_start' | 'active' | 'paused' | 'completed' | 'withdrawn' | 'submitted';
+  grade?: Grade | null;
 }
 
 interface StudentSubject {
@@ -66,10 +67,34 @@ export default function StudentDashboard() {
           startTime: exam.startTime,
           durationMinutes: exam.durationMinutes,
           status: exam.status || 'waiting_start',
+          grade: null as Grade | null,
         }))
       }));
+
+      // Fetch grades for submitted exams
+      const submittedExams = mapped.flatMap(s => s.exams).filter(e => e.status === 'submitted');
+      const gradePromises = submittedExams.map(async (exam) => {
+        try {
+          const gradeRes = await gradeApi.getGrade(exam.id, user?.id || '');
+          return { examId: exam.id, grade: gradeRes.data };
+        } catch {
+          return { examId: exam.id, grade: null };
+        }
+      });
+      const grades = await Promise.all(gradePromises);
+      const gradeMap = new Map(grades.map(g => [g.examId, g.grade]));
+
+      // Update exams with grades
+      const mappedWithGrades = mapped.map(subject => ({
+        ...subject,
+        exams: subject.exams.map(exam => ({
+          ...exam,
+          grade: gradeMap.get(exam.id) || null
+        }))
+      }));
+
       if (isMountedRef.current) {
-        setSubjects(mapped);
+        setSubjects(mappedWithGrades);
         lastRefreshAtRef.current = Date.now();
         const lastUpdate = lastUpdateAtRef.current ?? 0;
         if (lastUpdate <= startedAt) {
@@ -87,7 +112,7 @@ export default function StudentDashboard() {
         setIsLoading(false);
       }
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     loadSubjects();
@@ -424,7 +449,17 @@ export default function StudentDashboard() {
                                 {exam.name}
                               </h4>
                               {getStatusBadge(exam.status)}
+                              {exam.grade && (
+                                <span className="px-3 py-1 text-sm font-bold rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                  Grade: {exam.grade.value}
+                                </span>
+                              )}
                             </div>
+                            {exam.grade?.comment && (
+                              <div className="mt-1 text-sm text-gray-600 dark:text-gray-400 italic">
+                                "{exam.grade.comment}"
+                              </div>
+                            )}
                             <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
                               <span className="flex items-center">
                                 <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

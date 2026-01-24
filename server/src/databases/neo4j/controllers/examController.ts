@@ -1125,3 +1125,196 @@ export const withdrawExam = async (req: any, res: Response) => {
     res.status(500).json({ error: 'Error while withdrawing from exam' });
   }
 };
+
+// Grade Management
+export const setGrade = async (req: any, res: Response) => {
+  const { examId, studentId } = req.params;
+  const { value, comment } = req.body;
+  const professorId = req.user?.id;
+
+  if (!professorId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  if (req.user?.role !== 'PROFESSOR') {
+    return res.status(403).json({ error: 'Only professors can set grades' });
+  }
+
+  const session = neo4jDriver.session();
+  try {
+    // Verify professor owns the exam
+    const accessCheck = await session.run(
+      `
+      MATCH (p:User {id: $professorId})-[:PREDAJE]->(:Subject)-[:SADRZI]->(e:Exam {id: $examId})
+      RETURN count(e) AS examCount
+      `,
+      { professorId, examId }
+    );
+    const countRaw = accessCheck.records[0]?.get('examCount');
+    const count = typeof countRaw?.toNumber === 'function' ? countRaw.toNumber() : Number(countRaw || 0);
+    if (!count) {
+      return res.status(403).json({ error: 'You do not have access to this exam' });
+    }
+
+    // Create or update Grade node
+    const result = await session.run(
+      `
+      MATCH (e:Exam {id: $examId})
+      MATCH (s:User {id: $studentId})
+      MERGE (e)-[:HAS_GRADE]->(g:Grade {examId: $examId, studentId: $studentId})
+      SET g.value = $value,
+          g.comment = $comment,
+          g.professorId = $professorId,
+          g.updatedAt = datetime()
+      RETURN g
+      `,
+      { examId, studentId, value, comment: comment || '', professorId }
+    );
+
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: 'Exam or student not found' });
+    }
+
+    const grade = result.records[0].get('g').properties;
+    res.json({
+      examId: grade.examId,
+      studentId: grade.studentId,
+      value: grade.value,
+      comment: grade.comment,
+      professorId: grade.professorId,
+      updatedAt: grade.updatedAt?.toString?.() || null
+    });
+  } catch (error) {
+    console.error('Set grade error:', error);
+    res.status(500).json({ error: 'Error while setting grade' });
+  } finally {
+    await session.close();
+  }
+};
+
+export const getGrade = async (req: any, res: Response) => {
+  const { examId, studentId } = req.params;
+  const userId = req.user?.id;
+  const userRole = req.user?.role;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  // Students can only view their own grades
+  if (userRole === 'STUDENT' && studentId !== userId) {
+    return res.status(403).json({ error: 'You can only view your own grade' });
+  }
+
+  const session = neo4jDriver.session();
+  try {
+    // For professors, verify they own the exam
+    if (userRole === 'PROFESSOR') {
+      const accessCheck = await session.run(
+        `
+        MATCH (p:User {id: $professorId})-[:PREDAJE]->(:Subject)-[:SADRZI]->(e:Exam {id: $examId})
+        RETURN count(e) AS examCount
+        `,
+        { professorId: userId, examId }
+      );
+      const countRaw = accessCheck.records[0]?.get('examCount');
+      const count = typeof countRaw?.toNumber === 'function' ? countRaw.toNumber() : Number(countRaw || 0);
+      if (!count) {
+        return res.status(403).json({ error: 'You do not have access to this exam' });
+      }
+    }
+
+    const result = await session.run(
+      `
+      MATCH (e:Exam {id: $examId})-[:HAS_GRADE]->(g:Grade {studentId: $studentId})
+      RETURN g
+      `,
+      { examId, studentId }
+    );
+
+    if (result.records.length === 0) {
+      return res.json(null);
+    }
+
+    const grade = result.records[0].get('g').properties;
+    res.json({
+      examId: grade.examId,
+      studentId: grade.studentId,
+      value: grade.value,
+      comment: grade.comment,
+      professorId: grade.professorId,
+      updatedAt: grade.updatedAt?.toString?.() || null
+    });
+  } catch (error) {
+    console.error('Get grade error:', error);
+    res.status(500).json({ error: 'Error while fetching grade' });
+  } finally {
+    await session.close();
+  }
+};
+
+export const getExamStudents = async (req: any, res: Response) => {
+  const { examId } = req.params;
+  const professorId = req.user?.id;
+
+  if (!professorId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  if (req.user?.role !== 'PROFESSOR') {
+    return res.status(403).json({ error: 'Only professors can view exam students' });
+  }
+
+  const session = neo4jDriver.session();
+  try {
+    // Verify professor owns the exam
+    const accessCheck = await session.run(
+      `
+      MATCH (p:User {id: $professorId})-[:PREDAJE]->(:Subject)-[:SADRZI]->(e:Exam {id: $examId})
+      RETURN count(e) AS examCount
+      `,
+      { professorId, examId }
+    );
+    const countRaw = accessCheck.records[0]?.get('examCount');
+    const count = typeof countRaw?.toNumber === 'function' ? countRaw.toNumber() : Number(countRaw || 0);
+    if (!count) {
+      return res.status(403).json({ error: 'You do not have access to this exam' });
+    }
+
+    // Get all students who submitted the exam
+    const result = await session.run(
+      `
+      MATCH (s:User)-[sub:SUBMITTED_EXAM]->(e:Exam {id: $examId})
+      OPTIONAL MATCH (e)-[:HAS_GRADE]->(g:Grade {studentId: s.id})
+      RETURN s.id AS studentId,
+             s.email AS email,
+             s.firstName AS firstName,
+             s.lastName AS lastName,
+             sub.submittedAt AS submittedAt,
+             g.value AS gradeValue,
+             g.comment AS gradeComment,
+             g.updatedAt AS gradeUpdatedAt
+      ORDER BY s.lastName, s.firstName
+      `,
+      { examId }
+    );
+
+    const students = result.records.map(record => ({
+      studentId: record.get('studentId'),
+      email: record.get('email'),
+      firstName: record.get('firstName'),
+      lastName: record.get('lastName'),
+      submittedAt: record.get('submittedAt')?.toString?.() || null,
+      grade: record.get('gradeValue') !== null ? {
+        value: record.get('gradeValue'),
+        comment: record.get('gradeComment') || '',
+        updatedAt: record.get('gradeUpdatedAt')?.toString?.() || null
+      } : null
+    }));
+
+    res.json(students);
+  } catch (error) {
+    console.error('Get exam students error:', error);
+    res.status(500).json({ error: 'Error while fetching exam students' });
+  } finally {
+    await session.close();
+  }
+};

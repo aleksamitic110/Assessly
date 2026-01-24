@@ -9,7 +9,10 @@ import {
   createSecurityEvent,
   getExamSecurityEvents,
   getStudentSecurityEvents,
-  getViolationCount
+  getViolationCount,
+  createExamComment,
+  fetchExamComments,
+  removeExamComment
 } from '../controllers/logsController.js';
 
 const router = Router();
@@ -24,5 +27,10 @@ router.post('/security', validate({ body: logsSchemas.securityEvent }), createSe
 router.get('/security/:examId', requireRole('PROFESSOR'), validate({ params: uuidParam }), getExamSecurityEvents);
 router.get('/security/:examId/:studentId', requireRole('PROFESSOR'), validate({ params: uuidParam }), getStudentSecurityEvents);
 router.get('/security/:examId/:studentId/count', requireRole('PROFESSOR'), validate({ params: uuidParam }), getViolationCount);
+
+// Exam Comments routes
+router.post('/comments/:examId/:studentId', requireRole('PROFESSOR'), validate({ params: uuidParam }), createExamComment);
+router.get('/comments/:examId/:studentId', validate({ params: uuidParam }), fetchExamComments);
+router.delete('/comments/:examId/:studentId/:commentId', requireRole('PROFESSOR'), validate({ params: uuidParam }), removeExamComment);
 
 export default router;
