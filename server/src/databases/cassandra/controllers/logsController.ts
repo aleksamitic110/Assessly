@@ -8,9 +8,9 @@ import {
   countSecurityEvents,
   addExamComment,
   getExamComments,
-  deleteExamComment
+  deleteExamComment,
+  updateExamComment
 } from '../services/logsService.js';
-import { v4 as uuidv4 } from 'uuid';
 import type { LogExecutionRequest, LogSecurityEventRequest } from '../types.js';
 
 interface AuthenticatedRequest extends Request {
@@ -171,22 +171,18 @@ export async function createExamComment(req: AuthenticatedRequest, res: Response
       }
     }
 
-    const commentId = uuidv4();
-
     console.log('Adding comment with:', {
       examId,
       studentId,
-      commentId,
       parsedLine,
       message: message.substring(0, 50),
       authorId,
       authorName
     });
 
-    await addExamComment(
+    const commentId = await addExamComment(
       examId,
       studentId,
-      commentId,
       parsedLine,
       message,
       authorId,
@@ -251,5 +247,58 @@ export async function removeExamComment(req: AuthenticatedRequest, res: Response
   } catch (error) {
     console.error('Error deleting exam comment:', error);
     res.status(500).json({ error: 'Failed to delete comment' });
+  }
+}
+
+export async function editExamComment(req: AuthenticatedRequest, res: Response) {
+  try {
+    const { examId, studentId, commentId } = req.params;
+    const { line, message } = req.body;
+    const authorId = req.user?.id;
+    const authorName = `${req.user?.email || 'Unknown'}`;
+
+    if (!authorId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (req.user?.role !== 'PROFESSOR') {
+      return res.status(403).json({ error: 'Only professors can edit comments' });
+    }
+
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    let parsedLine: number | null = null;
+    if (line !== null && line !== undefined) {
+      const numLine = typeof line === 'number' ? line : parseInt(String(line), 10);
+      if (!Number.isNaN(numLine) && Number.isFinite(numLine) && numLine > 0) {
+        parsedLine = numLine;
+      }
+    }
+
+    await updateExamComment(
+      examId,
+      studentId,
+      commentId,
+      parsedLine,
+      message,
+      authorId,
+      authorName
+    );
+
+    res.json({
+      commentId,
+      examId,
+      studentId,
+      line: parsedLine,
+      message,
+      authorId,
+      authorName,
+      updatedAt: new Date().toISOString()
+    });
+  } catch (error: any) {
+    console.error('Error editing exam comment:', error.message);
+    res.status(500).json({ error: 'Failed to edit comment', details: error.message });
   }
 }

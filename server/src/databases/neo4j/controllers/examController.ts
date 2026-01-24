@@ -1139,6 +1139,11 @@ export const setGrade = async (req: any, res: Response) => {
     return res.status(403).json({ error: 'Only professors can set grades' });
   }
 
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || numericValue < 5 || numericValue > 10) {
+    return res.status(400).json({ error: 'Grade must be a number between 5 and 10' });
+  }
+
   const session = neo4jDriver.session();
   try {
     // Verify professor owns the exam
@@ -1167,7 +1172,7 @@ export const setGrade = async (req: any, res: Response) => {
           g.updatedAt = datetime()
       RETURN g
       `,
-      { examId, studentId, value, comment: comment || '', professorId }
+      { examId, studentId, value: numericValue, comment: comment || '', professorId }
     );
 
     if (result.records.length === 0) {

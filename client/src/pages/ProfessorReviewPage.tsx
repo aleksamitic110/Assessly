@@ -30,6 +30,7 @@ export default function ProfessorReviewPage() {
   const [newCommentLine, setNewCommentLine] = useState<string>('');
   const [newCommentMessage, setNewCommentMessage] = useState('');
   const [isSavingComment, setIsSavingComment] = useState(false);
+  const [isUpdatingComment, setIsUpdatingComment] = useState(false);
 
   // Load exam, tasks, and students
   const loadData = useCallback(async () => {
@@ -88,6 +89,10 @@ export default function ProfessorReviewPage() {
   // Save grade
   const handleSaveGrade = async () => {
     if (!examId || !selectedStudent) return;
+    if (gradeValue < 5 || gradeValue > 10) {
+      setError('Ocena mora biti izmedju 5 i 10.');
+      return;
+    }
     setIsSavingGrade(true);
     setError('');
     try {
@@ -123,6 +128,13 @@ export default function ProfessorReviewPage() {
           line = parsed;
         }
       }
+      const maxLines = currentSubmission?.sourceCode
+        ? currentSubmission.sourceCode.split('\n').length
+        : 0;
+      if (line && maxLines && line > maxLines) {
+        setError(`Line number must be between 1 and ${maxLines}.`);
+        return;
+      }
 
       const res = await commentsApi.addComment(examId, selectedStudent.studentId, line, newCommentMessage.trim());
       setComments(prev => [...prev, res.data]);
@@ -146,7 +158,41 @@ export default function ProfessorReviewPage() {
     }
   };
 
+  const handleEditComment = async (comment: ExamComment) => {
+    if (!examId || !selectedStudent) return;
+    const newMessage = prompt('Edit comment:', comment.message || '');
+    if (newMessage === null) return;
+    const newLineInput = prompt('Line number (optional):', comment.line ? String(comment.line) : '');
+    let newLine: number | null = null;
+    if (newLineInput && newLineInput.trim()) {
+      const parsed = parseInt(newLineInput.trim(), 10);
+      if (!Number.isNaN(parsed) && parsed > 0) {
+        newLine = parsed;
+      }
+    }
+
+    const maxLines = currentSubmission?.sourceCode
+      ? currentSubmission.sourceCode.split('\n').length
+      : 0;
+    if (newLine && maxLines && newLine > maxLines) {
+      setError(`Line number must be between 1 and ${maxLines}.`);
+      return;
+    }
+
+    setIsUpdatingComment(true);
+    setError('');
+    try {
+      const res = await commentsApi.updateComment(examId, selectedStudent.studentId, comment.commentId, newLine, newMessage.trim());
+      setComments(prev => prev.map(c => (c.commentId === comment.commentId ? res.data : c)));
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to update comment');
+    } finally {
+      setIsUpdatingComment(false);
+    }
+  };
+
   const currentSubmission = submissions[selectedTaskIndex];
+  const maxLineCount = currentSubmission?.sourceCode ? currentSubmission.sourceCode.split('\n').length : 0;
 
   // Get the task details for the current submission
   const currentTask = tasks.find(t => t.id === currentSubmission?.taskId);
@@ -169,24 +215,32 @@ export default function ProfessorReviewPage() {
                 </span>
                 <pre className="flex-1 pl-3 whitespace-pre-wrap break-all">{line || ' '}</pre>
               </div>
-              {lineComment && (
-                <div className="ml-12 pl-3 py-2 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 text-sm">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="font-medium text-yellow-700 dark:text-yellow-300">
-                        {lineComment.authorName}:
-                      </span>
-                      <span className="ml-2 text-gray-700 dark:text-gray-300">{lineComment.message}</span>
+                  {lineComment && (
+                    <div className="ml-12 pl-3 py-2 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 text-sm">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="font-medium text-yellow-700 dark:text-yellow-300">
+                            {lineComment.authorName}:
+                          </span>
+                          <span className="ml-2 text-gray-700 dark:text-gray-300">{lineComment.message}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleEditComment(lineComment)}
+                            className="text-xs text-blue-500 hover:text-blue-700"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteComment(lineComment.commentId)}
+                            className="text-xs text-red-500 hover:text-red-700"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => handleDeleteComment(lineComment.commentId)}
-                      className="text-xs text-red-500 hover:text-red-700"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              )}
+                  )}
             </div>
           );
         })}
@@ -306,8 +360,8 @@ export default function ProfessorReviewPage() {
                         <label className="block text-xs text-gray-500 mb-1">Grade</label>
                         <input
                           type="number"
-                          min="0"
-                          max="100"
+                          min="5"
+                          max="10"
                           value={gradeValue}
                           onChange={(e) => setGradeValue(Number(e.target.value))}
                           className="w-20 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
@@ -464,10 +518,13 @@ export default function ProfessorReviewPage() {
                   {/* Add Comment Form */}
                   <div className="flex gap-3 mb-4">
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Line # (optional)</label>
+                      <label className="block text-xs text-gray-500 mb-1">
+                        Line # (optional){maxLineCount ? ` / max ${maxLineCount}` : ''}
+                      </label>
                       <input
                         type="number"
                         min="1"
+                        max={maxLineCount || undefined}
                         value={newCommentLine}
                         onChange={(e) => setNewCommentLine(e.target.value)}
                         placeholder="Line"
@@ -520,12 +577,20 @@ export default function ProfessorReviewPage() {
                                 {comment.message}
                               </p>
                             </div>
-                            <button
-                              onClick={() => handleDeleteComment(comment.commentId)}
-                              className="text-xs text-red-500 hover:text-red-700"
-                            >
-                              Delete
-                            </button>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleEditComment(comment)}
+                                className="text-xs text-blue-500 hover:text-blue-700"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteComment(comment.commentId)}
+                                className="text-xs text-red-500 hover:text-red-700"
+                              >
+                                Delete
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -557,12 +622,20 @@ export default function ProfessorReviewPage() {
                                   {comment.message}
                                 </span>
                               </div>
-                              <button
-                                onClick={() => handleDeleteComment(comment.commentId)}
-                                className="text-xs text-red-500 hover:text-red-700"
-                              >
-                                Delete
-                              </button>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleEditComment(comment)}
+                                  className="text-xs text-blue-500 hover:text-blue-700"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteComment(comment.commentId)}
+                                  className="text-xs text-red-500 hover:text-red-700"
+                                >
+                                  Delete
+                                </button>
+                              </div>
                             </div>
                           ))}
                       </div>

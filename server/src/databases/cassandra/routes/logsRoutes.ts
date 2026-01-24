@@ -12,7 +12,8 @@ import {
   getViolationCount,
   createExamComment,
   fetchExamComments,
-  removeExamComment
+  removeExamComment,
+  editExamComment
 } from '../controllers/logsController.js';
 
 const router = Router();
@@ -31,6 +32,7 @@ router.get('/security/:examId/:studentId/count', requireRole('PROFESSOR'), valid
 // Exam Comments routes
 router.post('/comments/:examId/:studentId', requireRole('PROFESSOR'), validate({ params: uuidParam }), createExamComment);
 router.get('/comments/:examId/:studentId', validate({ params: uuidParam }), fetchExamComments);
+router.put('/comments/:examId/:studentId/:commentId', requireRole('PROFESSOR'), validate({ params: uuidParam }), editExamComment);
 router.delete('/comments/:examId/:studentId/:commentId', requireRole('PROFESSOR'), validate({ params: uuidParam }), removeExamComment);
 
 export default router;

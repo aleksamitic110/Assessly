@@ -191,24 +191,24 @@ export interface ExamComment {
 export async function addExamComment(
   examId: string,
   studentId: string,
-  commentId: string,
   line: number | null,
   message: string,
   authorId: string,
   authorName: string
-): Promise<void> {
+): Promise<string> {
   const query = `
     INSERT INTO exam_comments (exam_id, student_id, comment_id, line, message, author_id, author_name, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   try {
+    const commentId = types.TimeUuid.now();
     await cassandraClient.execute(
       query,
       [
         types.Uuid.fromString(examId),
         types.Uuid.fromString(studentId),
-        types.Uuid.fromString(commentId),
+        commentId,
         line,
         message,
         types.Uuid.fromString(authorId),
@@ -217,6 +217,7 @@ export async function addExamComment(
       ],
       { prepare: true }
     );
+    return commentId.toString();
   } catch (error: any) {
     console.error('Cassandra addExamComment error:', error.message);
     console.error('Full error:', error);
@@ -270,7 +271,38 @@ export async function deleteExamComment(
     [
       types.Uuid.fromString(examId),
       types.Uuid.fromString(studentId),
-      types.Uuid.fromString(commentId)
+      types.TimeUuid.fromString(commentId.trim())
+    ],
+    { prepare: true }
+  );
+}
+
+export async function updateExamComment(
+  examId: string,
+  studentId: string,
+  commentId: string,
+  line: number | null,
+  message: string,
+  authorId: string,
+  authorName: string
+): Promise<void> {
+  const query = `
+    UPDATE exam_comments
+    SET line = ?, message = ?, author_id = ?, author_name = ?, created_at = ?
+    WHERE exam_id = ? AND student_id = ? AND comment_id = ?
+  `;
+
+  await cassandraClient.execute(
+    query,
+    [
+      line,
+      message,
+      types.Uuid.fromString(authorId),
+      authorName,
+      new Date(),
+      types.Uuid.fromString(examId),
+      types.Uuid.fromString(studentId),
+      types.TimeUuid.fromString(commentId.trim())
     ],
     { prepare: true }
   );

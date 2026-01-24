@@ -65,6 +65,10 @@ export const commentsApi = {
   // Delete a comment (professor only)
   deleteComment: (examId: string, studentId: string, commentId: string) =>
     api.delete(`/logs/comments/${examId}/${studentId}/${commentId}`),
+
+  // Update a comment (professor only)
+  updateComment: (examId: string, studentId: string, commentId: string, line: number | null, message: string) =>
+    api.put<ExamComment>(`/logs/comments/${examId}/${studentId}/${commentId}`, { line, message }),
 };
 
 export default api;

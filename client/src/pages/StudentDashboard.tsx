@@ -450,8 +450,14 @@ export default function StudentDashboard() {
                               </h4>
                               {getStatusBadge(exam.status)}
                               {exam.grade && (
-                                <span className="px-3 py-1 text-sm font-bold rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                  Grade: {exam.grade.value}
+                                <span
+                                  className={`px-3 py-1 text-sm font-bold rounded-full ${
+                                    exam.grade.value === 5
+                                      ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                      : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                  }`}
+                                >
+                                  {exam.grade.value === 5 ? 'Ispit pao' : `Grade: ${exam.grade.value}`}
                                 </span>
                               )}
                             </div>

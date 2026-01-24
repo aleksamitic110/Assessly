@@ -7,7 +7,8 @@ export const uuidParam = z.object({
   examId: z.string().uuid().optional(),
   subjectId: z.string().uuid().optional(),
   taskId: z.string().uuid().optional(),
-  studentId: z.string().uuid().optional()
+  studentId: z.string().uuid().optional(),
+  commentId: z.string().uuid().optional()
 });
 
 export const authSchemas = {

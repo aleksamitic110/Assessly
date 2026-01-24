@@ -26,7 +26,7 @@ export async function initCassandraTables(): Promise<void> {
       CREATE TABLE IF NOT EXISTS exam_comments (
         exam_id uuid,
         student_id uuid,
-        comment_id uuid,
+        comment_id timeuuid,
         line int,
         message text,
         author_id uuid,
@@ -47,7 +47,7 @@ export async function initCassandraTables(): Promise<void> {
 CREATE TABLE IF NOT EXISTS exam_comments (
   exam_id uuid,
   student_id uuid,
-  comment_id uuid,
+  comment_id timeuuid,
   line int,
   message text,
   author_id uuid,
