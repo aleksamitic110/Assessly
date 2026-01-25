@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { socket, connectSocket, disconnectSocket } from '../services/socket';
 import type { Exam as ExamType, Task as TaskType } from '../types';
+import ExamChatPanel from '../components/ExamChatPanel';
 
 interface Subject {
   id: string;
@@ -71,6 +72,7 @@ export default function ProfessorDashboard() {
   //SOCKET STATES
   const [liveAlerts, setLiveAlerts] = useState<Alert[]>([]);
   const [monitoredExams, setMonitoredExams] = useState<Set<string>>(new Set());
+  const [chatExamId, setChatExamId] = useState<string | null>(null);
   const [taskExamId, setTaskExamId] = useState<string | null>(null);
   const [tasksByExam, setTasksByExam] = useState<Record<string, TaskType[]>>({});
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
@@ -1089,20 +1091,33 @@ export default function ProfessorDashboard() {
                                       
                                       {/*SOCKET: Actions Buttons */}
                                       <div className="flex flex-wrap gap-2 justify-end">
-                                        <button 
+                                        <button
                                           onClick={() =>
                                             monitoredExams.has(exam.id)
                                               ? handleStopMonitorExam(exam.id)
                                               : handleMonitorExam(exam.id)
                                           }
                                           className={`px-3 py-1 text-xs rounded border ${
-                                            monitoredExams.has(exam.id) 
-                                              ? 'bg-yellow-100 text-yellow-700 border-yellow-300' 
+                                            monitoredExams.has(exam.id)
+                                              ? 'bg-yellow-100 text-yellow-700 border-yellow-300'
                                               : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
                                           }`}
                                         >
                                           {monitoredExams.has(exam.id) ? 'Monitoring on' : 'Monitor'}
                                         </button>
+
+                                        {(status === 'active' || status === 'waiting_start') && (
+                                          <button
+                                            onClick={() => setChatExamId(chatExamId === exam.id ? null : exam.id)}
+                                            className={`px-3 py-1 text-xs rounded border ${
+                                              chatExamId === exam.id
+                                                ? 'bg-indigo-100 text-indigo-700 border-indigo-300'
+                                                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                            }`}
+                                          >
+                                            {chatExamId === exam.id ? 'Close Chat' : 'Chat'}
+                                          </button>
+                                        )}
 
                                         {(status === 'wait_room' || status === 'waiting_start') && (
                                           <button 
@@ -1418,6 +1433,11 @@ export default function ProfessorDashboard() {
           </div>
         )}
       </main>
+
+      {/* Chat Panel for active exam */}
+      {chatExamId && (
+        <ExamChatPanel examId={chatExamId} isProfessor={true} />
+      )}
     </div>
   );
 }

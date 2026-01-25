@@ -13,7 +13,10 @@ import {
   createExamComment,
   fetchExamComments,
   removeExamComment,
-  editExamComment
+  editExamComment,
+  fetchChatMessages,
+  sendChatMessage,
+  replyToChatMessage
 } from '../controllers/logsController.js';
 
 const router = Router();
@@ -34,5 +37,10 @@ router.post('/comments/:examId/:studentId', requireRole('PROFESSOR'), validate({
 router.get('/comments/:examId/:studentId', validate({ params: uuidParam }), fetchExamComments);
 router.put('/comments/:examId/:studentId/:commentId', requireRole('PROFESSOR'), validate({ params: uuidParam }), editExamComment);
 router.delete('/comments/:examId/:studentId/:commentId', requireRole('PROFESSOR'), validate({ params: uuidParam }), removeExamComment);
+
+// Exam Chat routes
+router.get('/chat/:examId', validate({ params: uuidParam }), fetchChatMessages);
+router.post('/chat/:examId', validate({ params: uuidParam }), sendChatMessage);
+router.post('/chat/:examId/:messageId/reply', requireRole('PROFESSOR'), validate({ params: uuidParam }), replyToChatMessage);
 
 export default router;

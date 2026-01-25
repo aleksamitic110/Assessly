@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Grade, ExamComment, ExamStudent, Submission } from '../types';
+import type { Grade, ExamComment, ExamStudent, Submission, ChatMessage } from '../types';
 
 const API_URL = 'http://localhost:3000/api';
 
@@ -69,6 +69,21 @@ export const commentsApi = {
   // Update a comment (professor only)
   updateComment: (examId: string, studentId: string, commentId: string, line: number | null, message: string) =>
     api.put<ExamComment>(`/logs/comments/${examId}/${studentId}/${commentId}`, { line, message }),
+};
+
+// Chat API functions (Cassandra - live exam chat)
+export const chatApi = {
+  // Get chat messages for an exam
+  getMessages: (examId: string) =>
+    api.get<ChatMessage[]>(`/logs/chat/${examId}`),
+
+  // Send a chat message (student)
+  sendMessage: (examId: string, message: string) =>
+    api.post<ChatMessage>(`/logs/chat/${examId}`, { message }),
+
+  // Reply to a chat message (professor only)
+  replyToMessage: (examId: string, messageId: string, replyMessage: string) =>
+    api.post<ChatMessage>(`/logs/chat/${examId}/${messageId}/reply`, { replyMessage }),
 };
 
 export default api;

@@ -307,3 +307,107 @@ export async function updateExamComment(
     { prepare: true }
   );
 }
+
+// ========== EXAM CHAT MESSAGES ==========
+
+export interface ChatMessage {
+  examId: string;
+  messageId: string;
+  senderId: string;
+  senderName: string;
+  message: string;
+  status: 'pending' | 'approved';
+  replyTo: string | null;
+  replyMessage: string | null;
+  replyAuthorId: string | null;
+  replyAuthorName: string | null;
+  createdAt: string;
+  approvedAt: string | null;
+}
+
+export async function addChatMessage(
+  examId: string,
+  senderId: string,
+  senderName: string,
+  message: string
+): Promise<string> {
+  const query = `
+    INSERT INTO exam_chat_messages (exam_id, message_id, sender_id, sender_name, message, status, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `;
+
+  const messageId = types.TimeUuid.now();
+  await cassandraClient.execute(
+    query,
+    [
+      types.Uuid.fromString(examId),
+      messageId,
+      types.Uuid.fromString(senderId),
+      senderName,
+      message,
+      'pending',
+      new Date()
+    ],
+    { prepare: true }
+  );
+  return messageId.toString();
+}
+
+export async function replyChatMessage(
+  examId: string,
+  messageId: string,
+  replyMessage: string,
+  replyAuthorId: string,
+  replyAuthorName: string
+): Promise<void> {
+  const query = `
+    UPDATE exam_chat_messages
+    SET status = ?, reply_to = ?, reply_message = ?, reply_author_id = ?, reply_author_name = ?, approved_at = ?
+    WHERE exam_id = ? AND message_id = ?
+  `;
+
+  await cassandraClient.execute(
+    query,
+    [
+      'approved',
+      types.TimeUuid.fromString(messageId),
+      replyMessage,
+      types.Uuid.fromString(replyAuthorId),
+      replyAuthorName,
+      new Date(),
+      types.Uuid.fromString(examId),
+      types.TimeUuid.fromString(messageId)
+    ],
+    { prepare: true }
+  );
+}
+
+export async function getChatMessages(examId: string): Promise<ChatMessage[]> {
+  const query = `
+    SELECT exam_id, message_id, sender_id, sender_name, message, status,
+           reply_to, reply_message, reply_author_id, reply_author_name, created_at, approved_at
+    FROM exam_chat_messages
+    WHERE exam_id = ?
+  `;
+
+  const result = await cassandraClient.execute(
+    query,
+    [types.Uuid.fromString(examId)],
+    { prepare: true }
+  );
+
+  return result.rows.map(row => ({
+    examId: row.exam_id.toString(),
+    messageId: row.message_id.toString(),
+    senderId: row.sender_id.toString(),
+    senderName: row.sender_name,
+    message: row.message,
+    status: row.status as 'pending' | 'approved',
+    replyTo: row.reply_to ? row.reply_to.toString() : null,
+    replyMessage: row.reply_message || null,
+    replyAuthorId: row.reply_author_id ? row.reply_author_id.toString() : null,
+    replyAuthorName: row.reply_author_name || null,
+    createdAt: row.created_at.toISOString(),
+    approvedAt: row.approved_at ? row.approved_at.toISOString() : null
+  }));
+}

@@ -6,6 +6,7 @@ import logsService from '../services/logs';
 import api from '../services/api';
 import { socket, connectSocket, disconnectSocket } from '../services/socket';
 import type { Exam, Task as TaskType } from '../types';
+import ExamChatPanel from '../components/ExamChatPanel';
 
 interface Submission {
   taskId: string;
@@ -786,6 +787,11 @@ Code saved.` : 'Code saved.'));
           )}
         </div>
       </div>
+
+      {/* Chat Panel - only show during active exam and not in review mode */}
+      {examId && !isReviewMode && (examStatus === 'active' || examStatus === 'waiting_start') && (
+        <ExamChatPanel examId={examId} isProfessor={false} />
+      )}
     </div>
   );
 }

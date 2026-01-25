@@ -124,3 +124,19 @@ export interface ExamStudent {
     updatedAt: string | null;
   } | null;
 }
+
+// Chat message types (for live exam chat)
+export interface ChatMessage {
+  examId: string;
+  messageId: string;
+  senderId: string;
+  senderName: string;
+  message: string;
+  status: 'pending' | 'approved';
+  replyTo: string | null;
+  replyMessage: string | null;
+  replyAuthorId: string | null;
+  replyAuthorName: string | null;
+  createdAt: string;
+  approvedAt: string | null;
+}

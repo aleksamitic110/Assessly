@@ -9,7 +9,10 @@ import {
   addExamComment,
   getExamComments,
   deleteExamComment,
-  updateExamComment
+  updateExamComment,
+  addChatMessage,
+  replyChatMessage,
+  getChatMessages
 } from '../services/logsService.js';
 import type { LogExecutionRequest, LogSecurityEventRequest } from '../types.js';
 
@@ -300,5 +303,104 @@ export async function editExamComment(req: AuthenticatedRequest, res: Response) 
   } catch (error: any) {
     console.error('Error editing exam comment:', error.message);
     res.status(500).json({ error: 'Failed to edit comment', details: error.message });
+  }
+}
+
+// ========== EXAM CHAT ==========
+
+export async function fetchChatMessages(req: AuthenticatedRequest, res: Response) {
+  try {
+    const { examId } = req.params;
+    const userId = req.user?.id;
+    const userRole = req.user?.role;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const messages = await getChatMessages(examId);
+
+    // Filter messages based on role
+    // Professor sees all messages
+    // Student sees: approved messages + own pending messages
+    const filteredMessages = userRole === 'PROFESSOR'
+      ? messages
+      : messages.filter(msg => msg.status === 'approved' || msg.senderId === userId);
+
+    res.json(filteredMessages);
+  } catch (error: any) {
+    console.error('Error fetching chat messages:', error.message);
+    res.status(500).json({ error: 'Failed to fetch chat messages' });
+  }
+}
+
+export async function sendChatMessage(req: AuthenticatedRequest, res: Response) {
+  try {
+    const { examId } = req.params;
+    const { message } = req.body;
+    const senderId = req.user?.id;
+    const senderName = `${req.user?.firstName || ''} ${req.user?.lastName || ''}`.trim() || req.user?.email || 'Unknown';
+
+    if (!senderId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    const messageId = await addChatMessage(examId, senderId, senderName, message);
+
+    const chatMessage = {
+      examId,
+      messageId,
+      senderId,
+      senderName,
+      message,
+      status: 'pending' as const,
+      replyTo: null,
+      replyMessage: null,
+      replyAuthorId: null,
+      replyAuthorName: null,
+      createdAt: new Date().toISOString(),
+      approvedAt: null
+    };
+
+    res.status(201).json(chatMessage);
+  } catch (error: any) {
+    console.error('Error sending chat message:', error.message);
+    res.status(500).json({ error: 'Failed to send chat message' });
+  }
+}
+
+export async function replyToChatMessage(req: AuthenticatedRequest, res: Response) {
+  try {
+    const { examId, messageId } = req.params;
+    const { replyMessage } = req.body;
+    const replyAuthorId = req.user?.id;
+    const replyAuthorName = `${req.user?.firstName || ''} ${req.user?.lastName || ''}`.trim() || req.user?.email || 'Unknown';
+
+    if (!replyAuthorId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (req.user?.role !== 'PROFESSOR') {
+      return res.status(403).json({ error: 'Only professors can reply to messages' });
+    }
+
+    if (!replyMessage || typeof replyMessage !== 'string') {
+      return res.status(400).json({ error: 'Reply message is required' });
+    }
+
+    await replyChatMessage(examId, messageId, replyMessage, replyAuthorId, replyAuthorName);
+
+    // Fetch the updated message to return full data
+    const messages = await getChatMessages(examId);
+    const updatedMessage = messages.find(m => m.messageId === messageId);
+
+    res.json(updatedMessage || { examId, messageId, status: 'approved' });
+  } catch (error: any) {
+    console.error('Error replying to chat message:', error.message);
+    res.status(500).json({ error: 'Failed to reply to chat message' });
   }
 }

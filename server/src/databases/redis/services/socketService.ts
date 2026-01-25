@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { redisClient } from '../client.js';
 import { neo4jDriver } from '../../neo4j/driver.js';
 import { autoSubmitExam } from '../../neo4j/services/autoSubmitService.js';
+import { addChatMessage, replyChatMessage, getChatMessages } from '../../cassandra/services/logsService.js';
 
 dotenv.config();
 
@@ -397,6 +398,66 @@ export const initSocket = (io: Server) => {
         notifyExamChanged(examId, 'active');
       } catch (error) {
         console.error('restart_exam failed:', error);
+      }
+    });
+
+    // ========== CHAT EVENTS ==========
+
+    socket.on('chat_message', async (data: { examId: string; message: string }) => {
+      try {
+        const { examId, message } = data;
+        if (!examId || !message) return;
+
+        const senderName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+        const messageId = await addChatMessage(examId, user.id, senderName, message);
+
+        const chatMessage = {
+          examId,
+          messageId,
+          senderId: user.id,
+          senderName,
+          message,
+          status: 'pending',
+          replyTo: null,
+          replyMessage: null,
+          replyAuthorId: null,
+          replyAuthorName: null,
+          createdAt: new Date().toISOString(),
+          approvedAt: null
+        };
+
+        // Emit to the student who sent + professors
+        socket.emit('chat_update', chatMessage);
+        io.to('professors_room').emit('chat_update', chatMessage);
+
+        console.log(`Chat message from ${user.email} in exam ${examId}`);
+      } catch (error) {
+        console.error('chat_message failed:', error);
+      }
+    });
+
+    socket.on('chat_reply', async (data: { examId: string; messageId: string; replyMessage: string }) => {
+      if (role !== 'professor') return;
+      try {
+        const { examId, messageId, replyMessage } = data;
+        if (!examId || !messageId || !replyMessage) return;
+
+        const replyAuthorName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+        await replyChatMessage(examId, messageId, replyMessage, user.id, replyAuthorName);
+
+        // Fetch the updated message
+        const messages = await getChatMessages(examId);
+        const updatedMessage = messages.find(m => m.messageId === messageId);
+
+        if (updatedMessage) {
+          // Emit to everyone in the exam room
+          io.to(examId).emit('chat_update', updatedMessage);
+          io.to('professors_room').emit('chat_update', updatedMessage);
+        }
+
+        console.log(`Chat reply from ${user.email} in exam ${examId}`);
+      } catch (error) {
+        console.error('chat_reply failed:', error);
       }
     });
 
