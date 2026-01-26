@@ -12,6 +12,7 @@ import {
   getExamById,
   withdrawExam,
   saveSubmission,
+  runCode,
   getMySubmissions,
   getStudentSubmissions,
   submitExam,
@@ -28,7 +29,7 @@ import {
 import { authenticateJWT, requireRole } from '../middleware/authMiddleware.js';
 import { taskUpload } from '../../../middleware/upload.js';
 import { validate } from '../../../middleware/validate.js';
-import { uuidParam, subjectSchemas, examSchemas, taskSchemas, submissionSchemas } from '../../../validation/schemas.js';
+import { uuidParam, subjectSchemas, examSchemas, taskSchemas, submissionSchemas, runSchemas } from '../../../validation/schemas.js';
 
 const router = Router();
 
@@ -48,6 +49,7 @@ router.get('/', authenticateJWT, getAvailableExams);
 router.get('/subjects', authenticateJWT, requireRole('PROFESSOR'), getProfessorSubjects);
 router.get('/:examId', authenticateJWT, validate({ params: uuidParam }), getExamById);
 router.get('/:examId/tasks', authenticateJWT, validate({ params: uuidParam }), getExamTasks);
+router.post('/:examId/run', authenticateJWT, requireRole('STUDENT'), validate({ params: uuidParam, body: runSchemas.run }), runCode);
 router.post('/:examId/submissions', authenticateJWT, requireRole('STUDENT'), validate({ params: uuidParam, body: submissionSchemas.save }), saveSubmission);
 router.get('/:examId/submissions', authenticateJWT, requireRole('STUDENT'), validate({ params: uuidParam }), getMySubmissions);
 router.get('/:examId/submissions/:studentId', authenticateJWT, requireRole('PROFESSOR'), validate({ params: uuidParam }), getStudentSubmissions);

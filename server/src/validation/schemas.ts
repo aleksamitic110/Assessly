@@ -95,6 +95,14 @@ export const submissionSchemas = {
   })
 };
 
+export const runSchemas = {
+  run: z.object({
+    taskId: z.string().uuid(),
+    sourceCode: z.string().max(50000),
+    input: z.string().max(10000).optional().nullable()
+  })
+};
+
 export const logsSchemas = {
   execution: z.object({
     examId: z.string().uuid(),
