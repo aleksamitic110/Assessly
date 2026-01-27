@@ -12,6 +12,8 @@ import StudentDashboard from './pages/StudentDashboard';
 import ExamPage from './pages/ExamPage';
 import ProfessorReviewPage from './pages/ProfessorReviewPage';
 import StudentWorkView from './pages/StudentWorkView';
+import AdminLogin from './pages/AdminLogin';
+import AdminDashboard from './pages/AdminDashboard';
 
 function App() {
   return (
@@ -73,6 +75,17 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['STUDENT']}>
                 <StudentWorkView />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Admin routes */}
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <AdminDashboard />
               </ProtectedRoute>
             }
           />

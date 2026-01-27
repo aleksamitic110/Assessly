@@ -16,6 +16,7 @@ import path from 'path';
 
 import authRoutes from './databases/neo4j/routes/authRoutes.js';
 import examRoutes from './databases/neo4j/routes/examRoutes.js';
+import adminRoutes from './databases/neo4j/routes/adminRoutes.js';
 import logsRoutes from './databases/cassandra/routes/logsRoutes.js';
 import redisStatusRoutes from './databases/redis/routes/statusRoutes.js';
 import neo4jStatusRoutes from './databases/neo4j/routes/statusRoutes.js';
@@ -88,6 +89,7 @@ app.use('/status/neo4j', neo4jStatusRoutes);
 app.use('/status/cassandra', cassandraStatusRoutes);
 
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/exams', examRoutes);
 app.use('/api/logs', logsRoutes);
 
