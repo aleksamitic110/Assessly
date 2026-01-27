@@ -8,6 +8,6 @@ Task: {id, title, description, starterCode, testCases (JSON string)}
 Status studenta: user:status:{userId} -> vrednosti: active, idle, offline (sa TTL od 60s).
 Tajmer ispita: exam:timer:{examId} -> vrednost: preostale sekunde (koristi se Redis TTL).
 Chat poruke: chat:{examId}:latest -> lista poslednjih poruka.
-Anti-cheat brojač: user:violations:{examId}:{userId} -> broj sumnjivih aktivnosti.
+Anti-cheat counter: user:violations:{examId}:{userId} -> number of suspicious activities.
 
 

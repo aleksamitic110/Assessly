@@ -5,10 +5,13 @@ import ProtectedRoute from './components/ProtectedRoute';
 // Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
+import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
 import ProfessorDashboard from './pages/ProfessorDashboard';
 import StudentDashboard from './pages/StudentDashboard';
 import ExamPage from './pages/ExamPage';
+import ProfessorReviewPage from './pages/ProfessorReviewPage';
+import StudentWorkView from './pages/StudentWorkView';
 
 function App() {
   return (
@@ -18,6 +21,7 @@ function App() {
           {/* Public routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/verify" element={<VerifyEmail />} />
 
           {/* Protected routes */}
           <Route
@@ -38,6 +42,14 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/professor/exam/:examId/review"
+            element={
+              <ProtectedRoute allowedRoles={['PROFESSOR']}>
+                <ProfessorReviewPage />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Student only */}
           <Route
@@ -53,6 +65,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['STUDENT']}>
                 <ExamPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/exam/:examId/review"
+            element={
+              <ProtectedRoute allowedRoles={['STUDENT']}>
+                <StudentWorkView />
               </ProtectedRoute>
             }
           />

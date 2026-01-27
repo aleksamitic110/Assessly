@@ -1,124 +1,133 @@
 /**
- * ASSESSLY BACKEND - Main Entry Point
+ * Assessly backend entry point.
  */
 
 import dotenv from 'dotenv';
 dotenv.config();
 
-import authRoutes from './routes/authRoutes.js';
-import examRoutes from './routes/examRoutes.js';
-import logsRoutes from './routes/logsRoutes.js';
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
+import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
+import morgan from 'morgan';
 import { Server } from 'socket.io';
+import path from 'path';
 
-// Importujemo naš novi config i service
-import { redisClient } from './config/redis.js';
-import { initSocket } from './services/socketService.js';
-import { neo4jDriver } from "./neo4j.js";
-import { cassandraClient } from "./cassandra.js";
+import authRoutes from './databases/neo4j/routes/authRoutes.js';
+import examRoutes from './databases/neo4j/routes/examRoutes.js';
+import logsRoutes from './databases/cassandra/routes/logsRoutes.js';
+import redisStatusRoutes from './databases/redis/routes/statusRoutes.js';
+import neo4jStatusRoutes from './databases/neo4j/routes/statusRoutes.js';
+import cassandraStatusRoutes from './databases/cassandra/routes/statusRoutes.js';
+import { redisClient } from './databases/redis/client.js';
+import { initSocket } from './databases/redis/services/socketService.js';
+import { neo4jDriver } from './databases/neo4j/driver.js';
+import { cassandraClient, initCassandraTables } from './databases/cassandra/client.js';
+import { apiLimiter } from './middleware/rateLimit.js';
+import { errorHandler } from './middleware/errorHandler.js';
+import { env, getCorsOrigins } from './config/env.js';
 
-// --- CONFIGURATION ---
 const PORT = process.env.PORT || 3000;
-const CLIENT_URL = "http://localhost:5173";
 
 const app = express();
 const server = http.createServer(app);
 
-// --- MIDDLEWARES ---
-app.use(cors());
-app.use(express.json());
-
-// --- SOCKET.IO SETUP ---
-const io = new Server(server, {
-  cors: {
-    origin: "*", // Za razvoj dozvoli sve, kasnije vrati CLIENT_URL
-    methods: ["GET", "POST"]
-  }
-});
-
-// 🔥 POKREĆEMO TVOJU SOCKET LOGIKU
-initSocket(io);
-
-// --- ROUTES ---
-app.get('/', (req, res) => {
-  res.send(`<h1>🚀 Assessly Backend is Running</h1><p>Socket.io & Redis Active</p>`);
-});
-
-// Database status endpoints
-app.get('/status/redis', async (req, res) => {
-  try {
-    const pong = await redisClient.ping();
-    res.json({ status: 'ok', message: pong });
-  } catch (error) {
-    res.status(500).json({ status: 'error', message: (error as Error).message });
-  }
-});
-
-app.get('/status/neo4j', async (req, res) => {
-  try {
-    const session = neo4jDriver.session();
-    const result = await session.run("RETURN 1 AS test");
-    await session.close();
-    res.json({ status: 'ok', message: result.records[0].get("test").toNumber().toString() });
-  } catch (error) {
-    res.status(500).json({ status: 'error', message: (error as Error).message });
-  }
-});
-
-app.get('/status/cassandra', async (req, res) => {
-  try {
-    const result = await cassandraClient.execute('SELECT release_version FROM system.local');
-    res.json({ status: 'ok', message: result.first().get('release_version') });
-  } catch (error) {
-    res.status(500).json({ status: 'error', message: (error as Error).message });
-  }
-});
-
-// --- CORE LOGIC: DATABASE INITIALIZATION ---
-async function initializeDatabases() {
-  console.log("🛠️  Initializing Cloud Databases...");
-
-  // 1. Redis (Konektujemo importovani klijent)
-  await redisClient.connect();
-  
-  // 2. Neo4j
-  const neoSession = neo4jDriver.session();
-  await neoSession.run("RETURN 1");
-  console.log("✅ Connected to Neo4j (AuraDB)");
-  await neoSession.close();
-
-  // 3. Cassandra
-  await cassandraClient.connect();
-  console.log(`✅ Connected to Cassandra (Astra DB)`);
+if (env.TRUST_PROXY) {
+  app.set('trust proxy', 1);
 }
 
-// --- SERVER START ---
+const corsOrigins = getCorsOrigins();
+const corsOptions: cors.CorsOptions = {
+  origin: corsOrigins.length
+    ? (origin, callback) => {
+        if (!origin || corsOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      }
+    : true,
+  credentials: true
+};
+
+app.disable('x-powered-by');
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'none'"],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
+      connectSrc: ["'self'", ...corsOrigins]
+    }
+  }
+}));
+app.use(cors(corsOptions));
+app.use(cookieParser());
+app.use(morgan(':method :url :status - :response-time ms'));
+app.use(apiLimiter);
+app.use(express.json({ limit: env.REQUEST_SIZE_LIMIT || '512kb' }));
+app.use(express.urlencoded({ extended: true, limit: env.REQUEST_SIZE_LIMIT || '512kb' }));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+const io = new Server(server, {
+  cors: corsOptions
+});
+
+initSocket(io);
+
+app.get('/', (req, res) => {
+  res.send('<h1>Assessly Backend is Running</h1><p>Socket.io & Redis Active</p>');
+});
+
+app.use('/status/redis', redisStatusRoutes);
+app.use('/status/neo4j', neo4jStatusRoutes);
+app.use('/status/cassandra', cassandraStatusRoutes);
+
+app.use('/api/auth', authRoutes);
+app.use('/api/exams', examRoutes);
+app.use('/api/logs', logsRoutes);
+
+app.use(errorHandler);
+
+async function initializeDatabases() {
+  console.log('Initializing databases...');
+
+  await redisClient.connect();
+
+  const neoSession = neo4jDriver.session();
+  await neoSession.run('RETURN 1');
+  console.log('Connected to Neo4j (AuraDB)');
+  await neoSession.close();
+
+  await cassandraClient.connect();
+  console.log('Connected to Cassandra (Astra DB)');
+
+  await initCassandraTables();
+}
+
 const startServer = async () => {
   try {
     await initializeDatabases();
 
-    app.use('/api/auth', authRoutes);
-    app.use('/api/exams', examRoutes);
-
     server.listen(PORT, () => {
-      console.log(`🚀 SERVER IS LIVE ON PORT ${PORT}`);
-      console.log(`⚡ Socket.io Auth & Monitoring: ACTIVE`);
+      console.log(`Server listening on port ${PORT}`);
+      console.log('Socket.io auth and monitoring: active');
     });
-
   } catch (error) {
-    console.error("❌ CRITICAL ERROR:", error);
+    console.error('Critical error:', error);
     process.exit(1);
   }
 };
 
-// --- GRACEFUL SHUTDOWN ---
 const gracefulShutdown = async () => {
-  console.log('\n🛑 Shutdown signal received...');
+  console.log('\nShutdown signal received...');
   try {
     await neo4jDriver.close();
-    if (redisClient.isOpen) await redisClient.quit(); // Provera da li je otvoren
+    if (redisClient.isOpen) await redisClient.quit();
     await cassandraClient.shutdown();
     server.close(() => process.exit(0));
   } catch (error) {
@@ -127,11 +136,7 @@ const gracefulShutdown = async () => {
   }
 };
 
-// Pokretanje aplikacije
-app.use('/api/auth', authRoutes);
-app.use('/api/exams', examRoutes);
-app.use('/api/logs', logsRoutes);
 startServer();
 
 process.on('SIGINT', gracefulShutdown);
-process.on('SIGTERM', gracefulShutdown);  
+process.on('SIGTERM', gracefulShutdown);

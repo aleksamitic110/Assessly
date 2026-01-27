@@ -5,14 +5,12 @@ export const logsService = {
   // Log code execution (student runs code)
   async logExecution(
     examId: string,
-    taskId: string,
     sourceCode: string,
     output: string,
     status: ExecutionStatus
   ): Promise<void> {
     await api.post('/logs/execution', {
       examId,
-      taskId,
       sourceCode,
       output,
       status,

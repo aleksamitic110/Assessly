@@ -1,8 +1,10 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import type { Exam as ExamType } from '../types';
+import { socket, connectSocket, disconnectSocket } from '../services/socket';
+import type { Exam as ExamType, Task as TaskType } from '../types';
+import ExamChatPanel from '../components/ExamChatPanel';
 
 interface Subject {
   id: string;
@@ -10,17 +12,44 @@ interface Subject {
   description: string;
 }
 
+interface ProfessorExam extends ExamType {
+  taskCount?: number;
+}
+
 interface SubjectWithExams extends Subject {
-  exams: ExamType[];
+  exams: ProfessorExam[];
+}
+
+// Socket alert type
+interface Alert {
+  studentId: string;
+  email: string;
+  type: string;
+  count: number;
+  timestamp: number;
+  examId: string;
 }
 
 export default function ProfessorDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
+  const toIsoString = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toISOString();
+  };
+
+  const toDateTimeLocal = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    const pad = (num: number) => String(num).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
   // State for creating subject
   const [showSubjectForm, setShowSubjectForm] = useState(false);
-  const [subjectData, setSubjectData] = useState({ name: '', description: '' });
+  const [subjectData, setSubjectData] = useState({ name: '', description: '', password: '' });
 
   // State for creating exam
   const [showExamForm, setShowExamForm] = useState(false);
@@ -40,6 +69,71 @@ export default function ProfessorDashboard() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
+  //SOCKET STATES
+  const [liveAlerts, setLiveAlerts] = useState<Alert[]>([]);
+  const [monitoredExams, setMonitoredExams] = useState<Set<string>>(new Set());
+  const [chatExamId, setChatExamId] = useState<string | null>(null);
+  const [taskExamId, setTaskExamId] = useState<string | null>(null);
+  const [tasksByExam, setTasksByExam] = useState<Record<string, TaskType[]>>({});
+  const [isLoadingTasks, setIsLoadingTasks] = useState(false);
+  const [taskError, setTaskError] = useState('');
+  const [editingTask, setEditingTask] = useState<TaskType | null>(null);
+  const [taskForm, setTaskForm] = useState({
+    title: '',
+    description: '',
+    starterCode: '',
+    testCases: '[]',
+    exampleInput: '',
+    exampleOutput: '',
+    notes: '',
+    pdfFile: null as File | null,
+  });
+  const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
+  const [subjectEditForm, setSubjectEditForm] = useState({
+    name: '',
+    description: '',
+    password: '',
+    invalidateEnrollments: false,
+  });
+  const [editingExamId, setEditingExamId] = useState<string | null>(null);
+  const [examEditForm, setExamEditForm] = useState({
+    name: '',
+    startTime: '',
+    durationMinutes: 60,
+  });
+
+  const alertsByExam = useMemo(() => {
+    return liveAlerts.reduce<Record<string, Alert[]>>((acc, alert) => {
+      const key = alert.examId || 'unknown';
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(alert);
+      return acc;
+    }, {});
+  }, [liveAlerts]);
+
+  const examNameById = useMemo(() => {
+    const map: Record<string, string> = {};
+    subjects.forEach((subject) => {
+      subject.exams.forEach((exam) => {
+        map[exam.id] = `${exam.name} (${subject.name})`;
+      });
+    });
+    return map;
+  }, [subjects]);
+
+  const updateExamStatus = (examId: string, status: ExamType['status']) => {
+    setSubjects((prev) =>
+      prev.map((subject) => ({
+        ...subject,
+        exams: subject.exams.map((exam) =>
+          exam.id === examId ? { ...exam, status } : exam
+        ),
+      }))
+    );
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -48,6 +142,428 @@ export default function ProfessorDashboard() {
   const toggleSubject = (subjectId: string) => {
     setExpandedSubjectId((prev) => (prev === subjectId ? null : subjectId));
   };
+
+  // Socket: professor live updates
+  useEffect(() => {
+    // Connect
+    connectSocket();
+
+    // Listen for violations
+    socket.on('violation_alert', (data: Alert) => {
+      console.log(' NEW ALERT:', data);
+      setLiveAlerts((prev) => [data, ...prev]);
+
+      // Optional alert sound
+      new Audio('/alert.mp3').play().catch(() => {});
+    });
+
+    // Student status updates
+    socket.on('student_status_update', (data) => {
+      console.log(`Status: ${data.email} -> ${data.status}`);
+    });
+
+    socket.on('exam_state', (data: { examId: string; status: ExamType['status'] }) => {
+      if (!data?.examId) return;
+      if (data.status === 'active' || data.status === 'paused' || data.status === 'completed') {
+        updateExamStatus(data.examId, data.status);
+      }
+    });
+
+    socket.on('exam_start_error', (data: { examId: string; reason?: string }) => {
+      if (!data?.examId) return;
+      if (data.reason === 'NO_TASKS') {
+        setError('Cannot start exam. Add at least one task first.');
+      }
+    });
+
+    return () => {
+      socket.off('violation_alert');
+      socket.off('student_status_update');
+      socket.off('exam_state');
+      socket.off('exam_start_error');
+      disconnectSocket();
+    };
+  }, []);
+
+  // Socket: start exam handler
+  const handleStartExam = (exam: ExamType) => {
+    const taskCount = (exam as ProfessorExam).taskCount || 0;
+    if (!taskCount) {
+      setError('Cannot start exam. Add at least one task first.');
+      return;
+    }
+    if (!confirm(`Start exam "${exam.name}"?`)) return;
+
+    handleMonitorExam(exam.id);
+
+    socket.emit('start_exam', {
+      examId: exam.id,
+      durationMinutes: exam.durationMinutes
+    });
+
+    updateExamStatus(exam.id, 'active');
+    setMessage(`Start command sent for exam "${exam.name}".`);
+  };
+
+  const handlePauseExam = (exam: ExamType) => {
+    socket.emit('pause_exam', { examId: exam.id });
+    updateExamStatus(exam.id, 'paused');
+    setMessage(`Exam "${exam.name}" paused.`);
+  };
+
+  const handleResumeExam = (exam: ExamType) => {
+    socket.emit('resume_exam', { examId: exam.id });
+    updateExamStatus(exam.id, 'active');
+    setMessage(`Exam "${exam.name}" resumed.`);
+  };
+
+  const handleExtendExam = (exam: ExamType) => {
+    const extra = prompt('Enter extra minutes:', '10');
+    const extraMinutes = extra ? parseInt(extra, 10) : 0;
+    if (!extraMinutes || Number.isNaN(extraMinutes) || extraMinutes <= 0) return;
+    socket.emit('extend_exam', { examId: exam.id, extraMinutes });
+    setMessage(`Exam "${exam.name}" extended by ${extraMinutes} min.`);
+  };
+
+  const handleEndExam = (exam: ExamType) => {
+    if (!confirm(`End exam "${exam.name}"?`)) return;
+    socket.emit('end_exam', { examId: exam.id });
+    updateExamStatus(exam.id, 'completed');
+    setMessage(`Exam "${exam.name}" ended.`);
+  };
+
+  const handleRestartExam = (exam: ExamType) => {
+    const taskCount = (exam as ProfessorExam).taskCount || 0;
+    if (!taskCount) {
+      setError('Cannot restart exam. Add at least one task first.');
+      return;
+    }
+    if (!confirm(`Restart exam "${exam.name}"?`)) return;
+    socket.emit('restart_exam', { examId: exam.id, durationMinutes: exam.durationMinutes });
+    updateExamStatus(exam.id, 'active');
+    setMessage(`Exam "${exam.name}" restarted.`);
+  };
+
+  const resetTaskForm = () => {
+    setTaskForm({
+      title: '',
+      description: '',
+      starterCode: '',
+      testCases: '[]',
+      exampleInput: '',
+      exampleOutput: '',
+      notes: '',
+      pdfFile: null,
+    });
+    setEditingTask(null);
+  };
+
+  const loadTasks = async (examId: string) => {
+    setIsLoadingTasks(true);
+    setTaskError('');
+    try {
+      const response = await api.get<TaskType[]>(`/exams/${examId}/tasks`);
+      setTasksByExam((prev) => ({ ...prev, [examId]: response.data }));
+      setSubjects((prev) =>
+        prev.map((subject) => ({
+          ...subject,
+          exams: subject.exams.map((exam) =>
+            exam.id === examId ? { ...exam, taskCount: response.data.length } : exam
+          ),
+        }))
+      );
+    } catch (err: any) {
+      setTaskError(err.response?.data?.error || 'Failed to load tasks');
+    } finally {
+      setIsLoadingTasks(false);
+    }
+  };
+
+  const toggleTaskPanel = async (examId: string) => {
+    if (taskExamId === examId) {
+      setTaskExamId(null);
+      resetTaskForm();
+      return;
+    }
+    setTaskExamId(examId);
+    await loadTasks(examId);
+  };
+
+  const handleTaskInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setTaskForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleTaskFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setTaskForm((prev) => ({ ...prev, pdfFile: file }));
+  };
+
+  const handleEditTask = (task: TaskType) => {
+    setEditingTask(task);
+    setTaskForm({
+      title: task.title || '',
+      description: task.description || '',
+      starterCode: task.starterCode || '',
+      testCases: task.testCases || '[]',
+      exampleInput: task.exampleInput || '',
+      exampleOutput: task.exampleOutput || '',
+      notes: task.notes || '',
+      pdfFile: null,
+    });
+  };
+
+  const handleSubmitTask = async (e: React.FormEvent, examId: string) => {
+    e.preventDefault();
+    setTaskError('');
+    try {
+      JSON.parse(taskForm.testCases || '[]');
+    } catch {
+      setTaskError('Test cases must be valid JSON.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('title', taskForm.title);
+    formData.append('description', taskForm.description);
+    formData.append('starterCode', taskForm.starterCode);
+    formData.append('testCases', taskForm.testCases);
+    formData.append('exampleInput', taskForm.exampleInput);
+    formData.append('exampleOutput', taskForm.exampleOutput);
+    formData.append('notes', taskForm.notes);
+    if (taskForm.pdfFile) {
+      formData.append('pdf', taskForm.pdfFile);
+    }
+
+    try {
+      if (editingTask) {
+        const response = await api.put(`/exams/tasks/${editingTask.id}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        setTasksByExam((prev) => ({
+          ...prev,
+          [examId]: (prev[examId] || []).map((task) =>
+            task.id === editingTask.id ? response.data : task
+          ),
+        }));
+        setMessage(`Task "${response.data.title}" updated.`);
+      } else {
+        formData.append('examId', examId);
+        const response = await api.post('/exams/tasks', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        setTasksByExam((prev) => ({
+          ...prev,
+          [examId]: [...(prev[examId] || []), response.data],
+        }));
+        setMessage(`Task "${response.data.title}" added.`);
+        setSubjects((prev) =>
+          prev.map((subject) => ({
+            ...subject,
+            exams: subject.exams.map((exam) =>
+              exam.id === examId
+                ? { ...exam, taskCount: (exam.taskCount || 0) + 1 }
+                : exam
+            ),
+          }))
+        );
+      }
+      resetTaskForm();
+    } catch (err: any) {
+      setTaskError(err.response?.data?.error || 'Error while saving task');
+    }
+  };
+
+  const handleDeleteTask = async (examId: string, task: TaskType) => {
+    if (!confirm(`Delete task "${task.title}"?`)) return;
+    try {
+      await api.delete(`/exams/tasks/${task.id}`);
+      setTasksByExam((prev) => ({
+        ...prev,
+        [examId]: (prev[examId] || []).filter((item) => item.id !== task.id),
+      }));
+      setMessage(`Task "${task.title}" deleted.`);
+      setSubjects((prev) =>
+        prev.map((subject) => ({
+          ...subject,
+          exams: subject.exams.map((exam) =>
+            exam.id === examId
+              ? { ...exam, taskCount: Math.max(0, (exam.taskCount || 0) - 1) }
+              : exam
+          ),
+        }))
+      );
+    } catch (err: any) {
+      setTaskError(err.response?.data?.error || 'Error while deleting task');
+    }
+  };
+
+  const startEditSubject = (subject: SubjectWithExams) => {
+    setEditingSubjectId(subject.id);
+    setSubjectEditForm({
+      name: subject.name || '',
+      description: subject.description || '',
+      password: '',
+      invalidateEnrollments: false,
+    });
+  };
+
+  const cancelEditSubject = () => {
+    setEditingSubjectId(null);
+    setSubjectEditForm({
+      name: '',
+      description: '',
+      password: '',
+      invalidateEnrollments: false,
+    });
+  };
+
+  const handleSubjectEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    if (type === 'checkbox') {
+      const target = e.target as HTMLInputElement;
+      setSubjectEditForm((prev) => ({ ...prev, [name]: target.checked }));
+      return;
+    }
+    setSubjectEditForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSaveSubject = async (subjectId: string) => {
+    setError('');
+    setMessage('');
+    try {
+      const payload: any = {
+        name: subjectEditForm.name,
+        description: subjectEditForm.description,
+      };
+      if (subjectEditForm.password.trim()) {
+        payload.password = subjectEditForm.password.trim();
+        payload.invalidateEnrollments = subjectEditForm.invalidateEnrollments;
+      }
+      const response = await api.put(`/exams/subjects/${subjectId}`, payload);
+      setSubjects((prev) =>
+        prev.map((item) =>
+          item.id === subjectId ? { ...item, ...response.data } : item
+        )
+      );
+      setMessage(`Subject "${response.data.name}" updated.`);
+      cancelEditSubject();
+    } catch (err: any) {
+      console.error('Update subject error:', err);
+      setError(err.response?.data?.error || 'Error while updating subject');
+    }
+  };
+
+  const handleDeleteSubject = async (subject: SubjectWithExams) => {
+    if (!confirm(`Delete subject "${subject.name}"?`)) return;
+
+    try {
+      await api.delete(`/exams/subjects/${subject.id}`);
+      setSubjects((prev) => prev.filter((item) => item.id !== subject.id));
+      setMessage(`Subject "${subject.name}" deleted.`);
+    } catch (err: any) {
+      console.error('Delete subject error:', err);
+      setError(err.response?.data?.error || 'Error while deleting subject');
+    }
+  };
+
+  const startEditExam = (exam: ExamType) => {
+    setEditingExamId(exam.id);
+    setExamEditForm({
+      name: exam.name || '',
+      startTime: exam.startTime ? toDateTimeLocal(exam.startTime) : '',
+      durationMinutes: exam.durationMinutes || 60,
+    });
+  };
+
+  const cancelEditExam = () => {
+    setEditingExamId(null);
+    setExamEditForm({
+      name: '',
+      startTime: '',
+      durationMinutes: 60,
+    });
+  };
+
+  const handleExamEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setExamEditForm((prev) => ({
+      ...prev,
+      [name]: name === 'durationMinutes' ? Number(value) : value,
+    }));
+  };
+
+  const handleSaveExam = async (examId: string) => {
+    setError('');
+    setMessage('');
+    const durationMinutes = Number(examEditForm.durationMinutes);
+    if (!examEditForm.name.trim() || !examEditForm.startTime.trim() || !durationMinutes || durationMinutes <= 0) {
+      setError('Please provide a valid name, start time, and duration.');
+      return;
+    }
+    try {
+      const response = await api.put(`/exams/exams/${examId}`, {
+        name: examEditForm.name.trim(),
+        startTime: toIsoString(examEditForm.startTime.trim()),
+        durationMinutes,
+      });
+      setSubjects((prev) =>
+        prev.map((subject) => ({
+          ...subject,
+          exams: subject.exams.map((item) =>
+            item.id === examId ? { ...item, ...response.data } : item
+          ),
+        }))
+      );
+      setMessage(`Exam "${response.data.name}" updated.`);
+      cancelEditExam();
+    } catch (err: any) {
+      console.error('Update exam error:', err);
+      setError(err.response?.data?.error || 'Error while updating exam');
+    }
+  };
+
+  const handleDeleteExam = async (exam: ExamType) => {
+    if (!confirm(`Delete exam "${exam.name}"?`)) return;
+
+    try {
+      await api.delete(`/exams/exams/${exam.id}`);
+      setSubjects((prev) =>
+        prev.map((subject) => ({
+          ...subject,
+          exams: subject.exams.filter((item) => item.id !== exam.id),
+        }))
+      );
+      setMessage(`Exam "${exam.name}" deleted.`);
+    } catch (err: any) {
+      console.error('Delete exam error:', err);
+      setError(err.response?.data?.error || 'Error while deleting exam');
+    }
+  };
+
+  //SOCKET: Funkcija za pracenje (Join Room)
+  const handleMonitorExam = (examId: string) => {
+    socket.emit('join_exam', examId);
+    setMonitoredExams((prev) => {
+      const next = new Set(prev);
+      next.add(examId);
+      return next;
+    });
+    setMessage(`Monitoring enabled for exam ID: ${examId.substring(0, 8)}...`);
+  };
+
+  const handleStopMonitorExam = (examId: string) => {
+    socket.emit('leave_exam', examId);
+    setMonitoredExams((prev) => {
+      const next = new Set(prev);
+      next.delete(examId);
+      return next;
+    });
+    setMessage(`Monitoring disabled for exam ID: ${examId.substring(0, 8)}...`);
+  };
+
 
   useEffect(() => {
     let isMounted = true;
@@ -62,7 +578,7 @@ export default function ProfessorDashboard() {
         }
       } catch (err: any) {
         if (isMounted) {
-          setError(err.response?.data?.error || 'Greska prilikom ucitavanja predmeta');
+          setError(err.response?.data?.error || 'Error while loading subjects');
         }
       } finally {
         if (isMounted) {
@@ -85,13 +601,13 @@ export default function ProfessorDashboard() {
 
     try {
       const response = await api.post('/exams/subjects', subjectData);
-      setMessage(`Predmet "${response.data.name}" uspesno kreiran! ID: ${response.data.id}`);
+      setMessage(`Subject "${response.data.name}" created. ID: ${response.data.id}`);
       setSubjects((prev) => [...prev, { ...response.data, exams: [] }]);
-      setSubjectData({ name: '', description: '' });
+      setSubjectData({ name: '', description: '', password: '' });
       setShowSubjectForm(false);
     } catch (err: any) {
       console.error('Create subject error:', err);
-      setError(err.response?.data?.error || 'Greska prilikom kreiranja predmeta');
+      setError(err.response?.data?.error || 'Error while creating subject');
     }
   };
 
@@ -102,12 +618,19 @@ export default function ProfessorDashboard() {
     setMessage('');
 
     try {
-      const response = await api.post('/exams/exams', examData);
-      setMessage(`Ispit "${response.data.name}" uspesno kreiran! ID: ${response.data.id}`);
+      const response = await api.post('/exams/exams', {
+        ...examData,
+        startTime: toIsoString(examData.startTime),
+      });
+      setMessage(`Exam "${response.data.name}" created. ID: ${response.data.id}`);
+      const scheduledStart = new Date(toIsoString(examData.startTime)).getTime();
+      const isFuture = !Number.isNaN(scheduledStart) && scheduledStart > Date.now();
+      const initialStatus = isFuture ? 'wait_room' : 'waiting_start';
+
       setSubjects((prev) =>
         prev.map((subject) =>
           subject.id === examData.subjectId
-            ? { ...subject, exams: [...subject.exams, response.data] }
+            ? { ...subject, exams: [...subject.exams, { ...response.data, status: initialStatus }] }
             : subject
         )
       );
@@ -115,7 +638,7 @@ export default function ProfessorDashboard() {
       setShowExamForm(false);
     } catch (err: any) {
       console.error('Create exam error:', err);
-      setError(err.response?.data?.error || 'Greska prilikom kreiranja ispita');
+      setError(err.response?.data?.error || 'Error while creating exam');
     }
   };
 
@@ -129,7 +652,7 @@ export default function ProfessorDashboard() {
               Assessly
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Profesor Dashboard
+              Professor Dashboard
             </p>
           </div>
           <div className="flex items-center space-x-4">
@@ -140,7 +663,7 @@ export default function ProfessorDashboard() {
               onClick={handleLogout}
               className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
             >
-              Odjavi se
+              Sign out
             </button>
           </div>
         </div>
@@ -171,17 +694,17 @@ export default function ProfessorDashboard() {
                 </svg>
               </div>
               <h3 className="ml-3 text-lg font-semibold text-gray-900 dark:text-white">
-                Predmeti
+                Subjects
               </h3>
             </div>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Kreirajte novi predmet koji predajete
+              Create a new subject you teach
             </p>
             <button
               onClick={() => setShowSubjectForm(!showSubjectForm)}
               className="w-full px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
             >
-              {showSubjectForm ? 'Zatvori' : 'Kreiraj predmet'}
+              {showSubjectForm ? 'Close' : 'Create subject'}
             </button>
 
             {/* Subject Form */}
@@ -190,7 +713,7 @@ export default function ProfessorDashboard() {
                 <div>
                   <input
                     type="text"
-                    placeholder="Naziv predmeta"
+                    placeholder="Subject name"
                     value={subjectData.name}
                     onChange={(e) => setSubjectData({ ...subjectData, name: e.target.value })}
                     required
@@ -199,10 +722,20 @@ export default function ProfessorDashboard() {
                 </div>
                 <div>
                   <textarea
-                    placeholder="Opis predmeta"
+                    placeholder="Subject description"
                     value={subjectData.description}
                     onChange={(e) => setSubjectData({ ...subjectData, description: e.target.value })}
                     rows={3}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <input
+                    type="password"
+                    placeholder="Subject password"
+                    value={subjectData.password}
+                    onChange={(e) => setSubjectData({ ...subjectData, password: e.target.value })}
+                    required
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
                   />
                 </div>
@@ -210,7 +743,7 @@ export default function ProfessorDashboard() {
                   type="submit"
                   className="w-full px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
                 >
-                  Sacuvaj predmet
+                  Save subject
                 </button>
               </form>
             )}
@@ -225,17 +758,17 @@ export default function ProfessorDashboard() {
                 </svg>
               </div>
               <h3 className="ml-3 text-lg font-semibold text-gray-900 dark:text-white">
-                Ispiti
+                Exams
               </h3>
             </div>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Kreirajte novi ispit za studente
+              Create a new exam for students
             </p>
             <button
               onClick={() => setShowExamForm(!showExamForm)}
               className="w-full px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
             >
-              {showExamForm ? 'Zatvori' : 'Kreiraj ispit'}
+              {showExamForm ? 'Close' : 'Create exam'}
             </button>
 
             {/* Exam Form */}
@@ -244,7 +777,7 @@ export default function ProfessorDashboard() {
                 <div>
                   <input
                     type="text"
-                    placeholder="Naziv ispita"
+                    placeholder="Exam name"
                     value={examData.name}
                     onChange={(e) => setExamData({ ...examData, name: e.target.value })}
                     required
@@ -253,7 +786,7 @@ export default function ProfessorDashboard() {
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                    Vreme pocetka
+                    Start time
                   </label>
                   <input
                     type="datetime-local"
@@ -265,7 +798,7 @@ export default function ProfessorDashboard() {
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                    Trajanje (minuti)
+                    Duration (minutes)
                   </label>
                   <input
                     type="number"
@@ -277,46 +810,88 @@ export default function ProfessorDashboard() {
                   />
                 </div>
                 <div>
-                  <input
-                    type="text"
-                    placeholder="ID predmeta"
+                  <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                    Subject
+                  </label>
+                  <select
                     value={examData.subjectId}
                     onChange={(e) => setExamData({ ...examData, subjectId: e.target.value })}
                     required
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-                  />
+                  >
+                    <option value="" disabled>
+                      {subjects.length > 0 ? 'Select a subject' : 'No subjects available'}
+                    </option>
+                    {subjects.map((subject) => (
+                      <option key={subject.id} value={subject.id}>
+                        {subject.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <button
                   type="submit"
                   className="w-full px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
                 >
-                  Sacuvaj ispit
+                  Save exam
                 </button>
               </form>
             )}
           </div>
 
-          {/* Live Monitoring Card */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+          {/*SOCKET: Live Monitoring Card*/}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 flex flex-col h-96">
             <div className="flex items-center mb-4">
-              <div className="p-3 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
-                <svg className="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="p-3 bg-red-100 dark:bg-red-900 rounded-lg animate-pulse">
+                <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                 </svg>
               </div>
               <h3 className="ml-3 text-lg font-semibold text-gray-900 dark:text-white">
-                Live Monitoring
+                Live Alerts ({liveAlerts.length})
               </h3>
             </div>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Pratite studente u realnom vremenu tokom ispita
-            </p>
-            <button
-              className="w-full px-4 py-2 text-sm font-medium text-white bg-yellow-600 rounded-lg hover:bg-yellow-700 transition-colors"
-              onClick={() => alert('Live monitoring ce biti implementiran sa Socket.io')}
+            
+            <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 rounded p-2 border border-gray-200 dark:border-gray-700">
+              {liveAlerts.length === 0 ? (
+                <p className="text-center text-gray-500 mt-10">No active alerts.</p>
+              ) : (
+                <div className="space-y-4">
+                  {Object.entries(alertsByExam)
+                    .sort((a, b) => {
+                      const aLatest = a[1][0]?.timestamp || 0;
+                      const bLatest = b[1][0]?.timestamp || 0;
+                      return bLatest - aLatest;
+                    })
+                    .map(([examId, alerts]) => (
+                      <div key={examId} className="rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                        <div className="px-3 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
+                          {examNameById[examId] || `Exam ${examId.substring(0, 8)}...`}
+                        </div>
+                        <div className="p-2 space-y-2">
+                          {alerts.map((alert, idx) => (
+                            <div key={`${alert.studentId}-${idx}`} className="p-2 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 rounded text-sm">
+                              <div className="flex justify-between font-bold text-red-700 dark:text-red-400">
+                                <span>{alert.email}</span>
+                                <span>{new Date(alert.timestamp).toLocaleTimeString()}</span>
+                              </div>
+                              <div className="text-gray-600 dark:text-gray-300">
+                                Type: {alert.type} | Count: {alert.count}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+            <button 
+              onClick={() => setLiveAlerts([])}
+              className="mt-2 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-right"
             >
-              Otvori monitoring
+              Clear logs
             </button>
           </div>
         </div>
@@ -324,14 +899,14 @@ export default function ProfessorDashboard() {
         {/* Created Subjects List */}
         {isLoadingSubjects && (
           <div className="mt-8 bg-white dark:bg-gray-800 rounded-lg shadow p-6 text-center text-gray-500 dark:text-gray-400">
-            Ucitavanje predmeta...
+            Loading subjects...
           </div>
         )}
 
         {!isLoadingSubjects && subjects.length > 0 && (
           <div className="mt-8">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Kreirani predmeti
+              Created subjects
             </h3>
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -341,10 +916,13 @@ export default function ProfessorDashboard() {
                       ID
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Naziv
+                      Name
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Opis
+                      Description
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -373,44 +951,475 @@ export default function ProfessorDashboard() {
                         <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                           <div className="flex items-center justify-between gap-3">
                             <span>{subject.description}</span>
-                            <button
+                              <button
                               type="button"
                               onClick={() => toggleSubject(subject.id)}
                               className="text-xs text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
                             >
-                              Detalji
+                              Details
+                            </button>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right text-sm text-gray-500 dark:text-gray-400">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                editingSubjectId === subject.id
+                                  ? cancelEditSubject()
+                                  : startEditSubject(subject)
+                              }
+                              className="px-3 py-1 text-xs rounded border border-indigo-300 text-indigo-600 hover:bg-indigo-50"
+                            >
+                              {editingSubjectId === subject.id ? 'Close edit' : 'Edit'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSubject(subject)}
+                              className="px-3 py-1 text-xs rounded border border-red-300 text-red-600 hover:bg-red-50"
+                            >
+                              Delete
                             </button>
                           </div>
                         </td>
                       </tr>
+                      {editingSubjectId === subject.id && (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-4 bg-indigo-50/60 dark:bg-indigo-900/20">
+                            <div className="text-sm font-semibold text-indigo-700 dark:text-indigo-200 mb-3">
+                              Edit subject
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <input
+                                name="name"
+                                value={subjectEditForm.name}
+                                onChange={handleSubjectEditChange}
+                                placeholder="Subject name"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                              />
+                              <input
+                                name="description"
+                                value={subjectEditForm.description}
+                                onChange={handleSubjectEditChange}
+                                placeholder="Subject description"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                              />
+                              <input
+                                name="password"
+                                type="password"
+                                value={subjectEditForm.password}
+                                onChange={handleSubjectEditChange}
+                                placeholder="New subject password (optional)"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                              />
+                              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <input
+                                  type="checkbox"
+                                  name="invalidateEnrollments"
+                                  checked={subjectEditForm.invalidateEnrollments}
+                                  onChange={handleSubjectEditChange}
+                                  disabled={!subjectEditForm.password.trim()}
+                                />
+                                Invalidate current enrollments
+                              </label>
+                            </div>
+                            <div className="mt-3 flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleSaveSubject(subject.id)}
+                                className="px-4 py-2 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                              >
+                                Save subject
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelEditSubject}
+                                className="px-4 py-2 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-100"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
                       {expandedSubjectId === subject.id && (
                         <tr>
-                          <td colSpan={3} className="px-6 py-4 bg-gray-50 dark:bg-gray-900/30">
+                          <td colSpan={4} className="px-6 py-4 bg-gray-50 dark:bg-gray-900/30">
                             <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                               Subject ID: <span className="text-gray-800 dark:text-gray-200">{subject.id}</span>
                             </div>
                             {subject.exams.length === 0 ? (
                               <div className="text-sm text-gray-500 dark:text-gray-400">
-                                Nema ispita za ovaj predmet
+                                No exams for this subject
                               </div>
                             ) : (
                               <ul className="space-y-2">
-                                {subject.exams.map((exam) => (
-                                  <li
-                                    key={exam.id}
-                                    className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-300"
-                                  >
-                                    <div className="flex flex-col">
-                                      <span>{exam.name}</span>
-                                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                                        Exam ID: {exam.id}
-                                      </span>
-                                    </div>
-                                    <span className="text-gray-500 dark:text-gray-400">
-                                      {exam.startTime}
-                                    </span>
-                                  </li>
-                                ))}
+                                {subject.exams.map((exam) => {
+                                  
+                                  const taskCount = exam.taskCount || 0;
+                                  const hasTasks = taskCount > 0;
+                                  const status = exam.status || 'waiting_start';
+
+                                  return (
+                                    <Fragment key={exam.id}>
+                                      <li
+                                        className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 p-3 rounded shadow-sm"
+                                      >
+                                        <div className="flex flex-col">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-semibold">{exam.name}</span>
+                                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                            status === 'active'
+                                              ? 'bg-green-100 text-green-700'
+                                              : status === 'paused'
+                                                ? 'bg-yellow-100 text-yellow-700'
+                                                : status === 'completed'
+                                                  ? 'bg-gray-200 text-gray-600'
+                                                  : 'bg-blue-100 text-blue-700'
+                                          }`}>
+                                            {status === 'active' && 'Active'}
+                                            {status === 'paused' && 'Paused'}
+                                            {status === 'completed' && 'Completed'}
+                                            {status === 'wait_room' && 'Inactive (scheduled)'}
+                                            {status === 'waiting_start' && 'Waiting to start'}
+                                          </span>
+                                        </div>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                          ID: {exam.id} | Start: {new Date(exam.startTime).toLocaleString()} | Tasks: {taskCount}
+                                        </span>
+                                      </div>
+                                      
+                                      {/*SOCKET: Actions Buttons */}
+                                      <div className="flex flex-wrap gap-2 justify-end">
+                                        <button
+                                          onClick={() =>
+                                            monitoredExams.has(exam.id)
+                                              ? handleStopMonitorExam(exam.id)
+                                              : handleMonitorExam(exam.id)
+                                          }
+                                          className={`px-3 py-1 text-xs rounded border ${
+                                            monitoredExams.has(exam.id)
+                                              ? 'bg-yellow-100 text-yellow-700 border-yellow-300'
+                                              : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                          }`}
+                                        >
+                                          {monitoredExams.has(exam.id) ? 'Monitoring on' : 'Monitor'}
+                                        </button>
+
+                                        {(status === 'active' || status === 'waiting_start') && (
+                                          <button
+                                            onClick={() => setChatExamId(chatExamId === exam.id ? null : exam.id)}
+                                            className={`px-3 py-1 text-xs rounded border ${
+                                              chatExamId === exam.id
+                                                ? 'bg-indigo-100 text-indigo-700 border-indigo-300'
+                                                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                            }`}
+                                          >
+                                            {chatExamId === exam.id ? 'Close Chat' : 'Chat'}
+                                          </button>
+                                        )}
+
+                                        {(status === 'wait_room' || status === 'waiting_start') && (
+                                          <button 
+                                            onClick={() => handleStartExam(exam)}
+                                            disabled={!hasTasks}
+                                            className={`px-3 py-1 text-xs rounded ${
+                                              hasTasks
+                                                ? 'bg-green-600 text-white hover:bg-green-700'
+                                                : 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                                            }`}
+                                          >
+                                            {hasTasks ? 'Start' : 'Add tasks first'}
+                                          </button>
+                                        )}
+
+                                        {status === 'active' && (
+                                          <button 
+                                            onClick={() => handlePauseExam(exam)}
+                                            className="px-3 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                                          >
+                                            Pause
+                                          </button>
+                                        )}
+
+                                        {status === 'paused' && (
+                                          <button 
+                                            onClick={() => handleResumeExam(exam)}
+                                            className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                                          >
+                                            Resume
+                                          </button>
+                                        )}
+
+                                        {(status === 'active' || status === 'paused') && (
+                                          <button 
+                                            onClick={() => handleExtendExam(exam)}
+                                            className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                                          >
+                                            Extend
+                                          </button>
+                                        )}
+
+                                        {(status === 'active' || status === 'paused') && (
+                                          <button 
+                                            onClick={() => handleEndExam(exam)}
+                                            className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                                          >
+                                            End
+                                          </button>
+                                        )}
+
+                                        {status === 'completed' && (
+                                          <button 
+                                            onClick={() => handleRestartExam(exam)}
+                                            disabled={!hasTasks}
+                                            className={`px-3 py-1 text-xs rounded ${
+                                              hasTasks
+                                                ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                                                : 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                                            }`}
+                                          >
+                                            Restart
+                                          </button>
+                                        )}
+
+                                        <button 
+                                          onClick={() =>
+                                            editingExamId === exam.id
+                                              ? cancelEditExam()
+                                              : startEditExam(exam)
+                                          }
+                                          className="px-3 py-1 text-xs border border-indigo-300 text-indigo-600 rounded hover:bg-indigo-50"
+                                        >
+                                          {editingExamId === exam.id ? 'Close edit' : 'Edit'}
+                                        </button>
+
+                                        <button 
+                                          onClick={() => handleDeleteExam(exam)}
+                                          className="px-3 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
+                                        >
+                                          Delete
+                                        </button>
+
+
+                                        <button
+                                          onClick={() => toggleTaskPanel(exam.id)}
+                                          className="px-3 py-1 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-50"
+                                        >
+                                          Tasks
+                                        </button>
+
+                                        <button
+                                          onClick={() => navigate(`/professor/exam/${exam.id}/review`)}
+                                          className="px-3 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
+                                        >
+                                          Review
+                                        </button>
+                                      </div>
+                                    </li>
+                                    {editingExamId === exam.id && (
+                                      <li className="bg-indigo-50/70 dark:bg-indigo-900/20 rounded p-3 border border-indigo-200 dark:border-indigo-800">
+                                        <div className="text-sm font-semibold text-indigo-700 dark:text-indigo-200 mb-3">
+                                          Edit exam
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                          <input
+                                            name="name"
+                                            value={examEditForm.name}
+                                            onChange={handleExamEditChange}
+                                            placeholder="Exam name"
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                          />
+                                          <input
+                                            name="startTime"
+                                            type="datetime-local"
+                                            value={examEditForm.startTime}
+                                            onChange={handleExamEditChange}
+                                            placeholder="Start time (YYYY-MM-DDTHH:mm)"
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                          />
+                                          <input
+                                            name="durationMinutes"
+                                            type="number"
+                                            min="1"
+                                            value={examEditForm.durationMinutes}
+                                            onChange={handleExamEditChange}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                          />
+                                        </div>
+                                        <div className="mt-3 flex gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleSaveExam(exam.id)}
+                                            className="px-4 py-2 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                                          >
+                                            Save exam
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={cancelEditExam}
+                                            className="px-4 py-2 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-100"
+                                          >
+                                            Cancel
+                                          </button>
+                                        </div>
+                                      </li>
+                                    )}
+                                    {taskExamId === exam.id && (
+                                      <li className="bg-gray-50 dark:bg-gray-900/40 rounded p-3 border border-gray-200 dark:border-gray-700">
+                                        <div className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">
+                                          {editingTask ? 'Edit task' : 'New task'}
+                                        </div>
+
+                                        {taskError && (
+                                          <div className="mb-3 text-xs text-red-600 dark:text-red-400">
+                                            {taskError}
+                                          </div>
+                                        )}
+
+                                        <form
+                                          className="grid grid-cols-1 gap-3"
+                                          onSubmit={(e) => handleSubmitTask(e, exam.id)}
+                                        >
+                                          <input
+                                            name="title"
+                                            value={taskForm.title}
+                                            onChange={handleTaskInputChange}
+                                            placeholder="Task title"
+                                            required
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                          />
+                                          <textarea
+                                            name="description"
+                                            value={taskForm.description}
+                                            onChange={handleTaskInputChange}
+                                            placeholder="Task description"
+                                            rows={3}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                          />
+
+                                          <textarea
+                                            name="exampleInput"
+                                            value={taskForm.exampleInput}
+                                            onChange={handleTaskInputChange}
+                                            placeholder="Example input"
+                                            rows={2}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white font-mono"
+                                          />
+                                          <textarea
+                                            name="exampleOutput"
+                                            value={taskForm.exampleOutput}
+                                            onChange={handleTaskInputChange}
+                                            placeholder="Example output"
+                                            rows={2}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white font-mono"
+                                          />
+                                          <textarea
+                                            name="notes"
+                                            value={taskForm.notes}
+                                            onChange={handleTaskInputChange}
+                                            placeholder="Notes"
+                                            rows={2}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                          />
+                                          <textarea
+                                            name="starterCode"
+                                            value={taskForm.starterCode}
+                                            onChange={handleTaskInputChange}
+                                            placeholder="Starter code"
+                                            rows={3}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white font-mono"
+                                          />
+                                          <textarea
+                                            name="testCases"
+                                            value={taskForm.testCases}
+                                            onChange={handleTaskInputChange}
+                                            placeholder='Test cases JSON (npr. [{"input":"1","output":"2"}])'
+                                            rows={3}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white font-mono"
+                                          />
+                                          <input
+                                            type="file"
+                                            accept="application/pdf"
+                                            onChange={handleTaskFileChange}
+                                            className="text-sm text-gray-600 dark:text-gray-300"
+                                          />
+                                          <div className="flex gap-2">
+                                            <button
+                                              type="submit"
+                                              className="px-3 py-2 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                                            >
+                                              {editingTask ? 'Save changes' : 'Add task'}
+                                            </button>
+                                            {editingTask && (
+                                              <button
+                                                type="button"
+                                                onClick={resetTaskForm}
+                                                className="px-3 py-2 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-100"
+                                              >
+                                                Cancel
+                                              </button>
+                                            )}
+                                          </div>
+                                        </form>
+
+                                        <div className="mt-4">
+                                          <div className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                                            Existing tasks
+                                          </div>
+                                          {isLoadingTasks ? (
+                                            <div className="text-xs text-gray-500">Loading...</div>
+                                          ) : (
+                                            <div className="space-y-2">
+                                              {(tasksByExam[exam.id] || []).length === 0 && (
+                                                <div className="text-xs text-gray-500">No tasks.</div>
+                                              )}
+                                              {(tasksByExam[exam.id] || []).map((task) => (
+                                                <div
+                                                  key={task.id}
+                                                  className="flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-xs"
+                                                >
+                                                  <div className="flex flex-col">
+                                                    <span className="font-semibold text-gray-700 dark:text-gray-200">
+                                                      {task.title}
+                                                    </span>
+                                                    {task.pdfUrl && (
+                                                      <a
+                                                        href={task.pdfUrl}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="text-indigo-600 hover:text-indigo-500"
+                                                      >
+                                                        Task PDF
+                                                      </a>
+                                                    )}
+                                                  </div>
+                                                  <div className="flex gap-2">
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => handleEditTask(task)}
+                                                      className="px-2 py-1 text-xs border border-indigo-300 text-indigo-600 rounded hover:bg-indigo-50"
+                                                    >
+                                                      Edit
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => handleDeleteTask(exam.id, task)}
+                                                      className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
+                                                    >
+                                                      Delete
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </li>
+                                    )}
+                                    </Fragment>
+                                  );
+                                })}
                               </ul>
                             )}
                           </td>
@@ -424,6 +1433,11 @@ export default function ProfessorDashboard() {
           </div>
         )}
       </main>
+
+      {/* Chat Panel for active exam */}
+      {chatExamId && (
+        <ExamChatPanel examId={chatExamId} isProfessor={true} />
+      )}
     </div>
   );
 }
