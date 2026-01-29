@@ -23,7 +23,7 @@ import neo4jStatusRoutes from './databases/neo4j/routes/statusRoutes.js';
 import cassandraStatusRoutes from './databases/cassandra/routes/statusRoutes.js';
 import { redisClient } from './databases/redis/client.js';
 import { initSocket } from './databases/redis/services/socketService.js';
-import { neo4jDriver } from './databases/neo4j/driver.js';
+import { neo4jDriver, initNeo4jSchema } from './databases/neo4j/driver.js';
 import { cassandraClient, initCassandraTables } from './databases/cassandra/client.js';
 import { apiLimiter } from './middleware/rateLimit.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -104,6 +104,8 @@ async function initializeDatabases() {
   await neoSession.run('RETURN 1');
   console.log('Connected to Neo4j (AuraDB)');
   await neoSession.close();
+
+  await initNeo4jSchema();
 
   await cassandraClient.connect();
   console.log('Connected to Cassandra (Astra DB)');

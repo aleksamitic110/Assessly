@@ -7,10 +7,15 @@
 
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
+import { v4 as uuidv4 } from 'uuid';
 import { types } from 'cassandra-driver';
 import { neo4jDriver } from '../driver.js';
 import { redisClient } from '../../redis/client.js';
 import { cassandraClient } from '../../cassandra/client.js';
+import { logAdminActivity } from '../../cassandra/services/logsService.js';
+
+const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS || 10);
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
@@ -92,11 +97,28 @@ export const getUsers = async (req: Request, res: Response) => {
   const session = neo4jDriver.session();
 
   try {
-    const query = search
-      ? `MATCH (u:User) WHERE toLower(u.email) CONTAINS toLower($search) RETURN u ORDER BY u.email`
-      : `MATCH (u:User) RETURN u ORDER BY u.email`;
+    let result;
+    if (search) {
+      const term = String(search).toLowerCase().replace(/[^a-z0-9@._-]/g, '');
+      // Try fulltext index first (fast), fall back to STARTS WITH on the indexed email property
+      try {
+        result = await session.run(
+          `CALL db.index.fulltext.queryNodes('userEmailFulltext', $term + '*')
+           YIELD node AS u, score
+           RETURN u ORDER BY score DESC, u.email`,
+          { term }
+        );
+      } catch {
+        // Fulltext index not available — fall back to STARTS WITH (uses btree index)
+        result = await session.run(
+          `MATCH (u:User) WHERE u.email STARTS WITH $term RETURN u ORDER BY u.email`,
+          { term }
+        );
+      }
+    } else {
+      result = await session.run(`MATCH (u:User) RETURN u ORDER BY u.email`);
+    }
 
-    const result = await session.run(query, search ? { search: String(search) } : {});
     const users = result.records.map(r => {
       const u = r.get('u').properties;
       return {
@@ -139,6 +161,7 @@ export const changeUserRole = async (req: Request, res: Response) => {
     }
 
     const u = result.records[0].get('u').properties;
+    await logAdminActivity('ADMIN_USER_ROLE_CHANGE', { userId: id, email: u.email, newRole: role });
     res.json({ id: u.id, email: u.email, role: u.role });
   } catch (error) {
     res.status(500).json({ error: 'Error changing user role' });
@@ -167,6 +190,7 @@ export const disableUser = async (req: Request, res: Response) => {
     }
 
     const u = result.records[0].get('u').properties;
+    await logAdminActivity('ADMIN_USER_DISABLE', { userId: id, email: u.email, disabled });
     res.json({ id: u.id, email: u.email, disabled: u.disabled === true || u.disabled === 'true' });
   } catch (error) {
     res.status(500).json({ error: 'Error updating user' });
@@ -272,6 +296,7 @@ export const adminDeleteExam = async (req: Request, res: Response) => {
       `exam:${examId}:session_id`
     );
 
+    await logAdminActivity('ADMIN_EXAM_DELETE', { examId });
     res.json({ message: 'Exam deleted by admin' });
   } catch (error) {
     res.status(500).json({ error: 'Error deleting exam' });
@@ -324,6 +349,7 @@ export const adminDeleteSubject = async (req: Request, res: Response) => {
       { subjectId }
     );
 
+    await logAdminActivity('ADMIN_SUBJECT_DELETE', { subjectId });
     res.json({ message: 'Subject deleted by admin' });
   } catch (error) {
     res.status(500).json({ error: 'Error deleting subject' });
@@ -345,6 +371,7 @@ export const adminResetExamState = async (req: Request, res: Response) => {
       `exam:${examId}:session_id`
     );
 
+    await logAdminActivity('ADMIN_EXAM_RESET_STATE', { examId });
     res.json({ message: 'Exam Redis state reset' });
   } catch (error) {
     res.status(500).json({ error: 'Error resetting exam state' });
@@ -357,16 +384,17 @@ export const getStatistics = async (_req: Request, res: Response) => {
   const session = neo4jDriver.session();
   try {
     const result = await session.run(`
-      OPTIONAL MATCH (u:User)
+      MATCH (u:User)
       WITH count(u) AS totalUsers
       OPTIONAL MATCH (s:User {role: 'STUDENT'})
       WITH totalUsers, count(s) AS totalStudents
       OPTIONAL MATCH (p:User {role: 'PROFESSOR'})
       WITH totalUsers, totalStudents, count(p) AS totalProfessors
+      WITH totalUsers, totalStudents, totalProfessors
       OPTIONAL MATCH (sub:Subject)
-      WITH totalUsers, totalStudents, totalProfessors, count(sub) AS totalSubjects
+      WITH totalUsers, totalStudents, totalProfessors, count(DISTINCT sub) AS totalSubjects
       OPTIONAL MATCH (e:Exam)
-      RETURN totalUsers, totalStudents, totalProfessors, totalSubjects, count(e) AS totalExams
+      RETURN totalUsers, totalStudents, totalProfessors, totalSubjects, count(DISTINCT e) AS totalExams
     `);
 
     const rec = result.records[0];
@@ -447,14 +475,15 @@ export const getSecurityEventsAdmin = async (req: Request, res: Response) => {
             details: JSON.parse(row.details || '{}')
           });
         }
-      } catch {
-        // skip exams with no events
+      } catch (err) {
+        console.warn(`[Admin] Failed to fetch security events for exam ${eid}:`, err);
       }
     }
 
     allEvents.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     res.json(allEvents.slice(0, 200));
   } catch (error) {
+    console.error('[Admin] Error fetching security events:', error);
     res.status(500).json({ error: 'Error fetching security events' });
   }
 };
@@ -534,6 +563,26 @@ export const getRecentActivity = async (_req: Request, res: Response) => {
     await session.close();
 
     const activities: any[] = [];
+
+    // Also fetch admin actions (stored under a fixed UUID partition)
+    try {
+      const adminResult = await cassandraClient.execute(
+        `SELECT user_id, event_type, timestamp, details FROM user_activity WHERE user_id = ? LIMIT 50`,
+        [types.Uuid.fromString('00000000-0000-0000-0000-000000000000')],
+        { prepare: true }
+      );
+      for (const row of adminResult.rows) {
+        activities.push({
+          userId: 'ADMIN',
+          eventType: row.event_type,
+          timestamp: row.timestamp.toISOString(),
+          details: JSON.parse(row.details || '{}')
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to fetch admin activity:', err);
+    }
+
     for (const record of usersResult.records) {
       const userId = record.get('id');
       if (!userId) continue;
@@ -561,5 +610,362 @@ export const getRecentActivity = async (_req: Request, res: Response) => {
     res.json(activities.slice(0, 100));
   } catch (error) {
     res.status(500).json({ error: 'Error fetching activity' });
+  }
+};
+
+// ─── Admin CRUD: Users ────────────────────────────────────────────────────────
+
+export const adminCreateUser = async (req: Request, res: Response) => {
+  const { email, password, firstName, lastName, role } = req.body;
+  const session = neo4jDriver.session();
+
+  try {
+    const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
+    const id = uuidv4();
+
+    const result = await session.run(
+      `CREATE (u:User {
+        id: $id, email: $email, passwordHash: $passwordHash,
+        firstName: $firstName, lastName: $lastName, role: $role,
+        isVerified: true, createdAt: datetime()
+      }) RETURN u`,
+      { id, email, passwordHash, firstName, lastName, role }
+    );
+
+    const u = result.records[0].get('u').properties;
+    delete u.passwordHash;
+    await logAdminActivity('ADMIN_USER_CREATE', { userId: id, email });
+    res.status(201).json(u);
+  } catch (error: any) {
+    if (error.code === 'Neo.ClientError.Schema.ConstraintValidationFailed') {
+      return res.status(400).json({ error: 'Email is already registered' });
+    }
+    res.status(500).json({ error: 'Error creating user' });
+  } finally {
+    await session.close();
+  }
+};
+
+export const adminGetUser = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const session = neo4jDriver.session();
+
+  try {
+    const result = await session.run(`MATCH (u:User {id: $id}) RETURN u`, { id });
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const u = result.records[0].get('u').properties;
+    delete u.passwordHash;
+    res.json(u);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching user' });
+  } finally {
+    await session.close();
+  }
+};
+
+export const adminUpdateUser = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { email, firstName, lastName, role } = req.body;
+  const session = neo4jDriver.session();
+
+  try {
+    const result = await session.run(
+      `MATCH (u:User {id: $id})
+       SET u.email = COALESCE($email, u.email),
+           u.firstName = COALESCE($firstName, u.firstName),
+           u.lastName = COALESCE($lastName, u.lastName),
+           u.role = COALESCE($role, u.role)
+       RETURN u`,
+      { id, email: email || null, firstName: firstName || null, lastName: lastName || null, role: role || null }
+    );
+
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const u = result.records[0].get('u').properties;
+    delete u.passwordHash;
+    await logAdminActivity('ADMIN_USER_ROLE_CHANGE', { userId: id, email: u.email, updates: req.body });
+    res.json(u);
+  } catch (error: any) {
+    if (error.code === 'Neo.ClientError.Schema.ConstraintValidationFailed') {
+      return res.status(400).json({ error: 'Email is already taken' });
+    }
+    res.status(500).json({ error: 'Error updating user' });
+  } finally {
+    await session.close();
+  }
+};
+
+export const adminDeleteUser = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const session = neo4jDriver.session();
+
+  try {
+    const result = await session.run(
+      `MATCH (u:User {id: $id}) DETACH DELETE u RETURN count(u) AS deleted`,
+      { id }
+    );
+    const deleted = result.records[0]?.get('deleted')?.toNumber?.() ?? result.records[0]?.get('deleted');
+    if (!deleted) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    await logAdminActivity('ADMIN_USER_DELETE', { userId: id });
+    res.json({ message: 'User deleted' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error deleting user' });
+  } finally {
+    await session.close();
+  }
+};
+
+// ─── Admin CRUD: Subjects ─────────────────────────────────────────────────────
+
+export const adminCreateSubject = async (req: Request, res: Response) => {
+  const { name, description, password, professorId } = req.body;
+  const session = neo4jDriver.session();
+
+  try {
+    const passwordHash = await bcrypt.hash(String(password), 10);
+    const id = uuidv4();
+
+    const result = await session.run(
+      `MATCH (p:User {id: $professorId})
+       CREATE (s:Subject {id: $id, name: $name, description: $description, passwordHash: $passwordHash})
+       CREATE (p)-[:PREDAJE]->(s)
+       RETURN s`,
+      { professorId, id, name, description: description || '', passwordHash }
+    );
+
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: 'Professor not found' });
+    }
+
+    const s = result.records[0].get('s').properties;
+    delete s.passwordHash;
+    await logAdminActivity('ADMIN_SUBJECT_CREATE', { subjectId: id, name });
+    res.status(201).json(s);
+  } catch (error) {
+    res.status(500).json({ error: 'Error creating subject' });
+  } finally {
+    await session.close();
+  }
+};
+
+export const adminUpdateSubject = async (req: Request, res: Response) => {
+  const { subjectId } = req.params;
+  const { name, description, password } = req.body;
+  const session = neo4jDriver.session();
+
+  try {
+    const passwordHash = password ? await bcrypt.hash(String(password), 10) : null;
+
+    const result = await session.run(
+      `MATCH (s:Subject {id: $subjectId})
+       SET s.name = COALESCE($name, s.name),
+           s.description = COALESCE($description, s.description),
+           s.passwordHash = COALESCE($passwordHash, s.passwordHash)
+       RETURN s`,
+      { subjectId, name: name || null, description: description !== undefined ? description : null, passwordHash }
+    );
+
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: 'Subject not found' });
+    }
+
+    const s = result.records[0].get('s').properties;
+    delete s.passwordHash;
+    await logAdminActivity('ADMIN_SUBJECT_UPDATE', { subjectId, name: s.name });
+    res.json(s);
+  } catch (error) {
+    res.status(500).json({ error: 'Error updating subject' });
+  } finally {
+    await session.close();
+  }
+};
+
+// ─── Admin CRUD: Exams ────────────────────────────────────────────────────────
+
+export const adminCreateExam = async (req: Request, res: Response) => {
+  const { subjectId, name, startTime, durationMinutes } = req.body;
+  const session = neo4jDriver.session();
+
+  try {
+    const id = uuidv4();
+    const result = await session.run(
+      `MATCH (s:Subject {id: $subjectId})
+       CREATE (e:Exam {id: $id, name: $name, startTime: $startTime, durationMinutes: $durationMinutes})
+       CREATE (s)-[:SADRZI]->(e)
+       RETURN e`,
+      { subjectId, id, name, startTime, durationMinutes }
+    );
+
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: 'Subject not found' });
+    }
+
+    const e = result.records[0].get('e').properties;
+    await logAdminActivity('ADMIN_EXAM_CREATE', { examId: id, name, subjectId });
+    res.status(201).json(e);
+  } catch (error) {
+    res.status(500).json({ error: 'Error creating exam' });
+  } finally {
+    await session.close();
+  }
+};
+
+export const adminUpdateExam = async (req: Request, res: Response) => {
+  const { examId } = req.params;
+  const { name, startTime, durationMinutes } = req.body;
+  const session = neo4jDriver.session();
+
+  try {
+    const result = await session.run(
+      `MATCH (e:Exam {id: $examId})
+       SET e.name = COALESCE($name, e.name),
+           e.startTime = COALESCE($startTime, e.startTime),
+           e.durationMinutes = COALESCE($durationMinutes, e.durationMinutes)
+       RETURN e`,
+      { examId, name: name || null, startTime: startTime || null, durationMinutes: durationMinutes ?? null }
+    );
+
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: 'Exam not found' });
+    }
+
+    const e = result.records[0].get('e').properties;
+    await logAdminActivity('ADMIN_EXAM_UPDATE', { examId, name: e.name });
+    res.json(e);
+  } catch (error) {
+    res.status(500).json({ error: 'Error updating exam' });
+  } finally {
+    await session.close();
+  }
+};
+
+// ─── Admin CRUD: Tasks ────────────────────────────────────────────────────────
+
+export const adminGetTasks = async (req: Request, res: Response) => {
+  const { examId } = req.params;
+  const session = neo4jDriver.session();
+
+  try {
+    const result = await session.run(
+      `MATCH (e:Exam {id: $examId})-[:IMA_ZADATAK]->(t:Task)
+       RETURN t ORDER BY t.title`,
+      { examId }
+    );
+
+    const tasks = result.records.map(r => r.get('t').properties);
+    res.json(tasks);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching tasks' });
+  } finally {
+    await session.close();
+  }
+};
+
+export const adminCreateTask = async (req: Request, res: Response) => {
+  const { examId, title, description, starterCode, testCases, exampleInput, exampleOutput, notes } = req.body;
+  const session = neo4jDriver.session();
+
+  try {
+    const id = uuidv4();
+    const testCasesStr = testCases ? (typeof testCases === 'string' ? testCases : JSON.stringify(testCases)) : null;
+
+    const result = await session.run(
+      `MATCH (e:Exam {id: $examId})
+       CREATE (t:Task {
+         id: $id, title: $title, description: $description,
+         starterCode: $starterCode, testCases: $testCases,
+         exampleInput: $exampleInput, exampleOutput: $exampleOutput,
+         notes: $notes
+       })
+       CREATE (e)-[:IMA_ZADATAK]->(t)
+       RETURN t`,
+      { examId, id, title, description: description || '', starterCode: starterCode || '', testCases: testCasesStr, exampleInput: exampleInput || '', exampleOutput: exampleOutput || '', notes: notes || '' }
+    );
+
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: 'Exam not found' });
+    }
+
+    const t = result.records[0].get('t').properties;
+    await logAdminActivity('ADMIN_TASK_CREATE', { taskId: id, examId, title });
+    res.status(201).json(t);
+  } catch (error) {
+    res.status(500).json({ error: 'Error creating task' });
+  } finally {
+    await session.close();
+  }
+};
+
+export const adminUpdateTask = async (req: Request, res: Response) => {
+  const { taskId } = req.params;
+  const { title, description, starterCode, testCases, exampleInput, exampleOutput, notes } = req.body;
+  const session = neo4jDriver.session();
+
+  try {
+    const testCasesStr = testCases !== undefined
+      ? (testCases ? (typeof testCases === 'string' ? testCases : JSON.stringify(testCases)) : null)
+      : undefined;
+
+    const result = await session.run(
+      `MATCH (t:Task {id: $taskId})
+       SET t.title = COALESCE($title, t.title),
+           t.description = COALESCE($description, t.description),
+           t.starterCode = COALESCE($starterCode, t.starterCode),
+           t.testCases = COALESCE($testCases, t.testCases),
+           t.exampleInput = COALESCE($exampleInput, t.exampleInput),
+           t.exampleOutput = COALESCE($exampleOutput, t.exampleOutput),
+           t.notes = COALESCE($notes, t.notes)
+       RETURN t`,
+      {
+        taskId,
+        title: title || null,
+        description: description !== undefined ? description : null,
+        starterCode: starterCode !== undefined ? starterCode : null,
+        testCases: testCasesStr !== undefined ? testCasesStr : null,
+        exampleInput: exampleInput !== undefined ? exampleInput : null,
+        exampleOutput: exampleOutput !== undefined ? exampleOutput : null,
+        notes: notes !== undefined ? notes : null
+      }
+    );
+
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    const t = result.records[0].get('t').properties;
+    await logAdminActivity('ADMIN_TASK_UPDATE', { taskId, title: t.title });
+    res.json(t);
+  } catch (error) {
+    res.status(500).json({ error: 'Error updating task' });
+  } finally {
+    await session.close();
+  }
+};
+
+export const adminDeleteTask = async (req: Request, res: Response) => {
+  const { taskId } = req.params;
+  const session = neo4jDriver.session();
+
+  try {
+    const result = await session.run(
+      `MATCH (t:Task {id: $taskId}) DETACH DELETE t RETURN count(t) AS deleted`,
+      { taskId }
+    );
+    const deleted = result.records[0]?.get('deleted')?.toNumber?.() ?? result.records[0]?.get('deleted');
+    if (!deleted) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+    await logAdminActivity('ADMIN_TASK_DELETE', { taskId });
+    res.json({ message: 'Task deleted' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error deleting task' });
+  } finally {
+    await session.close();
   }
 };

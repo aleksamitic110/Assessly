@@ -95,6 +95,68 @@ export const submissionSchemas = {
   })
 };
 
+export const adminSchemas = {
+  createUser: z.object({
+    email: z.string().email().max(254).transform((v) => v.toLowerCase()),
+    password: z.string().min(8).max(128),
+    firstName: trimmedString(50),
+    lastName: trimmedString(50),
+    role: z.enum(['STUDENT', 'PROFESSOR'])
+  }),
+  updateUser: z.object({
+    email: z.string().email().max(254).transform((v) => v.toLowerCase()).optional(),
+    firstName: z.string().trim().min(1).max(50).optional(),
+    lastName: z.string().trim().min(1).max(50).optional(),
+    role: z.enum(['STUDENT', 'PROFESSOR']).optional()
+  }),
+  changePassword: z.object({
+    currentPassword: z.string().min(8).max(128),
+    newPassword: z.string().min(8).max(128),
+    confirmNewPassword: z.string().min(8).max(128)
+  }),
+  createSubject: z.object({
+    name: trimmedString(100),
+    description: z.string().trim().max(500).optional().nullable(),
+    password: z.string().min(6).max(128),
+    professorId: z.string().uuid()
+  }),
+  updateSubject: z.object({
+    name: z.string().trim().min(1).max(100).optional(),
+    description: z.string().trim().max(500).optional().nullable(),
+    password: z.string().min(6).max(128).optional()
+  }),
+  createExam: z.object({
+    subjectId: z.string().uuid(),
+    name: trimmedString(120),
+    startTime: z.string().datetime(),
+    durationMinutes: z.coerce.number().int().min(1).max(600)
+  }),
+  updateExam: z.object({
+    name: z.string().trim().min(1).max(120).optional(),
+    startTime: z.string().datetime().optional(),
+    durationMinutes: z.coerce.number().int().min(1).max(600).optional()
+  }),
+  createTask: z.object({
+    examId: z.string().uuid(),
+    title: trimmedString(120),
+    description: z.string().trim().max(2000).optional().nullable(),
+    starterCode: z.string().max(20000).optional().nullable(),
+    testCases: z.union([z.string(), z.array(z.any())]).optional().nullable(),
+    exampleInput: z.string().max(2000).optional().nullable(),
+    exampleOutput: z.string().max(2000).optional().nullable(),
+    notes: z.string().max(2000).optional().nullable()
+  }),
+  updateTask: z.object({
+    title: z.string().trim().min(1).max(120).optional(),
+    description: z.string().trim().max(2000).optional().nullable(),
+    starterCode: z.string().max(20000).optional().nullable(),
+    testCases: z.union([z.string(), z.array(z.any())]).optional().nullable(),
+    exampleInput: z.string().max(2000).optional().nullable(),
+    exampleOutput: z.string().max(2000).optional().nullable(),
+    notes: z.string().max(2000).optional().nullable()
+  })
+};
+
 export const logsSchemas = {
   execution: z.object({
     examId: z.string().uuid(),

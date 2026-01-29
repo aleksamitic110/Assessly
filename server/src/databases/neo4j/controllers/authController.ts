@@ -281,3 +281,57 @@ export const resetPassword = async (req: Request, res: Response) => {
     await session.close();
   }
 };
+
+export const changePassword = async (req: any, res: Response) => {
+  const { currentPassword, newPassword, confirmNewPassword } = req.body;
+  const userId = req.user?.id;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  if (newPassword !== confirmNewPassword) {
+    return res.status(400).json({ error: 'New passwords do not match' });
+  }
+
+  const session = neo4jDriver.session();
+  try {
+    const result = await session.run(
+      'MATCH (u:User {id: $userId}) RETURN u',
+      { userId }
+    );
+
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = result.records[0].get('u').properties;
+    const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isValid) {
+      return res.status(400).json({ error: 'Current password is incorrect' });
+    }
+
+    const isSame = await bcrypt.compare(newPassword, user.passwordHash);
+    if (isSame) {
+      return res.status(400).json({ error: 'New password must be different from current password' });
+    }
+
+    const newHash = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);
+    await session.run(
+      'MATCH (u:User {id: $userId}) SET u.passwordHash = $newHash',
+      { userId, newHash }
+    );
+
+    try {
+      await logUserActivity(userId, 'PASSWORD_CHANGE', { email: user.email });
+    } catch (logErr) {
+      console.warn('Failed to log password change activity:', logErr);
+    }
+
+    res.json({ message: 'Password changed successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to change password' });
+  } finally {
+    await session.close();
+  }
+};
