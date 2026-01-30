@@ -9,7 +9,10 @@ const Icons = {
   Back: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>,
   User: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
   Check: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
-  Trash: () => <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+  Trash: () => <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+  Edit: () => <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>,
+  Save: () => <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+  X: () => <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
 };
 
 export default function ProfessorReviewPage() {
@@ -38,6 +41,11 @@ export default function ProfessorReviewPage() {
   const [newCommentLine, setNewCommentLine] = useState<string>('');
   const [newCommentMessage, setNewCommentMessage] = useState('');
   const [isSavingComment, setIsSavingComment] = useState(false);
+
+  // Edit Comment State (Inline Edit)
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editCommentMessage, setEditCommentMessage] = useState('');
+  const [editCommentLine, setEditCommentLine] = useState('');
 
   // Interaction State
   const [activeLine, setActiveLine] = useState<number | null>(null);
@@ -74,6 +82,7 @@ export default function ProfessorReviewPage() {
     setIsLoadingSubmissions(true);
     setSelectedStudent(student);
     setSelectedTaskIndex(0);
+    setEditingCommentId(null); // Reset edit mode
     try {
       const [submissionsRes, commentsRes] = await Promise.all([
         gradeApi.getStudentSubmissions(examId, student.studentId),
@@ -99,8 +108,7 @@ export default function ProfessorReviewPage() {
   // Computed Values
   const currentSubmission = submissions[selectedTaskIndex];
   const currentTask = tasks.find(t => t.id === currentSubmission?.taskId);
-  const maxLines = currentSubmission?.sourceCode ? currentSubmission.sourceCode.split('\n').length : 0;
-
+  
   const commentsByLine = useMemo(() => {
     const map: Record<number, ExamComment[]> = {};
     comments.forEach(c => {
@@ -126,7 +134,6 @@ export default function ProfessorReviewPage() {
     setIsSavingGrade(true);
     try {
       await gradeApi.setGrade(examId, selectedStudent.studentId, gradeValue, gradeComment);
-      
       const updatedGrade = { value: gradeValue, comment: gradeComment, updatedAt: new Date().toISOString() };
       setStudents(prev => prev.map(s => s.studentId === selectedStudent.studentId ? { ...s, grade: updatedGrade } : s));
       setSelectedStudent(prev => prev ? { ...prev, grade: updatedGrade } : null);
@@ -149,10 +156,34 @@ export default function ProfessorReviewPage() {
 
   const handleDeleteComment = async (commentId: string) => {
     if (!examId || !selectedStudent) return;
+    if (!confirm('Are you sure?')) return;
     try {
       await commentsApi.deleteComment(examId, selectedStudent.studentId, commentId);
       setComments(prev => prev.filter(c => c.commentId !== commentId));
     } catch { setError('Failed to delete comment'); }
+  };
+
+  // 🔥 RESTORED: Edit Comment Handlers
+  const startEditComment = (comment: ExamComment) => {
+    setEditingCommentId(comment.commentId);
+    setEditCommentMessage(comment.message);
+    setEditCommentLine(comment.line ? String(comment.line) : '');
+  };
+
+  const cancelEditComment = () => {
+    setEditingCommentId(null);
+    setEditCommentMessage('');
+    setEditCommentLine('');
+  };
+
+  const handleUpdateComment = async (commentId: string) => {
+    if (!examId || !selectedStudent) return;
+    try {
+      const line = editCommentLine.trim() ? parseInt(editCommentLine.trim(), 10) : null;
+      const res = await commentsApi.updateComment(examId, selectedStudent.studentId, commentId, line, editCommentMessage);
+      setComments(prev => prev.map(c => c.commentId === commentId ? res.data : c));
+      cancelEditComment();
+    } catch { setError('Failed to update comment'); }
   };
 
   if (isLoading) return <div className="min-h-screen bg-gray-900 flex items-center justify-center text-gray-400">Loading...</div>;
@@ -334,7 +365,7 @@ export default function ProfessorReviewPage() {
                 </div>
               </div>
 
-              {/* Comments List */}
+              {/* Comments List (Merged General + Line) */}
               <div className="space-y-4">
                 {/* Active Line Filter */}
                 {activeLine !== null && (
@@ -343,46 +374,45 @@ export default function ProfessorReviewPage() {
                     {commentsByLine[activeLine]?.length > 0 ? (
                       <div className="space-y-2">
                         {commentsByLine[activeLine].map(c => (
-                          <div key={c.commentId} className="bg-gray-800 p-2 rounded text-sm relative group">
-                            <p className="text-gray-300 pr-4">{c.message}</p>
-                            <button onClick={() => handleDeleteComment(c.commentId)} className="absolute top-2 right-2 text-gray-500 hover:text-red-500 opacity-0 group-hover:opacity-100"><Icons.Trash /></button>
-                          </div>
+                          <CommentItem 
+                            key={c.commentId} 
+                            comment={c} 
+                            isEditing={editingCommentId === c.commentId}
+                            onEdit={startEditComment}
+                            onDelete={handleDeleteComment}
+                            onSave={handleUpdateComment}
+                            onCancel={cancelEditComment}
+                            editMsg={editCommentMessage}
+                            setEditMsg={setEditCommentMessage}
+                            editLine={editCommentLine}
+                            setEditLine={setEditCommentLine}
+                          />
                         ))}
                       </div>
                     ) : <p className="text-xs text-gray-500 italic">No comments on this line yet.</p>}
                   </div>
                 )}
 
-                {/* General Comments */}
-                {generalComments.length > 0 && (
-                  <div>
-                    <div className="text-xs font-bold text-gray-500 uppercase mb-2">General</div>
-                    <div className="space-y-2">
-                      {generalComments.map(c => (
-                        <div key={c.commentId} className="bg-gray-700/30 p-2 rounded border border-gray-700 text-sm relative group">
-                          <p className="text-gray-300 pr-4">{c.message}</p>
-                          <button onClick={() => handleDeleteComment(c.commentId)} className="absolute top-2 right-2 text-gray-500 hover:text-red-500 opacity-0 group-hover:opacity-100"><Icons.Trash /></button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* All Line Comments (if no specific line selected) */}
-                {activeLine === null && comments.filter(c => c.line).length > 0 && (
-                  <div>
-                    <div className="text-xs font-bold text-gray-500 uppercase mb-2">Line Comments</div>
-                    <div className="space-y-2">
-                      {comments.filter(c => c.line).sort((a,b) => (a.line||0) - (b.line||0)).map(c => (
-                        <div key={c.commentId} className="bg-gray-700/30 p-2 rounded border-l-2 border-yellow-500 text-sm relative group cursor-pointer hover:bg-gray-700" onClick={() => setActiveLine(c.line)}>
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-xs font-bold text-yellow-500">Line {c.line}</span>
-                            <button onClick={(e) => {e.stopPropagation(); handleDeleteComment(c.commentId)}} className="text-gray-500 hover:text-red-500 opacity-0 group-hover:opacity-100"><Icons.Trash /></button>
-                          </div>
-                          <p className="text-gray-300">{c.message}</p>
-                        </div>
-                      ))}
-                    </div>
+                {/* All Comments (if no filter) */}
+                {activeLine === null && (
+                  <div className="space-y-2">
+                    {comments.sort((a,b) => (a.line||0) - (b.line||0)).map(c => (
+                      <CommentItem 
+                        key={c.commentId} 
+                        comment={c} 
+                        isEditing={editingCommentId === c.commentId}
+                        onEdit={startEditComment}
+                        onDelete={handleDeleteComment}
+                        onSave={handleUpdateComment}
+                        onCancel={cancelEditComment}
+                        editMsg={editCommentMessage}
+                        setEditMsg={setEditCommentMessage}
+                        editLine={editCommentLine}
+                        setEditLine={setEditCommentLine}
+                        onClickLine={() => c.line && setActiveLine(c.line)}
+                      />
+                    ))}
+                    {comments.length === 0 && <p className="text-center text-xs text-gray-600 py-4">No comments added yet.</p>}
                   </div>
                 )}
               </div>
@@ -397,4 +427,48 @@ export default function ProfessorReviewPage() {
       </div>
     </div>
   );
-} 
+}
+
+// Sub-component for individual comment items to keep main code clean
+function CommentItem({ comment, isEditing, onEdit, onDelete, onSave, onCancel, editMsg, setEditMsg, editLine, setEditLine, onClickLine }: any) {
+  if (isEditing) {
+    return (
+      <div className="bg-gray-700 p-3 rounded border border-indigo-500">
+        <div className="flex gap-2 mb-2">
+          <input 
+            className="w-16 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs" 
+            value={editLine} onChange={e => setEditLine(e.target.value)} placeholder="Line" 
+          />
+          <input 
+            className="flex-1 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs" 
+            value={editMsg} onChange={e => setEditMsg(e.target.value)} placeholder="Message" 
+          />
+        </div>
+        <div className="flex justify-end gap-2">
+          <button onClick={onCancel} className="text-xs text-gray-400 hover:text-white">Cancel</button>
+          <button onClick={() => onSave(comment.commentId)} className="text-xs bg-indigo-600 px-2 py-1 rounded text-white">Save</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`bg-gray-700/30 p-2 rounded border border-gray-700 text-sm relative group hover:bg-gray-700/50 ${onClickLine ? 'cursor-pointer' : ''}`} onClick={onClickLine}>
+      <div className="flex justify-between items-start mb-1">
+        <div className="flex items-center gap-2">
+          {comment.line ? (
+            <span className="text-xs font-bold text-yellow-500 bg-yellow-900/20 px-1.5 rounded">L{comment.line}</span>
+          ) : (
+            <span className="text-xs font-bold text-gray-400 bg-gray-800 px-1.5 rounded">Gen</span>
+          )}
+          <span className="text-[10px] text-gray-500">{new Date(comment.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+        </div>
+        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={(e) => { e.stopPropagation(); onEdit(comment); }} className="text-blue-400 hover:text-blue-300"><Icons.Edit /></button>
+          <button onClick={(e) => { e.stopPropagation(); onDelete(comment.commentId); }} className="text-gray-500 hover:text-red-500"><Icons.Trash /></button>
+        </div>
+      </div>
+      <p className="text-gray-300 pl-1">{comment.message}</p>
+    </div>
+  );
+}

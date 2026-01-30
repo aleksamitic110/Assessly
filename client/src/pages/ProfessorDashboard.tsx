@@ -32,7 +32,6 @@ interface Alert {
 
 // --- Icons ---
 const Icons = {
-  Plus: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
   Subject: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>,
   Exam: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
   Alert: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
@@ -55,11 +54,25 @@ export default function ProfessorDashboard() {
     return date.toISOString();
   };
 
+  const toDateTimeLocal = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    const pad = (num: number) => String(num).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
   // --- State ---
+  // Subject State
   const [showSubjectForm, setShowSubjectForm] = useState(false);
   const [subjectData, setSubjectData] = useState({ name: '', description: '', password: '' });
+  
+  // Subject Edit State
+  const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
+  const [subjectEditForm, setSubjectEditForm] = useState({ name: '', description: '', password: '', invalidateEnrollments: false });
 
+  // Exam State
   const [showExamForm, setShowExamForm] = useState(false);
+  const [editingExamId, setEditingExamId] = useState<string | null>(null);
   const [examData, setExamData] = useState({
     name: '',
     startTime: '',
@@ -67,10 +80,10 @@ export default function ProfessorDashboard() {
     subjectId: '',
   });
 
+  // Data State
   const [subjects, setSubjects] = useState<SubjectWithExams[]>([]);
   const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null);
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
-
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -78,12 +91,12 @@ export default function ProfessorDashboard() {
   const [liveAlerts, setLiveAlerts] = useState<Alert[]>([]);
   const [monitoredExams, setMonitoredExams] = useState<Set<string>>(new Set());
   const [chatExamId, setChatExamId] = useState<string | null>(null);
-  const [taskExamId, setTaskExamId] = useState<string | null>(null); // For Tasks Modal
+  
+  // Task State
+  const [taskExamId, setTaskExamId] = useState<string | null>(null);
   const [tasksByExam, setTasksByExam] = useState<Record<string, TaskType[]>>({});
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
   const [taskError, setTaskError] = useState('');
-  
-  // Task Form State
   const [editingTask, setEditingTask] = useState<TaskType | null>(null);
   const [taskForm, setTaskForm] = useState({
     title: '', description: '', starterCode: '', testCases: '[]',
@@ -160,7 +173,7 @@ export default function ProfessorDashboard() {
     return () => { isMounted = false; };
   }, []);
 
-  // --- Handlers (Subjects) ---
+  // --- SUBJECT CRUD ---
   const handleCreateSubject = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -174,22 +187,32 @@ export default function ProfessorDashboard() {
     }
   };
 
-  const handleCreateExam = async (e: React.FormEvent) => {
+  const openEditSubject = (subject: SubjectWithExams) => {
+    setEditingSubjectId(subject.id);
+    setSubjectEditForm({
+      name: subject.name,
+      description: subject.description,
+      password: '',
+      invalidateEnrollments: false
+    });
+    setShowSubjectForm(true); // Re-use the modal
+  };
+
+  const handleUpdateSubject = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!editingSubjectId) return;
     try {
-      const response = await api.post('/exams/exams', { ...examData, startTime: toIsoString(examData.startTime) });
-      const scheduledStart = new Date(toIsoString(examData.startTime)).getTime();
-      const initialStatus = scheduledStart > Date.now() ? 'wait_room' : 'waiting_start';
-      
-      setSubjects((prev) => prev.map((s) => 
-        s.id === examData.subjectId ? { ...s, exams: [...s.exams, { ...response.data, status: initialStatus }] } : s
-      ));
-      setExamData({ name: '', startTime: '', durationMinutes: 60, subjectId: '' });
-      setShowExamForm(false);
-      setMessage(`Exam "${response.data.name}" created.`);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Error creating exam');
-    }
+      const payload: any = { name: subjectEditForm.name, description: subjectEditForm.description };
+      if (subjectEditForm.password.trim()) {
+        payload.password = subjectEditForm.password.trim();
+        payload.invalidateEnrollments = subjectEditForm.invalidateEnrollments;
+      }
+      const response = await api.put(`/exams/subjects/${editingSubjectId}`, payload);
+      setSubjects((prev) => prev.map((s) => s.id === editingSubjectId ? { ...s, ...response.data } : s));
+      setMessage(`Subject updated.`);
+      setEditingSubjectId(null);
+      setShowSubjectForm(false);
+    } catch (err: any) { setError(err.response?.data?.error || 'Error updating subject'); }
   };
 
   const handleDeleteSubject = async (subject: SubjectWithExams) => {
@@ -197,11 +220,63 @@ export default function ProfessorDashboard() {
     try {
       await api.delete(`/exams/subjects/${subject.id}`);
       setSubjects((prev) => prev.filter((s) => s.id !== subject.id));
-      setMessage(`Subject "${subject.name}" deleted.`);
+      setMessage(`Subject deleted.`);
     } catch (err) { setError('Error deleting subject'); }
   };
 
-  // --- Handlers (Exams) ---
+  // --- EXAM CRUD ---
+  const handleEditExamClick = (exam: ExamType) => {
+    setEditingExamId(exam.id);
+    setExamData({
+      name: exam.name,
+      startTime: toDateTimeLocal(exam.startTime), // YYYY-MM-DDTHH:mm
+      durationMinutes: exam.durationMinutes,
+      subjectId: exam.subjectId || '', 
+    });
+    setShowExamForm(true);
+  };
+
+  const handleSaveExam = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingExamId) {
+        // UPDATE
+        const response = await api.put(`/exams/exams/${editingExamId}`, { 
+          name: examData.name, 
+          startTime: toIsoString(examData.startTime),
+          durationMinutes: examData.durationMinutes 
+        });
+        setSubjects((prev) => prev.map((s) => ({
+          ...s,
+          exams: s.exams.map(e => e.id === editingExamId ? { ...e, ...response.data } : e)
+        })));
+        setMessage(`Exam updated.`);
+      } else {
+        // CREATE
+        const response = await api.post('/exams/exams', { ...examData, startTime: toIsoString(examData.startTime) });
+        const scheduledStart = new Date(toIsoString(examData.startTime)).getTime();
+        const initialStatus = scheduledStart > Date.now() ? 'wait_room' : 'waiting_start';
+        setSubjects((prev) => prev.map((s) => 
+          s.id === examData.subjectId ? { ...s, exams: [...s.exams, { ...response.data, status: initialStatus }] } : s
+        ));
+        setMessage(`Exam created.`);
+      }
+      setExamData({ name: '', startTime: '', durationMinutes: 60, subjectId: '' });
+      setEditingExamId(null);
+      setShowExamForm(false);
+    } catch (err: any) { setError(err.response?.data?.error || 'Error saving exam'); }
+  };
+
+  const handleDeleteExam = async (exam: ExamType) => {
+    if (!confirm(`Delete exam "${exam.name}"?`)) return;
+    try {
+      await api.delete(`/exams/exams/${exam.id}`);
+      setSubjects((prev) => prev.map((s) => ({ ...s, exams: s.exams.filter((e) => e.id !== exam.id) })));
+      setMessage('Exam deleted.');
+    } catch { setError('Error deleting exam'); }
+  };
+
+  // --- SOCKET ACTIONS ---
   const handleStartExam = (exam: ExamType) => {
     if (!(exam as ProfessorExam).taskCount) return setError('Add tasks first.');
     if (!confirm(`Start "${exam.name}"?`)) return;
@@ -228,16 +303,7 @@ export default function ProfessorDashboard() {
     });
   };
 
-  const handleDeleteExam = async (exam: ExamType) => {
-    if (!confirm(`Delete exam "${exam.name}"?`)) return;
-    try {
-      await api.delete(`/exams/exams/${exam.id}`);
-      setSubjects((prev) => prev.map((s) => ({ ...s, exams: s.exams.filter((e) => e.id !== exam.id) })));
-      setMessage('Exam deleted.');
-    } catch { setError('Error deleting exam'); }
-  };
-
-  // --- Task Handlers (RESTORED) ---
+  // --- TASK CRUD ---
   const resetTaskForm = () => {
     setTaskForm({
       title: '', description: '', starterCode: '', testCases: '[]',
@@ -317,6 +383,21 @@ export default function ProfessorDashboard() {
     } catch { setTaskError('Error deleting task'); }
   };
 
+  // 🔥 Helper: Split/Merge Date & Time inputs
+  const handleDateChange = (newDate: string) => {
+    const currentTime = examData.startTime.includes('T') 
+      ? examData.startTime.split('T')[1].substring(0, 5) 
+      : '09:00';
+    setExamData({ ...examData, startTime: `${newDate}T${currentTime}` });
+  };
+
+  const handleTimeChange = (newTime: string) => {
+    const currentDate = examData.startTime.includes('T')
+      ? examData.startTime.split('T')[0]
+      : new Date().toISOString().split('T')[0];
+    setExamData({ ...examData, startTime: `${currentDate}T${newTime}` });
+  };
+
   return (
     <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900 font-sans overflow-hidden">
       {/* Top Navbar */}
@@ -342,7 +423,11 @@ export default function ProfessorDashboard() {
         {/* LEFT COLUMN: Actions */}
         <aside className="w-64 p-6 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 flex flex-col gap-4">
           <button 
-            onClick={() => setShowSubjectForm(true)}
+            onClick={() => {
+              setEditingSubjectId(null);
+              setSubjectData({ name: '', description: '', password: '' });
+              setShowSubjectForm(true);
+            }}
             className="flex flex-col items-center justify-center p-6 bg-indigo-50 dark:bg-indigo-900/20 border-2 border-dashed border-indigo-200 dark:border-indigo-800 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors group"
           >
             <div className="p-3 bg-indigo-100 dark:bg-indigo-800 rounded-full mb-3 group-hover:scale-110 transition-transform"><Icons.Subject /></div>
@@ -350,7 +435,11 @@ export default function ProfessorDashboard() {
           </button>
 
           <button 
-            onClick={() => setShowExamForm(true)}
+            onClick={() => {
+              setEditingExamId(null);
+              setExamData({ name: '', startTime: '', durationMinutes: 60, subjectId: '' });
+              setShowExamForm(true);
+            }}
             className="flex flex-col items-center justify-center p-6 bg-green-50 dark:bg-green-900/20 border-2 border-dashed border-green-200 dark:border-green-800 rounded-xl hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors group"
           >
             <div className="p-3 bg-green-100 dark:bg-green-800 rounded-full mb-3 group-hover:scale-110 transition-transform"><Icons.Exam /></div>
@@ -384,6 +473,7 @@ export default function ProfessorDashboard() {
                       <p className="text-sm text-gray-500 dark:text-gray-400">{subject.description}</p>
                     </div>
                     <div className="flex gap-2">
+                      <button onClick={(e) => { e.stopPropagation(); openEditSubject(subject); }} className="p-2 text-gray-400 hover:text-indigo-500 rounded-full hover:bg-indigo-50"><Icons.Edit /></button>
                       <button onClick={(e) => { e.stopPropagation(); handleDeleteSubject(subject); }} className="p-2 text-gray-400 hover:text-red-500 rounded-full hover:bg-red-50"><Icons.Trash /></button>
                       <svg className={`w-5 h-5 text-gray-400 transform transition-transform ${expandedSubjectId === subject.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                     </div>
@@ -415,7 +505,10 @@ export default function ProfessorDashboard() {
                                 <Icons.Monitor />
                               </button>
                               
-                              {/* Edit/Delete */}
+                              {/* Edit Button */}
+                              <button onClick={() => handleEditExamClick(exam)} className="p-1.5 text-gray-400 hover:text-indigo-600 rounded-lg hover:bg-indigo-50"><Icons.Edit /></button>
+
+                              {/* Delete Button */}
                               <button onClick={() => handleDeleteExam(exam)} className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50"><Icons.Trash /></button>
                             </div>
                           </div>
@@ -485,44 +578,52 @@ export default function ProfessorDashboard() {
       {showSubjectForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-md m-4">
-            <h2 className="text-xl font-bold mb-4 dark:text-white">New Subject</h2>
-            <form onSubmit={handleCreateSubject} className="space-y-4">
+            <h2 className="text-xl font-bold mb-4 dark:text-white">{editingSubjectId ? 'Edit Subject' : 'New Subject'}</h2>
+            <form onSubmit={editingSubjectId ? handleUpdateSubject : handleCreateSubject} className="space-y-4">
               <input 
                 placeholder="Name" 
-                value={subjectData.name} 
-                onChange={e => setSubjectData({...subjectData, name: e.target.value})} 
+                value={editingSubjectId ? subjectEditForm.name : subjectData.name} 
+                onChange={e => editingSubjectId ? setSubjectEditForm({...subjectEditForm, name: e.target.value}) : setSubjectData({...subjectData, name: e.target.value})} 
                 className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
                 required 
               />
               <textarea 
                 placeholder="Description" 
-                value={subjectData.description} 
-                onChange={e => setSubjectData({...subjectData, description: e.target.value})} 
+                value={editingSubjectId ? subjectEditForm.description : subjectData.description} 
+                onChange={e => editingSubjectId ? setSubjectEditForm({...subjectEditForm, description: e.target.value}) : setSubjectData({...subjectData, description: e.target.value})} 
                 className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
               />
-              <input 
-                type="password"
-                placeholder="Access Password" 
-                value={subjectData.password} 
-                onChange={e => setSubjectData({...subjectData, password: e.target.value})} 
-                className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
-                required 
-              />
+              <div className="space-y-2">
+                <input 
+                  type="password"
+                  placeholder={editingSubjectId ? "New Password (optional)" : "Access Password"} 
+                  value={editingSubjectId ? subjectEditForm.password : subjectData.password} 
+                  onChange={e => editingSubjectId ? setSubjectEditForm({...subjectEditForm, password: e.target.value}) : setSubjectData({...subjectData, password: e.target.value})} 
+                  className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                  required={!editingSubjectId}
+                />
+                {editingSubjectId && (
+                  <label className="flex items-center gap-2 text-sm text-gray-500">
+                    <input type="checkbox" checked={subjectEditForm.invalidateEnrollments} onChange={e => setSubjectEditForm({...subjectEditForm, invalidateEnrollments: e.target.checked})} />
+                    Invalidate current enrollments
+                  </label>
+                )}
+              </div>
               <div className="flex gap-3 justify-end mt-6">
                 <button type="button" onClick={() => setShowSubjectForm(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Create</button>
+                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">{editingSubjectId ? 'Update' : 'Create'}</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Create Exam Modal */}
+      {/* Create/Edit Exam Modal */}
       {showExamForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-md m-4">
-            <h2 className="text-xl font-bold mb-4 dark:text-white">New Exam</h2>
-            <form onSubmit={handleCreateExam} className="space-y-4">
+            <h2 className="text-xl font-bold mb-4 dark:text-white">{editingExamId ? 'Edit Exam' : 'New Exam'}</h2>
+            <form onSubmit={handleSaveExam} className="space-y-4">
               <input 
                 placeholder="Exam Name" 
                 value={examData.name} 
@@ -530,40 +631,55 @@ export default function ProfessorDashboard() {
                 className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
                 required 
               />
+              
+              {/* 🔥 SPLIT DATE & TIME INPUTS */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Start Time</label>
+                  <label className="text-xs text-gray-500 mb-1 block">Date</label>
                   <input 
-                    type="datetime-local" 
-                    value={examData.startTime} 
-                    onChange={e => setExamData({...examData, startTime: e.target.value})} 
-                    className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
-                    required 
+                    type="date" 
+                    value={examData.startTime.split('T')[0] || ''}
+                    onChange={(e) => handleDateChange(e.target.value)}
+                    className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    required
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Duration (min)</label>
+                  <label className="text-xs text-gray-500 mb-1 block">Time</label>
                   <input 
-                    type="number" 
-                    value={examData.durationMinutes} 
-                    onChange={e => setExamData({...examData, durationMinutes: parseInt(e.target.value)})} 
-                    className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
-                    required 
+                    type="time" 
+                    value={examData.startTime.split('T')[1]?.substring(0, 5) || ''}
+                    onChange={(e) => handleTimeChange(e.target.value)}
+                    className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    required
                   />
                 </div>
               </div>
+
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Duration (min)</label>
+                <input 
+                  type="number" 
+                  value={examData.durationMinutes} 
+                  onChange={e => setExamData({...examData, durationMinutes: parseInt(e.target.value)})} 
+                  className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                  required 
+                />
+              </div>
+
               <select 
                 value={examData.subjectId} 
                 onChange={e => setExamData({...examData, subjectId: e.target.value})} 
                 className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
                 required
+                disabled={!!editingExamId} 
               >
                 <option value="" disabled>Select Subject</option>
                 {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
               <div className="flex gap-3 justify-end mt-6">
                 <button type="button" onClick={() => setShowExamForm(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Create</button>
+                <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">{editingExamId ? 'Update' : 'Create'}</button>
               </div>
             </form>
           </div>
