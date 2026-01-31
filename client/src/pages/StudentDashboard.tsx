@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import api, { gradeApi } from '../services/api';
 import { socket, connectSocket, disconnectSocket } from '../services/socket';
 import type { Grade } from '../types';
@@ -242,6 +242,48 @@ export default function StudentDashboard() {
             <div className="flex items-center gap-2">
               <div className="bg-indigo-600 p-1.5 rounded-lg">
                 <Icons.Academic />
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+      <header className="bg-white dark:bg-gray-800 shadow">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+              Assessly
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Student Dashboard
+            </p>
+          </div>
+          <div className="flex items-center space-x-4">
+            <span className="text-gray-700 dark:text-gray-300">
+              {user?.firstName} {user?.lastName}
+            </span>
+            <Link
+              to="/change-password"
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            >
+              Change Password
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {hasUpdates && (
+          <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-blue-800 shadow-sm dark:border-blue-900 dark:bg-blue-900/30 dark:text-blue-100">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm font-medium">
+                Updates available. Refresh to see the latest exam changes.
+                {lastUpdateAt ? (
+                  <span className="ml-2 text-xs text-blue-700/80 dark:text-blue-200/80">
+                    Last change: {new Date(lastUpdateAt).toLocaleTimeString('en-US')}
+                  </span>
+                ) : null}
               </div>
               <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
                 Assessly
