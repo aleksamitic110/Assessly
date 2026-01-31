@@ -28,6 +28,9 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
   // Check role if allowedRoles is specified
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
     // Redirect to appropriate dashboard based on role
+    if (user.role === 'ADMIN') {
+      return <Navigate to="/admin" replace />;
+    }
     if (user.role === 'PROFESSOR') {
       return <Navigate to="/professor" replace />;
     }
