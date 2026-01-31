@@ -233,7 +233,6 @@ export default function StudentDashboard() {
     });
   };
 
-  // We change the main container to flex row and max height screen
   return (
     <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900 font-sans overflow-hidden">
       {/* Navbar - Fixed height */}
@@ -252,7 +251,6 @@ export default function StudentDashboard() {
               <span className="text-sm font-medium text-gray-700 dark:text-gray-200 hidden sm:block">
                 {user?.firstName} {user?.lastName}
               </span>
-              {/* UPDATED SIGN OUT BUTTON */}
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm transition-all active:scale-95"
@@ -299,15 +297,22 @@ export default function StudentDashboard() {
             />
           </div>
 
-          {hasUpdates && (
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl shadow-sm text-blue-900 text-sm">
-              <p className="font-bold mb-2">Updates available</p>
-              <button
-                onClick={handleRefresh}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-              >
-                <Icons.Refresh /> Refresh List
-              </button>
+          {/* --- ALWAYS VISIBLE REFRESH BUTTON  --- */}
+          <button
+            onClick={handleRefresh}
+            disabled={isLoading}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:text-indigo-600 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-700"
+          >
+            <div className={`${isLoading ? "animate-spin" : ""}`}>
+              <Icons.Refresh />
+            </div>
+            <span>{isLoading ? "Refreshing..." : "Refresh List"}</span>
+          </button>
+
+          {/* Existing update banner */}
+          {hasUpdates && !isLoading && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl shadow-sm text-blue-900 text-xs text-center">
+              Updates available.
             </div>
           )}
         </aside>
@@ -343,7 +348,6 @@ export default function StudentDashboard() {
           </div>
 
           {/* SCROLLABLE EXAM LIST CONTAINER */}
-          {/* flex-1 and overflow-y-auto ensures ONLY this part scrolls */}
           <div className="flex-1 overflow-y-auto rounded-2xl border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-900/50 shadow-inner p-1">
             {isLoading ? (
               <div className="h-full flex flex-col items-center justify-center">
@@ -383,7 +387,7 @@ export default function StudentDashboard() {
                                 </div>
                                 {exam.grade && (
                                    <div className={`mt-2 inline-flex items-center gap-2 px-2 py-1 rounded border text-xs font-bold ${
-                                     exam.grade.value === 5 ? 'bg-red-50 border-red-100 text-red-700' : 'bg-green-50 border-green-100 text-green-700'
+                                      exam.grade.value === 5 ? 'bg-red-50 border-red-100 text-red-700' : 'bg-green-50 border-green-100 text-green-700'
                                    }`}>
                                       {exam.grade.value === 5 ? 'Failed' : `Grade: ${exam.grade.value}`}
                                    </div>
