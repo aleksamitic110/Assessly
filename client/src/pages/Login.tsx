@@ -113,6 +113,16 @@ export default function Login() {
                 Create one
               </Link>
             </p>
+
+            {/* Admin login link */}
+            <p className="text-center text-sm text-gray-500 dark:text-gray-500">
+              <Link
+                to="/admin/login"
+                className="hover:text-gray-400 transition-colors"
+              >
+                Admin access
+              </Link>
+            </p>
           </div>
         </form>
       </div>

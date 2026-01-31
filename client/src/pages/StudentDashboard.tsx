@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import api, { gradeApi } from '../services/api';
 import { socket, connectSocket, disconnectSocket } from '../services/socket';
 import type { Exam, Grade } from '../types';
@@ -268,6 +268,12 @@ export default function StudentDashboard() {
             <span className="text-gray-700 dark:text-gray-300">
               {user?.firstName} {user?.lastName}
             </span>
+            <Link
+              to="/change-password"
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            >
+              Change Password
+            </Link>
             <button
               onClick={handleLogout}
               className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"

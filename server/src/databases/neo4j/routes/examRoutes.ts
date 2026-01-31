@@ -3,6 +3,7 @@ import {
   createSubject,
   updateSubject,
   deleteSubject,
+  addProfessorToSubject,
   enrollSubject,
   unenrollSubject,
   getStudentSubjects,
@@ -34,6 +35,7 @@ import { uuidParam, subjectSchemas, examSchemas, taskSchemas, submissionSchemas,
 const router = Router();
 
 router.post('/subjects', authenticateJWT, requireRole('PROFESSOR'), validate({ body: subjectSchemas.create }), createSubject);
+router.post('/subjects/:subjectId/professors', authenticateJWT, requireRole('PROFESSOR'), validate({ params: uuidParam, body: subjectSchemas.addProfessor }), addProfessorToSubject);
 router.put('/subjects/:subjectId', authenticateJWT, requireRole('PROFESSOR'), validate({ params: uuidParam, body: subjectSchemas.update }), updateSubject);
 router.delete('/subjects/:subjectId', authenticateJWT, requireRole('PROFESSOR'), validate({ params: uuidParam }), deleteSubject);
 router.post('/subjects/enroll', authenticateJWT, requireRole('STUDENT'), validate({ body: subjectSchemas.enroll }), enrollSubject);

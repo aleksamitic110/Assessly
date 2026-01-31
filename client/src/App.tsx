@@ -12,6 +12,9 @@ import StudentDashboard from './pages/StudentDashboard';
 import ExamPage from './pages/ExamPage';
 import ProfessorReviewPage from './pages/ProfessorReviewPage';
 import StudentWorkView from './pages/StudentWorkView';
+import AdminLogin from './pages/AdminLogin';
+import AdminDashboard from './pages/AdminDashboard';
+import ChangePassword from './pages/ChangePassword';
 
 function App() {
   return (
@@ -73,6 +76,27 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['STUDENT']}>
                 <StudentWorkView />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Change password (Student + Professor) */}
+          <Route
+            path="/change-password"
+            element={
+              <ProtectedRoute allowedRoles={['STUDENT', 'PROFESSOR']}>
+                <ChangePassword />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Admin routes */}
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <AdminDashboard />
               </ProtectedRoute>
             }
           />

@@ -16,13 +16,14 @@ import path from 'path';
 
 import authRoutes from './databases/neo4j/routes/authRoutes.js';
 import examRoutes from './databases/neo4j/routes/examRoutes.js';
+import adminRoutes from './databases/neo4j/routes/adminRoutes.js';
 import logsRoutes from './databases/cassandra/routes/logsRoutes.js';
 import redisStatusRoutes from './databases/redis/routes/statusRoutes.js';
 import neo4jStatusRoutes from './databases/neo4j/routes/statusRoutes.js';
 import cassandraStatusRoutes from './databases/cassandra/routes/statusRoutes.js';
 import { redisClient } from './databases/redis/client.js';
 import { initSocket } from './databases/redis/services/socketService.js';
-import { neo4jDriver } from './databases/neo4j/driver.js';
+import { neo4jDriver, initNeo4jSchema } from './databases/neo4j/driver.js';
 import { cassandraClient, initCassandraTables } from './databases/cassandra/client.js';
 import { apiLimiter } from './middleware/rateLimit.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -88,6 +89,7 @@ app.use('/status/neo4j', neo4jStatusRoutes);
 app.use('/status/cassandra', cassandraStatusRoutes);
 
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/exams', examRoutes);
 app.use('/api/logs', logsRoutes);
 
@@ -102,6 +104,8 @@ async function initializeDatabases() {
   await neoSession.run('RETURN 1');
   console.log('Connected to Neo4j (AuraDB)');
   await neoSession.close();
+
+  await initNeo4jSchema();
 
   await cassandraClient.connect();
   console.log('Connected to Cassandra (Astra DB)');

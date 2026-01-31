@@ -176,6 +176,37 @@ export async function logUserActivity(
   );
 }
 
+/**
+ * Log an admin action into user_activity using a deterministic UUID
+ * (the admin has a non-UUID id so we use a fixed UUID for partitioning).
+ */
+const ADMIN_ACTIVITY_UUID = '00000000-0000-0000-0000-000000000000';
+
+export async function logAdminActivity(
+  eventType: UserActivityEventType,
+  details: Record<string, unknown> = {}
+): Promise<void> {
+  const query = `
+    INSERT INTO user_activity (user_id, event_type, timestamp, details)
+    VALUES (?, ?, ?, ?)
+  `;
+
+  try {
+    await cassandraClient.execute(
+      query,
+      [
+        types.Uuid.fromString(ADMIN_ACTIVITY_UUID),
+        eventType,
+        new Date(),
+        JSON.stringify(details)
+      ],
+      { prepare: true }
+    );
+  } catch (err) {
+    console.warn('Failed to log admin activity:', err);
+  }
+}
+
 // Exam Comments
 export interface ExamComment {
   examId: string;

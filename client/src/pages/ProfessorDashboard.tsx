@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
 import { socket, connectSocket, disconnectSocket } from '../services/socket';
 import type { Exam as ExamType, Task as TaskType } from '../types';
@@ -10,6 +10,8 @@ interface Subject {
   id: string;
   name: string;
   description: string;
+  createdBy?: string | null;
+  isCreator?: boolean;
 }
 
 interface ProfessorExam extends ExamType {
@@ -64,6 +66,7 @@ export default function ProfessorDashboard() {
   const [subjects, setSubjects] = useState<SubjectWithExams[]>([]);
   const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null);
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
+  const [addProfessorEmail, setAddProfessorEmail] = useState<Record<string, string>>({});
 
   // Messages
   const [message, setMessage] = useState('');
@@ -469,6 +472,24 @@ export default function ProfessorDashboard() {
     }
   };
 
+  const handleAddProfessor = async (subjectId: string) => {
+    const email = (addProfessorEmail[subjectId] || '').trim().toLowerCase();
+    if (!email) {
+      setError('Enter a professor email.');
+      return;
+    }
+    setError('');
+    setMessage('');
+    try {
+      await api.post(`/exams/subjects/${subjectId}/professors`, { email });
+      setMessage(`Professor "${email}" added to subject.`);
+      setAddProfessorEmail((prev) => ({ ...prev, [subjectId]: '' }));
+    } catch (err: any) {
+      console.error('Add professor error:', err);
+      setError(err.response?.data?.error || 'Error while adding professor to subject');
+    }
+  };
+
   const startEditExam = (exam: ExamType) => {
     setEditingExamId(exam.id);
     setExamEditForm({
@@ -659,6 +680,12 @@ export default function ProfessorDashboard() {
             <span className="text-gray-700 dark:text-gray-300">
               {user?.firstName} {user?.lastName}
             </span>
+            <Link
+              to="/change-password"
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            >
+              Change Password
+            </Link>
             <button
               onClick={handleLogout}
               className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
@@ -1048,6 +1075,34 @@ export default function ProfessorDashboard() {
                             <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                               Subject ID: <span className="text-gray-800 dark:text-gray-200">{subject.id}</span>
                             </div>
+                            {subject.isCreator && (
+                              <div className="mb-4">
+                                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                                  Add professor to this subject
+                                </label>
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                  <input
+                                    type="email"
+                                    placeholder="Professor email"
+                                    value={addProfessorEmail[subject.id] || ''}
+                                    onChange={(e) =>
+                                      setAddProfessorEmail((prev) => ({ ...prev, [subject.id]: e.target.value }))
+                                    }
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddProfessor(subject.id)}
+                                    className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+                                  >
+                                    Add
+                                  </button>
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                  Only the subject creator can add other professors.
+                                </p>
+                              </div>
+                            )}
                             {subject.exams.length === 0 ? (
                               <div className="text-sm text-gray-500 dark:text-gray-400">
                                 No exams for this subject

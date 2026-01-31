@@ -1,6 +1,6 @@
 // Shared types between frontend and backend
 
-export type UserRole = 'STUDENT' | 'PROFESSOR';
+export type UserRole = 'STUDENT' | 'PROFESSOR' | 'ADMIN';
 
 export interface User {
   id: string;
