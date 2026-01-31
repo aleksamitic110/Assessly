@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, useMemo } from 'react';
+import { Fragment, useEffect, useState, useMemo, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
@@ -33,14 +33,11 @@ interface Alert {
 // --- Icons ---
 const Icons = {
   Subject: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>,
-  Exam: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
+  Exam: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
   Alert: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
   Trash: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
   Edit: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
-  Monitor: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
-  Play: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-  Pause: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-  Stop: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" /></svg>
+  Monitor: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
 };
 
 export default function ProfessorDashboard() {
@@ -62,15 +59,12 @@ export default function ProfessorDashboard() {
   };
 
   // --- State ---
-  // Subject State
   const [showSubjectForm, setShowSubjectForm] = useState(false);
   const [subjectData, setSubjectData] = useState({ name: '', description: '', password: '' });
   
-  // Subject Edit State
   const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
   const [subjectEditForm, setSubjectEditForm] = useState({ name: '', description: '', password: '', invalidateEnrollments: false });
 
-  // Exam State
   const [showExamForm, setShowExamForm] = useState(false);
   const [editingExamId, setEditingExamId] = useState<string | null>(null);
   const [examData, setExamData] = useState({
@@ -80,19 +74,17 @@ export default function ProfessorDashboard() {
     subjectId: '',
   });
 
-  // Data State
   const [subjects, setSubjects] = useState<SubjectWithExams[]>([]);
   const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null);
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
+
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  // Socket & Live State
   const [liveAlerts, setLiveAlerts] = useState<Alert[]>([]);
   const [monitoredExams, setMonitoredExams] = useState<Set<string>>(new Set());
   const [chatExamId, setChatExamId] = useState<string | null>(null);
   
-  // Task State
   const [taskExamId, setTaskExamId] = useState<string | null>(null);
   const [tasksByExam, setTasksByExam] = useState<Record<string, TaskType[]>>({});
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
@@ -103,7 +95,6 @@ export default function ProfessorDashboard() {
     exampleInput: '', exampleOutput: '', notes: '', pdfFile: null as File | null,
   });
 
-  // --- Derived State ---
   const alertsByExam = useMemo(() => {
     return liveAlerts.reduce<Record<string, Alert[]>>((acc, alert) => {
       const key = alert.examId || 'unknown';
@@ -123,7 +114,14 @@ export default function ProfessorDashboard() {
     return map;
   }, [subjects]);
 
-  // --- Socket Effects ---
+
+  const updateExamStatus = (examId: string, newStatus: ExamType['status']) => {
+    setSubjects((prev) => prev.map((s) => ({
+      ...s,
+      exams: s.exams.map((e) => e.id === examId ? { ...e, status: newStatus } : e)
+    })));
+  };
+
   useEffect(() => {
     connectSocket();
     socket.on('violation_alert', (data: Alert) => {
@@ -134,12 +132,7 @@ export default function ProfessorDashboard() {
     
     socket.on('exam_state', (data: { examId: string; status: ExamType['status'] }) => {
       if (!data?.examId) return;
-      if (['active', 'paused', 'completed'].includes(data.status)) {
-        setSubjects((prev) => prev.map((s) => ({
-          ...s,
-          exams: s.exams.map((e) => e.id === data.examId ? { ...e, status: data.status } : e)
-        })));
-      }
+      updateExamStatus(data.examId, data.status);
     });
 
     socket.on('exam_start_error', (data) => {
@@ -155,25 +148,25 @@ export default function ProfessorDashboard() {
     };
   }, []);
 
-  // --- Data Loading ---
-  useEffect(() => {
-    let isMounted = true;
-    const loadSubjects = async () => {
-      setIsLoadingSubjects(true);
-      try {
-        const response = await api.get<SubjectWithExams[]>('/exams/subjects');
-        if (isMounted) setSubjects(response.data);
-      } catch (err: any) {
-        if (isMounted) setError(err.response?.data?.error || 'Error while loading subjects');
-      } finally {
-        if (isMounted) setIsLoadingSubjects(false);
-      }
-    };
-    loadSubjects();
-    return () => { isMounted = false; };
+  // --- REUSABLE LOAD FUNCTION ---
+  const loadSubjects = useCallback(async (showLoading = true) => {
+    if (showLoading) setIsLoadingSubjects(true);
+    try {
+
+      const response = await api.get<SubjectWithExams[]>(`/exams/subjects?_t=${Date.now()}`);
+      setSubjects(response.data);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Error while loading subjects');
+    } finally {
+      if (showLoading) setIsLoadingSubjects(false);
+    }
   }, []);
 
-  // --- SUBJECT CRUD ---
+  useEffect(() => {
+    loadSubjects();
+  }, [loadSubjects]);
+
+  // --- HANDLERS ---
   const handleCreateSubject = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -195,7 +188,7 @@ export default function ProfessorDashboard() {
       password: '',
       invalidateEnrollments: false
     });
-    setShowSubjectForm(true); // Re-use the modal
+    setShowSubjectForm(true);
   };
 
   const handleUpdateSubject = async (e: React.FormEvent) => {
@@ -224,12 +217,11 @@ export default function ProfessorDashboard() {
     } catch (err) { setError('Error deleting subject'); }
   };
 
-  // --- EXAM CRUD ---
   const handleEditExamClick = (exam: ExamType) => {
     setEditingExamId(exam.id);
     setExamData({
       name: exam.name,
-      startTime: toDateTimeLocal(exam.startTime), // YYYY-MM-DDTHH:mm
+      startTime: toDateTimeLocal(exam.startTime),
       durationMinutes: exam.durationMinutes,
       subjectId: exam.subjectId || '', 
     });
@@ -240,7 +232,6 @@ export default function ProfessorDashboard() {
     e.preventDefault();
     try {
       if (editingExamId) {
-        // UPDATE
         const response = await api.put(`/exams/exams/${editingExamId}`, { 
           name: examData.name, 
           startTime: toIsoString(examData.startTime),
@@ -252,7 +243,6 @@ export default function ProfessorDashboard() {
         })));
         setMessage(`Exam updated.`);
       } else {
-        // CREATE
         const response = await api.post('/exams/exams', { ...examData, startTime: toIsoString(examData.startTime) });
         const scheduledStart = new Date(toIsoString(examData.startTime)).getTime();
         const initialStatus = scheduledStart > Date.now() ? 'wait_room' : 'waiting_start';
@@ -276,17 +266,78 @@ export default function ProfessorDashboard() {
     } catch { setError('Error deleting exam'); }
   };
 
-  // --- SOCKET ACTIONS ---
+  // --- MODIFIED EXAM ACTION HANDLERS WITH DELAY ---
+
   const handleStartExam = (exam: ExamType) => {
     if (!(exam as ProfessorExam).taskCount) return setError('Add tasks first.');
     if (!confirm(`Start "${exam.name}"?`)) return;
+    
     handleMonitorExam(exam.id);
+    
+
+    updateExamStatus(exam.id, 'active');
+    
+
     socket.emit('start_exam', { examId: exam.id, durationMinutes: exam.durationMinutes });
+
+
+    setTimeout(() => {
+        loadSubjects(false); 
+    }, 2000);
   };
 
   const handleEndExam = (exam: ExamType) => {
     if (!confirm(`End "${exam.name}"?`)) return;
+    
+    updateExamStatus(exam.id, 'completed');
     socket.emit('end_exam', { examId: exam.id });
+
+    setTimeout(() => {
+        loadSubjects(false);
+    }, 2000);
+  };
+
+  const handlePauseExam = (exam: ExamType) => {
+    updateExamStatus(exam.id, 'paused');
+    socket.emit('pause_exam', { examId: exam.id });
+
+    setTimeout(() => {
+        loadSubjects(false);
+    }, 2000);
+  };
+
+  const handleResumeExam = (exam: ExamType) => {
+    updateExamStatus(exam.id, 'active');
+    socket.emit('resume_exam', { examId: exam.id });
+
+    setTimeout(() => {
+        loadSubjects(false);
+    }, 2000);
+  };
+
+  const handleExtendExam = (exam: ExamType) => {
+    const extra = prompt('Enter extra minutes:', '10');
+    const extraMinutes = extra ? parseInt(extra, 10) : 0;
+    if (!extraMinutes || Number.isNaN(extraMinutes) || extraMinutes <= 0) return;
+    socket.emit('extend_exam', { examId: exam.id, extraMinutes });
+    setMessage(`Exam "${exam.name}" extended by ${extraMinutes} min.`);
+  };
+
+  const handleRestartExam = (exam: ExamType) => {
+    if (!(exam as ProfessorExam).taskCount) { 
+        return setError('Cannot restart exam. Add at least one task first.');
+    }
+    
+    if (!confirm(`Restart exam "${exam.name}"?`)) return;
+    
+    updateExamStatus(exam.id, 'active');
+    socket.emit('restart_exam', { examId: exam.id, durationMinutes: exam.durationMinutes });
+  
+    setMessage(`Exam "${exam.name}" restarted.`);
+
+    setTimeout(() => {
+        loadSubjects(false);
+    }, 2000);
   };
 
   const handleMonitorExam = (examId: string) => {
@@ -303,7 +354,6 @@ export default function ProfessorDashboard() {
     });
   };
 
-  // --- TASK CRUD ---
   const resetTaskForm = () => {
     setTaskForm({
       title: '', description: '', starterCode: '', testCases: '[]',
@@ -383,7 +433,6 @@ export default function ProfessorDashboard() {
     } catch { setTaskError('Error deleting task'); }
   };
 
-  // 🔥 Helper: Split/Merge Date & Time inputs
   const handleDateChange = (newDate: string) => {
     const currentTime = examData.startTime.includes('T') 
       ? examData.startTime.split('T')[1].substring(0, 5) 
@@ -463,7 +512,6 @@ export default function ProfessorDashboard() {
             <div className="space-y-6">
               {subjects.map((subject) => (
                 <div key={subject.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-                  {/* Subject Header */}
                   <div className="px-6 py-4 bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center cursor-pointer" onClick={() => setExpandedSubjectId(expandedSubjectId === subject.id ? null : subject.id)}>
                     <div>
                       <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -479,7 +527,6 @@ export default function ProfessorDashboard() {
                     </div>
                   </div>
 
-                  {/* Exams List */}
                   {expandedSubjectId === subject.id && (
                     <div className="divide-y divide-gray-100 dark:divide-gray-700">
                       {subject.exams.length === 0 && <div className="p-4 text-center text-sm text-gray-500">No exams in this subject.</div>}
@@ -496,7 +543,6 @@ export default function ProfessorDashboard() {
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              {/* Monitor Button */}
                               <button 
                                 onClick={() => monitoredExams.has(exam.id) ? handleStopMonitorExam(exam.id) : handleMonitorExam(exam.id)}
                                 className={`p-1.5 rounded-lg border transition-colors ${monitoredExams.has(exam.id) ? 'bg-red-50 border-red-200 text-red-600 animate-pulse' : 'bg-white border-gray-200 text-gray-500 hover:text-indigo-600'}`}
@@ -504,16 +550,12 @@ export default function ProfessorDashboard() {
                               >
                                 <Icons.Monitor />
                               </button>
-                              
-                              {/* Edit Button */}
                               <button onClick={() => handleEditExamClick(exam)} className="p-1.5 text-gray-400 hover:text-indigo-600 rounded-lg hover:bg-indigo-50"><Icons.Edit /></button>
-
-                              {/* Delete Button */}
                               <button onClick={() => handleDeleteExam(exam)} className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50"><Icons.Trash /></button>
                             </div>
                           </div>
-
-                          {/* Action Bar */}
+                          
+                          {/* ACTION BAR - FIXED */}
                           <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
                             <button onClick={() => toggleTaskPanel(exam.id)} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50">Tasks</button>
                             
@@ -523,8 +565,33 @@ export default function ProfessorDashboard() {
                             
                             {exam.status === 'active' && (
                               <>
-                                <button className="px-3 py-1.5 text-xs font-medium bg-yellow-500 text-white rounded hover:bg-yellow-600">Pause</button>
+                                <button onClick={() => handlePauseExam(exam)} className="px-3 py-1.5 text-xs font-medium bg-yellow-500 text-white rounded hover:bg-yellow-600">Pause</button>
+                                <button onClick={() => handleExtendExam(exam)} className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700">Extend</button>
                                 <button onClick={() => handleEndExam(exam)} className="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700">End</button>
+                              </>
+                            )}
+
+                            {exam.status === 'paused' && (
+                              <>
+                                <button onClick={() => handleResumeExam(exam)} className="px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded hover:bg-green-700">Resume</button>
+                                <button onClick={() => handleExtendExam(exam)} className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700">Extend</button>
+                                <button onClick={() => handleEndExam(exam)} className="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700">End</button>
+                              </>
+                            )}
+
+                            {exam.status === 'completed' && (
+                              <>
+                                <button 
+                                  onClick={() => handleRestartExam(exam)} 
+                                  disabled={!exam.taskCount}
+                                  className={`px-3 py-1.5 text-xs font-medium rounded ${
+                                    exam.taskCount 
+                                      ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
+                                      : 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                                  }`}
+                                >
+                                  Restart
+                                </button>
                               </>
                             )}
 
@@ -573,10 +640,9 @@ export default function ProfessorDashboard() {
         </aside>
       </div>
 
-      {/* --- MODALS --- */}
-      {/* Create Subject Modal */}
+      {/* --- MODALS  --- */}
       {showSubjectForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-md m-4">
             <h2 className="text-xl font-bold mb-4 dark:text-white">{editingSubjectId ? 'Edit Subject' : 'New Subject'}</h2>
             <form onSubmit={editingSubjectId ? handleUpdateSubject : handleCreateSubject} className="space-y-4">
@@ -618,9 +684,8 @@ export default function ProfessorDashboard() {
         </div>
       )}
 
-      {/* Create/Edit Exam Modal */}
       {showExamForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-md m-4">
             <h2 className="text-xl font-bold mb-4 dark:text-white">{editingExamId ? 'Edit Exam' : 'New Exam'}</h2>
             <form onSubmit={handleSaveExam} className="space-y-4">
@@ -632,27 +697,32 @@ export default function ProfessorDashboard() {
                 required 
               />
               
-              {/* 🔥 SPLIT DATE & TIME INPUTS */}
+              {/* Date & Time Picker UX */}
               <div className="grid grid-cols-2 gap-4">
-                <div>
+                <div className="relative">
                   <label className="text-xs text-gray-500 mb-1 block">Date</label>
                   <input 
                     type="date" 
                     value={examData.startTime.split('T')[0] || ''}
                     onChange={(e) => handleDateChange(e.target.value)}
-                    className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    onClick={(e) => e.currentTarget.showPicker()} 
+                    onFocus={(e) => e.currentTarget.showPicker()}
+                    className={`w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white cursor-pointer ${!examData.startTime.split('T')[0] ? 'border-red-300 dark:border-red-800' : 'dark:border-gray-600'}`}
                     required
                   />
                 </div>
-                <div>
+                <div className="relative">
                   <label className="text-xs text-gray-500 mb-1 block">Time</label>
                   <input 
                     type="time" 
                     value={examData.startTime.split('T')[1]?.substring(0, 5) || ''}
                     onChange={(e) => handleTimeChange(e.target.value)}
-                    className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    onClick={(e) => e.currentTarget.showPicker()}
+                    onFocus={(e) => e.currentTarget.showPicker()}
+                    className={`w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white cursor-pointer ${!examData.startTime.split('T')[1] ? 'border-red-300 dark:border-red-800' : 'dark:border-gray-600'}`}
                     required
                   />
+                  <p className="text-[10px] text-gray-400 mt-1">Click to select</p>
                 </div>
               </div>
 
@@ -670,13 +740,14 @@ export default function ProfessorDashboard() {
               <select 
                 value={examData.subjectId} 
                 onChange={e => setExamData({...examData, subjectId: e.target.value})} 
-                className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                className={`w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white ${!examData.subjectId ? 'border-red-300 dark:border-red-800' : 'dark:border-gray-600'}`} 
                 required
                 disabled={!!editingExamId} 
               >
                 <option value="" disabled>Select Subject</option>
                 {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
+              
               <div className="flex gap-3 justify-end mt-6">
                 <button type="button" onClick={() => setShowExamForm(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
                 <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">{editingExamId ? 'Update' : 'Create'}</button>
@@ -686,9 +757,9 @@ export default function ProfessorDashboard() {
         </div>
       )}
 
-      {/* Task Manager Modal */}
+      {/* Task Manager Modal (z-[100]) */}
       {taskExamId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold dark:text-white">Manage Tasks</h2>
