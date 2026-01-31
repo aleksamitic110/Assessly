@@ -667,7 +667,7 @@ export const adminGetUser = async (req: Request, res: Response) => {
 
 export const adminUpdateUser = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { email, firstName, lastName, role } = req.body;
+  const { email, firstName, lastName, role, isVerified } = req.body;
   const session = neo4jDriver.session();
 
   try {
@@ -676,9 +676,17 @@ export const adminUpdateUser = async (req: Request, res: Response) => {
        SET u.email = COALESCE($email, u.email),
            u.firstName = COALESCE($firstName, u.firstName),
            u.lastName = COALESCE($lastName, u.lastName),
-           u.role = COALESCE($role, u.role)
+           u.role = COALESCE($role, u.role),
+           u.isVerified = COALESCE($isVerified, u.isVerified)
        RETURN u`,
-      { id, email: email || null, firstName: firstName || null, lastName: lastName || null, role: role || null }
+      {
+        id,
+        email: email || null,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        role: role || null,
+        isVerified: typeof isVerified === 'boolean' ? isVerified : null
+      }
     );
 
     if (result.records.length === 0) {

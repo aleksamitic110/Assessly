@@ -10,6 +10,8 @@ interface Subject {
   id: string;
   name: string;
   description: string;
+  createdBy?: string | null;
+  isCreator?: boolean;
 }
 
 interface ProfessorExam extends ExamType {
@@ -64,6 +66,7 @@ export default function ProfessorDashboard() {
   const [subjects, setSubjects] = useState<SubjectWithExams[]>([]);
   const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null);
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
+  const [addProfessorEmail, setAddProfessorEmail] = useState<Record<string, string>>({});
 
   // Messages
   const [message, setMessage] = useState('');
@@ -466,6 +469,24 @@ export default function ProfessorDashboard() {
     } catch (err: any) {
       console.error('Delete subject error:', err);
       setError(err.response?.data?.error || 'Error while deleting subject');
+    }
+  };
+
+  const handleAddProfessor = async (subjectId: string) => {
+    const email = (addProfessorEmail[subjectId] || '').trim().toLowerCase();
+    if (!email) {
+      setError('Enter a professor email.');
+      return;
+    }
+    setError('');
+    setMessage('');
+    try {
+      await api.post(`/exams/subjects/${subjectId}/professors`, { email });
+      setMessage(`Professor "${email}" added to subject.`);
+      setAddProfessorEmail((prev) => ({ ...prev, [subjectId]: '' }));
+    } catch (err: any) {
+      console.error('Add professor error:', err);
+      setError(err.response?.data?.error || 'Error while adding professor to subject');
     }
   };
 
@@ -1054,6 +1075,34 @@ export default function ProfessorDashboard() {
                             <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                               Subject ID: <span className="text-gray-800 dark:text-gray-200">{subject.id}</span>
                             </div>
+                            {subject.isCreator && (
+                              <div className="mb-4">
+                                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                                  Add professor to this subject
+                                </label>
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                  <input
+                                    type="email"
+                                    placeholder="Professor email"
+                                    value={addProfessorEmail[subject.id] || ''}
+                                    onChange={(e) =>
+                                      setAddProfessorEmail((prev) => ({ ...prev, [subject.id]: e.target.value }))
+                                    }
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddProfessor(subject.id)}
+                                    className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+                                  >
+                                    Add
+                                  </button>
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                  Only the subject creator can add other professors.
+                                </p>
+                              </div>
+                            )}
                             {subject.exams.length === 0 ? (
                               <div className="text-sm text-gray-500 dark:text-gray-400">
                                 No exams for this subject

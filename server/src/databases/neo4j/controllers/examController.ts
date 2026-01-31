@@ -105,7 +105,7 @@ export const createSubject = async (req: any, res: Response) => {
     const result = await session.run(
       `
       MATCH (p:User {id: $professorId})
-      CREATE (s:Subject {id: $id, name: $name, description: $description, passwordHash: $passwordHash})
+      CREATE (s:Subject {id: $id, name: $name, description: $description, passwordHash: $passwordHash, createdBy: $professorId})
       CREATE (p)-[:PREDAJE]->(s)
       RETURN s
       `,
@@ -114,7 +114,7 @@ export const createSubject = async (req: any, res: Response) => {
 
     const subject = result.records[0].get('s').properties;
     delete subject.passwordHash;
-    res.status(201).json(subject);
+    res.status(201).json({ ...subject, isCreator: true });
     emitExamChanged(subject.id, 'subject_created');
   } catch (error) {
     res.status(500).json({ error: 'Error while creating subject' });
@@ -380,19 +380,24 @@ export const getStudentSubjects = async (req: any, res: Response) => {
 
 export const createExam = async (req: any, res: Response) => {
   const { subjectId, name, startTime, durationMinutes } = req.body;
+  const professorId = req.user.id;
   const session = neo4jDriver.session();
 
   try {
     const id = uuidv4();
     const result = await session.run(
       `
-      MATCH (s:Subject {id: $subjectId})
+      MATCH (p:User {id: $professorId})-[:PREDAJE]->(s:Subject {id: $subjectId})
       CREATE (e:Exam {id: $id, name: $name, startTime: $startTime, durationMinutes: $durationMinutes})
       CREATE (s)-[:SADRZI]->(e)
       RETURN e
       `,
-      { subjectId, id, name, startTime, durationMinutes }
+      { professorId, subjectId, id, name, startTime, durationMinutes }
     );
+
+    if (result.records.length === 0) {
+      return res.status(403).json({ error: 'You can only create exams for your subjects' });
+    }
 
     res.status(201).json(result.records[0].get('e').properties);
     emitExamChanged(subjectId, 'exam_created');
@@ -815,6 +820,8 @@ export const getProfessorSubjects = async (req: any, res: Response) => {
           id: subject.id,
           name: subject.name,
           description: subject.description,
+          createdBy: subject.createdBy || null,
+          isCreator: subject.createdBy === professorId || !subject.createdBy,
           exams: []
         });
       }
@@ -848,6 +855,37 @@ export const getProfessorSubjects = async (req: any, res: Response) => {
     res.json(subjects);
   } catch (error) {
     res.status(500).json({ error: 'Error while fetching subjects' });
+  } finally {
+    await session.close();
+  }
+};
+
+export const addProfessorToSubject = async (req: any, res: Response) => {
+  const { subjectId } = req.params;
+  const { email } = req.body;
+  const professorId = req.user.id;
+  const session = neo4jDriver.session();
+
+  try {
+    const result = await session.run(
+      `
+      MATCH (owner:User {id: $professorId})-[:PREDAJE]->(s:Subject {id: $subjectId})
+      WHERE s.createdBy = $professorId OR s.createdBy IS NULL
+      MATCH (p:User {email: $email, role: 'PROFESSOR'})
+      MERGE (p)-[:PREDAJE]->(s)
+      SET s.createdBy = COALESCE(s.createdBy, $professorId)
+      RETURN p, s
+      `,
+      { professorId, subjectId, email }
+    );
+
+    if (result.records.length === 0) {
+      return res.status(403).json({ error: 'Only the subject creator can add professors' });
+    }
+
+    res.json({ message: 'Professor added to subject' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error while adding professor to subject' });
   } finally {
     await session.close();
   }

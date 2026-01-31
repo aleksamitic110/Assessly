@@ -411,7 +411,7 @@ function UsersPanel() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [editUser, setEditUser] = useState<AdminUser | null>(null);
-  const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT' });
+  const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', isVerified: false });
   const [formError, setFormError] = useState('');
 
   const fetchUsers = useCallback(async (q?: string) => {
@@ -454,13 +454,13 @@ function UsersPanel() {
   };
 
   const openCreate = () => {
-    setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT' });
+    setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', isVerified: false });
     setFormError('');
     setShowCreate(true);
   };
 
   const openEdit = (u: AdminUser) => {
-    setForm({ email: u.email, password: '', firstName: u.firstName, lastName: u.lastName, role: u.role });
+    setForm({ email: u.email, password: '', firstName: u.firstName, lastName: u.lastName, role: u.role, isVerified: u.isVerified });
     setFormError('');
     setEditUser(u);
   };
@@ -469,7 +469,13 @@ function UsersPanel() {
     e.preventDefault();
     setFormError('');
     try {
-      await api.post('/admin/users', form);
+      await api.post('/admin/users', {
+        email: form.email,
+        password: form.password,
+        firstName: form.firstName,
+        lastName: form.lastName,
+        role: form.role
+      });
       setShowCreate(false);
       fetchUsers();
     } catch (err: any) {
@@ -482,11 +488,12 @@ function UsersPanel() {
     if (!editUser) return;
     setFormError('');
     try {
-      const updates: Record<string, string> = {};
+      const updates: Record<string, string | boolean> = {};
       if (form.email !== editUser.email) updates.email = form.email;
       if (form.firstName !== editUser.firstName) updates.firstName = form.firstName;
       if (form.lastName !== editUser.lastName) updates.lastName = form.lastName;
       if (form.role !== editUser.role) updates.role = form.role;
+      if (form.isVerified !== editUser.isVerified) updates.isVerified = form.isVerified;
       await api.put(`/admin/users/${editUser.id}`, updates);
       setEditUser(null);
       fetchUsers();
@@ -579,6 +586,14 @@ function UsersPanel() {
               <option value="STUDENT">STUDENT</option>
               <option value="PROFESSOR">PROFESSOR</option>
             </select>
+            <label className="flex items-center gap-2 text-sm text-gray-300">
+              <input
+                type="checkbox"
+                checked={form.isVerified}
+                onChange={(e) => setForm({ ...form, isVerified: e.target.checked })}
+              />
+              Verified
+            </label>
             <div className="flex gap-2 pt-2">
               <button type="submit" className={btnPrimary}>Save</button>
               <button type="button" onClick={() => setEditUser(null)} className={btnSecondary}>Cancel</button>

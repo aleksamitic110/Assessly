@@ -46,6 +46,9 @@ export const subjectSchemas = {
     password: z.string().min(6).max(128).optional(),
     invalidateEnrollments: z.boolean().optional()
   }),
+  addProfessor: z.object({
+    email: z.string().email().max(254).transform((v) => v.toLowerCase())
+  }),
   enroll: z.object({
     password: z.string().min(6).max(128)
   })
@@ -107,7 +110,8 @@ export const adminSchemas = {
     email: z.string().email().max(254).transform((v) => v.toLowerCase()).optional(),
     firstName: z.string().trim().min(1).max(50).optional(),
     lastName: z.string().trim().min(1).max(50).optional(),
-    role: z.enum(['STUDENT', 'PROFESSOR']).optional()
+    role: z.enum(['STUDENT', 'PROFESSOR']).optional(),
+    isVerified: z.boolean().optional()
   }),
   changePassword: z.object({
     currentPassword: z.string().min(8).max(128),
@@ -154,6 +158,9 @@ export const adminSchemas = {
     exampleInput: z.string().max(2000).optional().nullable(),
     exampleOutput: z.string().max(2000).optional().nullable(),
     notes: z.string().max(2000).optional().nullable()
+  })
+};
+
 export const runSchemas = {
   run: z.object({
     taskId: z.string().uuid(),
