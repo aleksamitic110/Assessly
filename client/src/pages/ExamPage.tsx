@@ -376,12 +376,13 @@ export default function ExamPage() {
     if (!currentTask || !examId || examStatus !== 'active' || isReviewMode) return;
     setIsRunning(true);
     setOutput('Compiling and running...\n');
+    const currentCode = codeByTaskId[currentTask.id] ?? code;
 
     if (examId) {
       try {
         await logsService.logExecution(
           examId,
-          code,
+          currentCode,
           'Code executed',
           'RUNNING'
         );
@@ -390,27 +391,40 @@ export default function ExamPage() {
       }
     }
 
-    setTimeout(() => {
-      const mockOutput = `Before sort: 64 34 25 12 22 11 90
-After sort: 11 12 22 25 34 64 90
+    try {
+      const response = await api.post(`/exams/${examId}/run`, {
+        taskId: currentTask.id,
+        sourceCode: currentCode,
+        input: currentTask.exampleInput || ''
+      });
 
-Program finished.
-Execution time: 0.003s`;
-      setOutput(mockOutput);
-      setIsRunning(false);
-      if (currentTask) {
-        setOutputByTaskId((prev) => ({ ...prev, [currentTask.id]: mockOutput }));
-      }
+      const result = response.data as { ok?: boolean; output?: string };
+      const outputText = result?.output || 'Program finished with no output.';
+      setOutput(outputText);
+      setOutputByTaskId((prev) => ({ ...prev, [currentTask.id]: outputText }));
 
       if (examId) {
-        logsService.logExecution(
+        await logsService.logExecution(
           examId,
-          code,
-          mockOutput,
-          'SUCCESS'
+          currentCode,
+          outputText,
+          result?.ok ? 'SUCCESS' : 'ERROR'
         );
       }
-    }, 2000);
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to run code.';
+      setOutput(message);
+      if (examId) {
+        await logsService.logExecution(
+          examId,
+          currentCode,
+          message,
+          'ERROR'
+        );
+      }
+    } finally {
+      setIsRunning(false);
+    }
   };
 
   const handleSelectTask = (task: TaskType) => {

@@ -154,6 +154,11 @@ export const adminSchemas = {
     exampleInput: z.string().max(2000).optional().nullable(),
     exampleOutput: z.string().max(2000).optional().nullable(),
     notes: z.string().max(2000).optional().nullable()
+export const runSchemas = {
+  run: z.object({
+    taskId: z.string().uuid(),
+    sourceCode: z.string().max(50000),
+    input: z.string().max(10000).optional().nullable()
   })
 };
 

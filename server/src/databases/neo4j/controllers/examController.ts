@@ -6,6 +6,7 @@ import { redisClient } from '../../redis/client.js';
 import { logUserActivity } from '../../cassandra/services/logsService.js';
 import { autoSubmitExam } from '../services/autoSubmitService.js';
 import { emitExamChanged } from '../../redis/services/socketService.js';
+import { runCppCode } from '../../../services/codeRunner.js';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -902,6 +903,60 @@ export const getExamTasks = async (req: any, res: Response) => {
     res.status(500).json({ error: 'Error while fetching tasks' });
   } finally {
     await session.close();
+  }
+};
+
+export const runCode = async (req: any, res: Response) => {
+  const { examId } = req.params;
+  const { taskId, sourceCode, input } = req.body;
+  const studentId = req.user?.id;
+
+  if (!studentId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  if (req.user?.role !== 'STUDENT') {
+    return res.status(403).json({ error: 'Only students can run code' });
+  }
+  if (!taskId || sourceCode === undefined) {
+    return res.status(400).json({ error: 'Missing required fields: taskId, sourceCode' });
+  }
+
+  const session = neo4jDriver.session();
+  try {
+    const access = await session.run(
+      `
+      MATCH (u:User {id: $studentId})-[:ENROLLED_IN]->(:Subject)-[:SADRZI]->(e:Exam {id: $examId})
+      RETURN count(e) AS examCount
+      `,
+      { studentId, examId }
+    );
+    const countRaw = access.records[0]?.get('examCount');
+    const count = typeof countRaw?.toNumber === 'function' ? countRaw.toNumber() : Number(countRaw || 0);
+    if (!count) {
+      return res.status(403).json({ error: 'You are not enrolled in this subject' });
+    }
+
+    const taskCheck = await session.run(
+      `
+      MATCH (e:Exam {id: $examId})-[:IMA_ZADATAK]->(t:Task {id: $taskId})
+      RETURN t
+      `,
+      { examId, taskId }
+    );
+    if (taskCheck.records.length === 0) {
+      return res.status(404).json({ error: 'Task not found for exam' });
+    }
+  } catch (error) {
+    return res.status(500).json({ error: 'Error while validating exam access' });
+  } finally {
+    await session.close();
+  }
+
+  try {
+    const result = await runCppCode(String(sourceCode), String(input || ''));
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: 'Error while running code' });
   }
 };
 
