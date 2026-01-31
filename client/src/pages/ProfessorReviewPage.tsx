@@ -1,8 +1,19 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api, { gradeApi, commentsApi } from '../services/api';
 import type { ExamStudent, Submission, ExamComment, Exam, Task } from '../types';
+
+// Icons
+const Icons = {
+  Back: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>,
+  User: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
+  Check: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+  Trash: () => <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+  Edit: () => <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>,
+  Save: () => <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+  X: () => <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+};
 
 export default function ProfessorReviewPage() {
   const { examId } = useParams<{ examId: string }>();
@@ -30,9 +41,17 @@ export default function ProfessorReviewPage() {
   const [newCommentLine, setNewCommentLine] = useState<string>('');
   const [newCommentMessage, setNewCommentMessage] = useState('');
   const [isSavingComment, setIsSavingComment] = useState(false);
-  const [isUpdatingComment, setIsUpdatingComment] = useState(false);
 
-  // Load exam, tasks, and students
+  // Edit Comment State (Inline Edit)
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editCommentMessage, setEditCommentMessage] = useState('');
+  const [editCommentLine, setEditCommentLine] = useState('');
+
+  // Interaction State
+  const [activeLine, setActiveLine] = useState<number | null>(null);
+  const [hoverLine, setHoverLine] = useState<number | null>(null);
+
+  // Load exam data
   const loadData = useCallback(async () => {
     if (!examId) return;
     setIsLoading(true);
@@ -57,12 +76,13 @@ export default function ProfessorReviewPage() {
     loadData();
   }, [loadData]);
 
-  // Load student submissions and comments
+  // Load specific student data
   const loadStudentData = useCallback(async (student: ExamStudent) => {
     if (!examId) return;
     setIsLoadingSubmissions(true);
     setSelectedStudent(student);
     setSelectedTaskIndex(0);
+    setEditingCommentId(null); // Reset edit mode
     try {
       const [submissionsRes, commentsRes] = await Promise.all([
         gradeApi.getStudentSubmissions(examId, student.studentId),
@@ -71,7 +91,6 @@ export default function ProfessorReviewPage() {
       setSubmissions(submissionsRes.data);
       setComments(commentsRes.data);
 
-      // Set grade form values
       if (student.grade) {
         setGradeValue(student.grade.value);
         setGradeComment(student.grade.comment || '');
@@ -86,567 +105,370 @@ export default function ProfessorReviewPage() {
     }
   }, [examId]);
 
-  // Save grade
-  const handleSaveGrade = async () => {
-    if (!examId || !selectedStudent) return;
-    if (gradeValue < 5 || gradeValue > 10) {
-      setError('Ocena mora biti izmedju 5 i 10.');
-      return;
-    }
-    setIsSavingGrade(true);
-    setError('');
-    try {
-      await gradeApi.setGrade(examId, selectedStudent.studentId, gradeValue, gradeComment);
-      // Update local state
-      setStudents(prev => prev.map(s =>
-        s.studentId === selectedStudent.studentId
-          ? { ...s, grade: { value: gradeValue, comment: gradeComment, updatedAt: new Date().toISOString() } }
-          : s
-      ));
-      setSelectedStudent(prev => prev ? {
-        ...prev,
-        grade: { value: gradeValue, comment: gradeComment, updatedAt: new Date().toISOString() }
-      } : null);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to save grade');
-    } finally {
-      setIsSavingGrade(false);
-    }
+  // Computed Values
+  const currentSubmission = submissions[selectedTaskIndex];
+  const currentTask = tasks.find(t => t.id === currentSubmission?.taskId);
+  
+  const commentsByLine = useMemo(() => {
+    const map: Record<number, ExamComment[]> = {};
+    comments.forEach(c => {
+      if (c.line) {
+        if (!map[c.line]) map[c.line] = [];
+        map[c.line].push(c);
+      }
+    });
+    return map;
+  }, [comments]);
+
+  const generalComments = comments.filter(c => c.line === null);
+
+  // --- Handlers ---
+
+  const handleLineClick = (lineNum: number) => {
+    setActiveLine(lineNum);
+    setNewCommentLine(String(lineNum)); // Auto-fill form
   };
 
-  // Add comment
+  const handleSaveGrade = async () => {
+    if (!examId || !selectedStudent) return;
+    setIsSavingGrade(true);
+    try {
+      await gradeApi.setGrade(examId, selectedStudent.studentId, gradeValue, gradeComment);
+      const updatedGrade = { value: gradeValue, comment: gradeComment, updatedAt: new Date().toISOString() };
+      setStudents(prev => prev.map(s => s.studentId === selectedStudent.studentId ? { ...s, grade: updatedGrade } : s));
+      setSelectedStudent(prev => prev ? { ...prev, grade: updatedGrade } : null);
+    } catch { setError('Failed to save grade'); } 
+    finally { setIsSavingGrade(false); }
+  };
+
   const handleAddComment = async () => {
     if (!examId || !selectedStudent || !newCommentMessage.trim()) return;
     setIsSavingComment(true);
-    setError('');
     try {
-      // Parse line number properly - only send if it's a valid positive integer
-      let line: number | null = null;
-      if (newCommentLine.trim()) {
-        const parsed = parseInt(newCommentLine.trim(), 10);
-        if (!Number.isNaN(parsed) && parsed > 0) {
-          line = parsed;
-        }
-      }
-      const maxLines = currentSubmission?.sourceCode
-        ? currentSubmission.sourceCode.split('\n').length
-        : 0;
-      if (line && maxLines && line > maxLines) {
-        setError(`Line number must be between 1 and ${maxLines}.`);
-        return;
-      }
-
+      const line = newCommentLine.trim() ? parseInt(newCommentLine.trim(), 10) : null;
       const res = await commentsApi.addComment(examId, selectedStudent.studentId, line, newCommentMessage.trim());
       setComments(prev => [...prev, res.data]);
-      setNewCommentLine('');
       setNewCommentMessage('');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to add comment');
-    } finally {
-      setIsSavingComment(false);
-    }
+      if(!activeLine) setNewCommentLine('');
+    } catch { setError('Failed to add comment'); } 
+    finally { setIsSavingComment(false); }
   };
 
-  // Delete comment
   const handleDeleteComment = async (commentId: string) => {
     if (!examId || !selectedStudent) return;
+    if (!confirm('Are you sure?')) return;
     try {
       await commentsApi.deleteComment(examId, selectedStudent.studentId, commentId);
       setComments(prev => prev.filter(c => c.commentId !== commentId));
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to delete comment');
-    }
+    } catch { setError('Failed to delete comment'); }
   };
 
-  const handleEditComment = async (comment: ExamComment) => {
+  // 🔥 RESTORED: Edit Comment Handlers
+  const startEditComment = (comment: ExamComment) => {
+    setEditingCommentId(comment.commentId);
+    setEditCommentMessage(comment.message);
+    setEditCommentLine(comment.line ? String(comment.line) : '');
+  };
+
+  const cancelEditComment = () => {
+    setEditingCommentId(null);
+    setEditCommentMessage('');
+    setEditCommentLine('');
+  };
+
+  const handleUpdateComment = async (commentId: string) => {
     if (!examId || !selectedStudent) return;
-    const newMessage = prompt('Edit comment:', comment.message || '');
-    if (newMessage === null) return;
-    const newLineInput = prompt('Line number (optional):', comment.line ? String(comment.line) : '');
-    let newLine: number | null = null;
-    if (newLineInput && newLineInput.trim()) {
-      const parsed = parseInt(newLineInput.trim(), 10);
-      if (!Number.isNaN(parsed) && parsed > 0) {
-        newLine = parsed;
-      }
-    }
-
-    const maxLines = currentSubmission?.sourceCode
-      ? currentSubmission.sourceCode.split('\n').length
-      : 0;
-    if (newLine && maxLines && newLine > maxLines) {
-      setError(`Line number must be between 1 and ${maxLines}.`);
-      return;
-    }
-
-    setIsUpdatingComment(true);
-    setError('');
     try {
-      const res = await commentsApi.updateComment(examId, selectedStudent.studentId, comment.commentId, newLine, newMessage.trim());
-      setComments(prev => prev.map(c => (c.commentId === comment.commentId ? res.data : c)));
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to update comment');
-    } finally {
-      setIsUpdatingComment(false);
-    }
+      const line = editCommentLine.trim() ? parseInt(editCommentLine.trim(), 10) : null;
+      const res = await commentsApi.updateComment(examId, selectedStudent.studentId, commentId, line, editCommentMessage);
+      setComments(prev => prev.map(c => c.commentId === commentId ? res.data : c));
+      cancelEditComment();
+    } catch { setError('Failed to update comment'); }
   };
 
-  const currentSubmission = submissions[selectedTaskIndex];
-  const maxLineCount = currentSubmission?.sourceCode ? currentSubmission.sourceCode.split('\n').length : 0;
+  if (isLoading) return <div className="min-h-screen bg-gray-900 flex items-center justify-center text-gray-400">Loading...</div>;
 
-  // Get the task details for the current submission
-  const currentTask = tasks.find(t => t.id === currentSubmission?.taskId);
+  return (
+    <div className="h-screen flex flex-col bg-gray-900 text-gray-100 font-sans overflow-hidden">
+      
+      {/* Header */}
+      <header className="h-14 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-4 shrink-0 z-20">
+        <div className="flex items-center gap-4">
+          <button onClick={() => navigate('/professor')} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"><Icons.Back /></button>
+          <div>
+            <h1 className="text-sm font-bold text-white leading-none">{exam?.name || 'Exam Review'}</h1>
+            <span className="text-xs text-gray-400">{exam?.subjectName}</span>
+          </div>
+        </div>
+        {selectedStudent && (
+          <div className="flex items-center gap-3 bg-gray-700/50 px-3 py-1.5 rounded-full border border-gray-600">
+            <Icons.User />
+            <span className="text-sm font-medium">{selectedStudent.firstName} {selectedStudent.lastName}</span>
+            {selectedStudent.grade && <span className={`text-xs font-bold px-2 py-0.5 rounded ${selectedStudent.grade.value === 5 ? 'bg-red-900/50 text-red-400' : 'bg-green-900/50 text-green-400'}`}>{selectedStudent.grade.value}</span>}
+          </div>
+        )}
+      </header>
 
-  // Render code with line numbers
-  const renderCode = (code: string) => {
-    const lines = code.split('\n');
-    const lineComments = comments.filter(c => c.line !== null);
+      {/* Main Layout - 3 Columns */}
+      <div className="flex-1 flex overflow-hidden">
+        
+        {/* LEFT: Student List */}
+        <aside className="w-64 bg-gray-850 border-r border-gray-700 flex flex-col shrink-0">
+          <div className="p-4 border-b border-gray-700 font-semibold text-gray-300">Students ({students.length})</div>
+          <div className="flex-1 overflow-y-auto">
+            {students.map(student => (
+              <button
+                key={student.studentId}
+                onClick={() => loadStudentData(student)}
+                className={`w-full text-left px-4 py-3 border-b border-gray-800 hover:bg-gray-800 transition-colors flex justify-between items-center ${selectedStudent?.studentId === student.studentId ? 'bg-indigo-900/20 border-l-4 border-l-indigo-500' : ''}`}
+              >
+                <div>
+                  <div className="text-sm font-medium text-gray-200">{student.firstName} {student.lastName}</div>
+                  <div className="text-xs text-gray-500 truncate w-40">{student.email}</div>
+                </div>
+                {student.grade && (
+                  <span className={`text-xs font-bold ${student.grade.value === 5 ? 'text-red-400' : 'text-green-400'}`}>{student.grade.value}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </aside>
 
-    return (
-      <div className="font-mono text-sm">
-        {lines.map((line, idx) => {
-          const lineNum = idx + 1;
-          const lineComment = lineComments.find(c => c.line === lineNum);
-          return (
-            <div key={idx}>
-              <div className="flex hover:bg-gray-100 dark:hover:bg-gray-700">
-                <span className="w-12 text-right pr-3 text-gray-400 select-none border-r border-gray-300 dark:border-gray-600">
-                  {lineNum}
-                </span>
-                <pre className="flex-1 pl-3 whitespace-pre-wrap break-all">{line || ' '}</pre>
+        {/* MIDDLE: Code Viewer */}
+        <div className="flex-1 flex flex-col min-w-0 bg-[#1e1e1e]">
+          {selectedStudent ? (
+            <>
+              {/* Task Tabs */}
+              <div className="flex overflow-x-auto border-b border-gray-700 bg-gray-800 scrollbar-hide">
+                {submissions.length > 0 ? submissions.map((sub, idx) => (
+                  <button
+                    key={sub.taskId}
+                    onClick={() => { setSelectedTaskIndex(idx); setActiveLine(null); }}
+                    className={`px-4 py-3 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${selectedTaskIndex === idx ? 'border-indigo-500 text-indigo-400 bg-gray-700/50' : 'border-transparent text-gray-400 hover:text-gray-200'}`}
+                  >
+                    {sub.taskTitle || `Task ${idx + 1}`}
+                  </button>
+                )) : <div className="px-4 py-3 text-xs text-gray-500">No submissions</div>}
               </div>
-                  {lineComment && (
-                    <div className="ml-12 pl-3 py-2 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 text-sm">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <span className="font-medium text-yellow-700 dark:text-yellow-300">
-                            {lineComment.authorName}:
-                          </span>
-                          <span className="ml-2 text-gray-700 dark:text-gray-300">{lineComment.message}</span>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleEditComment(lineComment)}
-                            className="text-xs text-blue-500 hover:text-blue-700"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteComment(lineComment.commentId)}
-                            className="text-xs text-red-500 hover:text-red-700"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
 
-  if (isLoading) {
+              {/* Editor */}
+              <div className="flex-1 overflow-y-auto font-mono text-sm relative">
+                {currentSubmission?.sourceCode ? (
+                  <div className="min-h-full pb-20">
+                    {currentSubmission.sourceCode.split('\n').map((line, idx) => {
+                      const lineNum = idx + 1;
+                      const hasComments = commentsByLine[lineNum]?.length > 0;
+                      const isActive = activeLine === lineNum;
+
+                      return (
+                        <div 
+                          key={idx} 
+                          className={`group flex relative cursor-pointer ${isActive ? 'bg-indigo-900/20' : 'hover:bg-gray-800'}`}
+                          onClick={() => handleLineClick(lineNum)}
+                          onMouseEnter={() => setHoverLine(lineNum)}
+                          onMouseLeave={() => setHoverLine(null)}
+                        >
+                          <div className={`w-12 text-right pr-3 select-none border-r border-gray-700 ${hasComments ? 'text-yellow-500 font-bold bg-yellow-900/10' : 'text-gray-600 group-hover:text-gray-400'}`}>
+                            {lineNum}
+                          </div>
+                          <div className="flex-1 pl-4 pr-4 whitespace-pre-wrap break-all text-gray-300 py-[1px]">
+                            {line || <br/>}
+                          </div>
+                          {hasComments && (
+                            <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                              <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-gray-500">
+                    <p>No code submitted for this task.</p>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="h-full flex items-center justify-center text-gray-500">Select a student to start reviewing.</div>
+          )}
+        </div>
+
+        {/* RIGHT: Grading & Feedback Sidebar */}
+        <aside className="w-[350px] bg-gray-800 border-l border-gray-700 flex flex-col shrink-0">
+          {selectedStudent ? (
+            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+              
+              {/* Grading Box */}
+              <div className="bg-gray-700/30 rounded-xl p-4 border border-gray-600">
+                <h3 className="text-xs font-bold text-gray-400 uppercase mb-3">Assessment</h3>
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <div className="w-20">
+                      <label className="text-[10px] text-gray-500 mb-1 block">Grade</label>
+                      <input 
+                        type="number" min="5" max="10" 
+                        value={gradeValue} onChange={e => setGradeValue(Number(e.target.value))}
+                        className="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-sm text-center font-bold" 
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-[10px] text-gray-500 mb-1 block">Summary</label>
+                      <input 
+                        type="text" 
+                        value={gradeComment} onChange={e => setGradeComment(e.target.value)}
+                        placeholder="Very good work..."
+                        className="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-sm" 
+                      />
+                    </div>
+                  </div>
+                  <button 
+                    onClick={handleSaveGrade} 
+                    disabled={isSavingGrade}
+                    className="w-full py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded shadow-sm"
+                  >
+                    {isSavingGrade ? 'Saving...' : 'Save Grade'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Add Feedback Form */}
+              <div>
+                <h3 className="text-xs font-bold text-gray-400 uppercase mb-3 flex justify-between">
+                  <span>Feedback</span>
+                  {activeLine && <button onClick={() => setActiveLine(null)} className="text-[10px] text-indigo-400 hover:underline">Clear Line Selection</button>}
+                </h3>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <input 
+                      type="number" 
+                      placeholder="Line #" 
+                      value={newCommentLine} onChange={e => setNewCommentLine(e.target.value)}
+                      className={`w-20 bg-gray-900 border rounded px-2 py-1.5 text-sm ${activeLine ? 'border-indigo-500 text-indigo-400' : 'border-gray-600'}`}
+                    />
+                    <input 
+                      type="text" 
+                      placeholder="Add comment..." 
+                      value={newCommentMessage} onChange={e => setNewCommentMessage(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleAddComment()}
+                      className="flex-1 bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-sm" 
+                    />
+                  </div>
+                  <button 
+                    onClick={handleAddComment}
+                    disabled={!newCommentMessage.trim()}
+                    className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded shadow-sm disabled:opacity-50"
+                  >
+                    Add Comment
+                  </button>
+                </div>
+              </div>
+
+              {/* Comments List (Merged General + Line) */}
+              <div className="space-y-4">
+                {/* Active Line Filter */}
+                {activeLine !== null && (
+                  <div className="bg-indigo-900/20 border border-indigo-500/30 rounded-lg p-3">
+                    <div className="text-xs font-bold text-indigo-400 mb-2">Comments on Line {activeLine}</div>
+                    {commentsByLine[activeLine]?.length > 0 ? (
+                      <div className="space-y-2">
+                        {commentsByLine[activeLine].map(c => (
+                          <CommentItem 
+                            key={c.commentId} 
+                            comment={c} 
+                            isEditing={editingCommentId === c.commentId}
+                            onEdit={startEditComment}
+                            onDelete={handleDeleteComment}
+                            onSave={handleUpdateComment}
+                            onCancel={cancelEditComment}
+                            editMsg={editCommentMessage}
+                            setEditMsg={setEditCommentMessage}
+                            editLine={editCommentLine}
+                            setEditLine={setEditCommentLine}
+                          />
+                        ))}
+                      </div>
+                    ) : <p className="text-xs text-gray-500 italic">No comments on this line yet.</p>}
+                  </div>
+                )}
+
+                {/* All Comments (if no filter) */}
+                {activeLine === null && (
+                  <div className="space-y-2">
+                    {comments.sort((a,b) => (a.line||0) - (b.line||0)).map(c => (
+                      <CommentItem 
+                        key={c.commentId} 
+                        comment={c} 
+                        isEditing={editingCommentId === c.commentId}
+                        onEdit={startEditComment}
+                        onDelete={handleDeleteComment}
+                        onSave={handleUpdateComment}
+                        onCancel={cancelEditComment}
+                        editMsg={editCommentMessage}
+                        setEditMsg={setEditCommentMessage}
+                        editLine={editCommentLine}
+                        setEditLine={setEditCommentLine}
+                        onClickLine={() => c.line && setActiveLine(c.line)}
+                      />
+                    ))}
+                    {comments.length === 0 && <p className="text-center text-xs text-gray-600 py-4">No comments added yet.</p>}
+                  </div>
+                )}
+              </div>
+
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-gray-600 text-sm p-6 text-center">
+              Select a student from the list to view their submission and add grades.
+            </div>
+          )}
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+// Sub-component for individual comment items to keep main code clean
+function CommentItem({ comment, isEditing, onEdit, onDelete, onSave, onCancel, editMsg, setEditMsg, editLine, setEditLine, onClickLine }: any) {
+  if (isEditing) {
     return (
-      <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-gray-500 dark:text-gray-400">Loading...</div>
+      <div className="bg-gray-700 p-3 rounded border border-indigo-500">
+        <div className="flex gap-2 mb-2">
+          <input 
+            className="w-16 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs" 
+            value={editLine} onChange={e => setEditLine(e.target.value)} placeholder="Line" 
+          />
+          <input 
+            className="flex-1 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs" 
+            value={editMsg} onChange={e => setEditMsg(e.target.value)} placeholder="Message" 
+          />
+        </div>
+        <div className="flex justify-end gap-2">
+          <button onClick={onCancel} className="text-xs text-gray-400 hover:text-white">Cancel</button>
+          <button onClick={() => onSave(comment.commentId)} className="text-xs bg-indigo-600 px-2 py-1 rounded text-white">Save</button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-              Review: {exam?.name || 'Exam'}
-            </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {exam?.subjectName}
-            </p>
-          </div>
-          <button
-            onClick={() => navigate('/professor')}
-            className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100"
-          >
-            Back to Dashboard
-          </button>
+    <div className={`bg-gray-700/30 p-2 rounded border border-gray-700 text-sm relative group hover:bg-gray-700/50 ${onClickLine ? 'cursor-pointer' : ''}`} onClick={onClickLine}>
+      <div className="flex justify-between items-start mb-1">
+        <div className="flex items-center gap-2">
+          {comment.line ? (
+            <span className="text-xs font-bold text-yellow-500 bg-yellow-900/20 px-1.5 rounded">L{comment.line}</span>
+          ) : (
+            <span className="text-xs font-bold text-gray-400 bg-gray-800 px-1.5 rounded">Gen</span>
+          )}
+          <span className="text-[10px] text-gray-500">{new Date(comment.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
         </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {error && (
-          <div className="mb-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg">
-            {error}
-            <button onClick={() => setError('')} className="ml-2 text-sm underline">Dismiss</button>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Student List */}
-          <div className="lg:col-span-1">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                Students ({students.length})
-              </h2>
-              <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                {students.length === 0 ? (
-                  <p className="text-sm text-gray-500">No submissions yet.</p>
-                ) : (
-                  students.map(student => (
-                    <button
-                      key={student.studentId}
-                      onClick={() => loadStudentData(student)}
-                      className={`w-full text-left p-3 rounded-lg transition-colors ${
-                        selectedStudent?.studentId === student.studentId
-                          ? 'bg-indigo-100 dark:bg-indigo-900 border-indigo-500'
-                          : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'
-                      }`}
-                    >
-                      <div className="font-medium text-gray-900 dark:text-white">
-                        {student.firstName} {student.lastName}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {student.email}
-                      </div>
-                      {student.grade && (
-                        <div className="mt-1 text-sm font-semibold text-green-600 dark:text-green-400">
-                          Grade: {student.grade.value}
-                        </div>
-                      )}
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Main Content */}
-          <div className="lg:col-span-3">
-            {!selectedStudent ? (
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center text-gray-500 dark:text-gray-400">
-                Select a student to review their work
-              </div>
-            ) : isLoadingSubmissions ? (
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center text-gray-500 dark:text-gray-400">
-                Loading submissions...
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {/* Student Info & Grade */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                  <div className="flex flex-wrap justify-between items-start gap-4">
-                    <div>
-                      <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                        {selectedStudent.firstName} {selectedStudent.lastName}
-                      </h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {selectedStudent.email}
-                      </p>
-                      {selectedStudent.submittedAt && (
-                        <p className="text-xs text-gray-400 mt-1">
-                          Submitted: {new Date(selectedStudent.submittedAt).toLocaleString()}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Grade Form */}
-                    <div className="flex flex-wrap items-end gap-3">
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">Grade</label>
-                        <input
-                          type="number"
-                          min="5"
-                          max="10"
-                          value={gradeValue}
-                          onChange={(e) => setGradeValue(Number(e.target.value))}
-                          className="w-20 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">Comment</label>
-                        <input
-                          type="text"
-                          value={gradeComment}
-                          onChange={(e) => setGradeComment(e.target.value)}
-                          placeholder="General comment..."
-                          className="w-48 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
-                        />
-                      </div>
-                      <button
-                        onClick={handleSaveGrade}
-                        disabled={isSavingGrade}
-                        className="px-4 py-1.5 text-sm font-medium text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50"
-                      >
-                        {isSavingGrade ? 'Saving...' : 'Save Grade'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Task Tabs */}
-                {submissions.length > 0 && (
-                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-                    <div className="border-b border-gray-200 dark:border-gray-700">
-                      <nav className="flex overflow-x-auto">
-                        {submissions.map((sub, idx) => (
-                          <button
-                            key={sub.taskId}
-                            onClick={() => setSelectedTaskIndex(idx)}
-                            className={`px-4 py-3 text-sm font-medium whitespace-nowrap ${
-                              selectedTaskIndex === idx
-                                ? 'border-b-2 border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                                : 'text-gray-500 hover:text-gray-700'
-                            }`}
-                          >
-                            {sub.taskTitle || `Task ${idx + 1}`}
-                          </button>
-                        ))}
-                      </nav>
-                    </div>
-
-                    {/* Task Details & Code Display */}
-                    <div className="p-4">
-                      {currentSubmission ? (
-                        <div>
-                          <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-                            {currentSubmission.taskTitle}
-                          </h4>
-
-                          {/* Task Description */}
-                          {currentTask && (
-                            <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                              <h5 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">
-                                Task Description
-                              </h5>
-                              {currentTask.description && (
-                                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap mb-3">
-                                  {currentTask.description}
-                                </p>
-                              )}
-
-                              {/* Example Input/Output */}
-                              {(currentTask.exampleInput || currentTask.exampleOutput) && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                                  {currentTask.exampleInput && (
-                                    <div>
-                                      <span className="text-xs font-medium text-blue-700 dark:text-blue-400">Example Input:</span>
-                                      <pre className="mt-1 p-2 bg-white dark:bg-gray-800 rounded text-xs font-mono overflow-x-auto">
-                                        {currentTask.exampleInput}
-                                      </pre>
-                                    </div>
-                                  )}
-                                  {currentTask.exampleOutput && (
-                                    <div>
-                                      <span className="text-xs font-medium text-blue-700 dark:text-blue-400">Example Output:</span>
-                                      <pre className="mt-1 p-2 bg-white dark:bg-gray-800 rounded text-xs font-mono overflow-x-auto">
-                                        {currentTask.exampleOutput}
-                                      </pre>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* Notes */}
-                              {currentTask.notes && (
-                                <div className="mb-3">
-                                  <span className="text-xs font-medium text-blue-700 dark:text-blue-400">Notes:</span>
-                                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{currentTask.notes}</p>
-                                </div>
-                              )}
-
-                              {/* PDF Link */}
-                              {currentTask.pdfUrl && (
-                                <a
-                                  href={currentTask.pdfUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/50 rounded hover:bg-blue-200 dark:hover:bg-blue-900"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                  </svg>
-                                  View Task PDF
-                                </a>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Student Code */}
-                          <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                            Student's Code
-                          </h5>
-                          {currentSubmission.sourceCode ? (
-                            <div className="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                              <div className="max-h-[400px] overflow-y-auto">
-                                {renderCode(currentSubmission.sourceCode)}
-                              </div>
-                            </div>
-                          ) : (
-                            <p className="text-gray-500 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                              No code submitted for this task.
-                            </p>
-                          )}
-
-                          {/* Output */}
-                          {currentSubmission.output && (
-                            <div className="mt-4">
-                              <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Output:</h5>
-                              <pre className="bg-gray-100 dark:bg-gray-900 p-3 rounded text-sm overflow-x-auto border border-gray-200 dark:border-gray-700">
-                                {currentSubmission.output}
-                              </pre>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="text-gray-500">No submission data available.</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Comments Section */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                    Add Feedback
-                  </h4>
-
-                  {/* Add Comment Form */}
-                  <div className="flex gap-3 mb-4">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">
-                        Line # (optional){maxLineCount ? ` / max ${maxLineCount}` : ''}
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max={maxLineCount || undefined}
-                        value={newCommentLine}
-                        onChange={(e) => setNewCommentLine(e.target.value)}
-                        placeholder="Line"
-                        className="w-20 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <label className="block text-xs text-gray-500 mb-1">Comment</label>
-                      <input
-                        type="text"
-                        value={newCommentMessage}
-                        onChange={(e) => setNewCommentMessage(e.target.value)}
-                        placeholder="Enter your feedback..."
-                        onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
-                      />
-                    </div>
-                    <div className="flex items-end">
-                      <button
-                        onClick={handleAddComment}
-                        disabled={isSavingComment || !newCommentMessage.trim()}
-                        className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700 disabled:opacity-50"
-                      >
-                        {isSavingComment ? 'Adding...' : 'Add Comment'}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* General comments (no line number) */}
-                  <div className="space-y-2">
-                    <h5 className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                      General Comments ({comments.filter(c => c.line === null).length})
-                    </h5>
-                    {comments
-                      .filter(c => c.line === null)
-                      .map(comment => (
-                        <div
-                          key={comment.commentId}
-                          className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
-                        >
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <span className="font-medium text-gray-900 dark:text-white">
-                                {comment.authorName}
-                              </span>
-                              <span className="ml-2 text-xs text-gray-500">
-                                {new Date(comment.createdAt).toLocaleString()}
-                              </span>
-                              <p className="mt-1 text-gray-700 dark:text-gray-300">
-                                {comment.message}
-                              </p>
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleEditComment(comment)}
-                                className="text-xs text-blue-500 hover:text-blue-700"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => handleDeleteComment(comment.commentId)}
-                                className="text-xs text-red-500 hover:text-red-700"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    {comments.filter(c => c.line === null).length === 0 && (
-                      <p className="text-sm text-gray-500 italic">No general comments yet. Add one above.</p>
-                    )}
-                  </div>
-
-                  {/* Line comments summary */}
-                  {comments.filter(c => c.line !== null).length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                      <h5 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
-                        Line Comments ({comments.filter(c => c.line !== null).length})
-                      </h5>
-                      <div className="space-y-1">
-                        {comments
-                          .filter(c => c.line !== null)
-                          .sort((a, b) => (a.line || 0) - (b.line || 0))
-                          .map(comment => (
-                            <div
-                              key={comment.commentId}
-                              className="flex items-center justify-between text-sm p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded"
-                            >
-                              <div>
-                                <span className="font-medium text-yellow-700 dark:text-yellow-400">
-                                  Line {comment.line}:
-                                </span>
-                                <span className="ml-2 text-gray-700 dark:text-gray-300">
-                                  {comment.message}
-                                </span>
-                              </div>
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => handleEditComment(comment)}
-                                  className="text-xs text-blue-500 hover:text-blue-700"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteComment(comment.commentId)}
-                                  className="text-xs text-red-500 hover:text-red-700"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={(e) => { e.stopPropagation(); onEdit(comment); }} className="text-blue-400 hover:text-blue-300"><Icons.Edit /></button>
+          <button onClick={(e) => { e.stopPropagation(); onDelete(comment.commentId); }} className="text-gray-500 hover:text-red-500"><Icons.Trash /></button>
         </div>
-      </main>
+      </div>
+      <p className="text-gray-300 pl-1">{comment.message}</p>
     </div>
   );
 }
