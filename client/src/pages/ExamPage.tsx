@@ -46,8 +46,8 @@ export default function ExamPage() {
   const [leftWidth, setLeftWidth] = useState(33);
   const [outputHeight, setOutputHeight] = useState(220);
 
-  const dragModeRef = useRef<'vertical' | 'horizontal' | null>(null);
   const rightPanelRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const autoSubmittedRef = useRef(false);
 
@@ -82,40 +82,45 @@ export default function ExamPage() {
   }, [isReviewMode]);
 
   useEffect(() => {
-    const handleMouseMove = (event: MouseEvent) => {
-      if (!dragModeRef.current) return;
-
-      if (dragModeRef.current === 'vertical' && containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const relativeX = event.clientX - rect.left;
-        const percent = (relativeX / rect.width) * 100;
-        const clamped = Math.min(70, Math.max(20, percent));
-        setLeftWidth(clamped);
-        return;
-      }
-
-      if (dragModeRef.current === 'horizontal' && rightPanelRef.current) {
-        const rect = rightPanelRef.current.getBoundingClientRect();
-        const minHeight = 120;
-        const maxHeight = Math.max(minHeight, rect.height - 180);
-        const relative = rect.bottom - event.clientY;
-        const nextHeight = Math.min(maxHeight, Math.max(minHeight, relative));
-        setOutputHeight(nextHeight);
+    const handleWindowResize = () => {
+      if (rightPanelRef.current) {
+        const maxH = rightPanelRef.current.offsetHeight - 100;
+        setOutputHeight((prev: number) => Math.min(Math.max(120, maxH), Math.max(120, prev)));
       }
     };
-
-    const handleMouseUp = () => {
-      dragModeRef.current = null;
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
+    window.addEventListener('resize', handleWindowResize);
+    return () => window.removeEventListener('resize', handleWindowResize);
   }, []);
+
+  const startDrag = (mode: 'vertical' | 'horizontal', _startX: number, startY: number) => {
+    const snapOutputHeight = outputHeight;
+
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = mode === 'vertical' ? 'col-resize' : 'row-resize';
+
+    const onMouseMove = (ev: MouseEvent) => {
+      ev.preventDefault();
+      if (mode === 'vertical' && contentRef.current) {
+        const rect = contentRef.current.getBoundingClientRect();
+        const percent = ((ev.clientX - rect.left) / rect.width) * 100;
+        setLeftWidth(Math.min(60, Math.max(20, percent)));
+      } else if (mode === 'horizontal') {
+        const deltaY = ev.clientY - startY;
+        const maxH = rightPanelRef.current ? rightPanelRef.current.offsetHeight - 100 : 600;
+        setOutputHeight(Math.min(Math.max(120, maxH), Math.max(120, snapOutputHeight - deltaY)));
+      }
+    };
+
+    const onMouseUp = () => {
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
 
   const requestFullscreen = async () => {
     if (document.fullscreenElement || isReviewMode) return;
@@ -495,10 +500,10 @@ Code saved.` : 'Code saved.'));
   const isExamLocked = examStatus !== 'active' || isReviewMode;
 
   return (
-    <div className={`min-h-screen bg-gray-900 text-white flex flex-col ${!isReviewMode ? 'pb-20 md:pb-0' : ''}`}
+    <div className={`h-screen bg-gray-900 text-white flex flex-col overflow-hidden ${!isReviewMode ? 'pb-20 md:pb-0' : ''}`}
       ref={containerRef}
     >
-      <header className="bg-gray-800 border-b border-gray-700 px-4 py-3">
+      <header className="bg-gray-800 border-b border-gray-700 px-4 py-3 shrink-0">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center space-x-4">
             <h1 className="text-xl font-bold text-indigo-400">Assessly</h1>
@@ -584,10 +589,10 @@ Code saved.` : 'Code saved.'));
         </div>
       )}
 
-      <div className="flex-1 flex">
+      <div className="flex-1 flex overflow-hidden" ref={contentRef}>
         <div
           className="bg-gray-800 border-r border-gray-700 p-4 overflow-y-auto"
-          style={{ width: `${leftWidth}%`, minWidth: '16rem', maxWidth: '70vw' }}
+          style={{ width: `${leftWidth}%`, flexShrink: 0 }}
         >
           {isExamLocked && !isReviewMode && (
             <div className="mb-4 rounded border border-yellow-600/40 bg-yellow-900/20 px-3 py-2 text-sm text-yellow-200">
@@ -711,15 +716,16 @@ Code saved.` : 'Code saved.'));
         </div>
 
         <div
-          className="w-1 bg-gray-700 cursor-col-resize hover:bg-gray-500"
-          onMouseDown={(event) => {
-            event.preventDefault();
-            dragModeRef.current = 'vertical';
+          className="w-2 bg-gray-700 cursor-col-resize hover:bg-indigo-500 transition-colors"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            startDrag('vertical', e.clientX, e.clientY);
           }}
         />
-        <div className="flex-1 flex flex-col" ref={rightPanelRef}>
+        <div className="flex-1 flex flex-col overflow-hidden" ref={rightPanelRef}>
           {showEditor && (
-            <div className="flex-1 border-b border-gray-700" style={{ overflow: 'auto', minHeight: '16rem' }}>
+            <div className="flex-1 border-b border-gray-700 min-h-0 overflow-hidden">
               <Editor
                 height="100%"
                 defaultLanguage="cpp"
@@ -747,10 +753,11 @@ Code saved.` : 'Code saved.'));
 
           {showEditor && showOutput && (
             <div
-              className="h-2 bg-gray-800 cursor-row-resize hover:bg-gray-700"
+              className="h-2 bg-gray-800 cursor-row-resize hover:bg-indigo-500 transition-colors"
               onMouseDown={(event) => {
                 event.preventDefault();
-                dragModeRef.current = 'horizontal';
+                event.stopPropagation();
+                startDrag('horizontal', event.clientX, event.clientY);
               }}
             />
           )}
@@ -758,7 +765,7 @@ Code saved.` : 'Code saved.'));
           {showOutput && (
             <div
               className="bg-gray-900 border-t border-gray-700"
-              style={{ height: `${outputHeight}px`, minHeight: '8rem' }}
+              style={{ height: `${outputHeight}px`, flexShrink: 0 }}
             >
               <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
                 <span className="text-sm font-medium text-gray-400">Output</span>
