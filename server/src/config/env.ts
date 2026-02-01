@@ -28,7 +28,16 @@ const envSchema = z.object({
   SMTP_PORT: z.string().optional(),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
-  SMTP_FROM: z.string().optional()
+  SMTP_FROM: z.string().optional(),
+  JUDGE0_BASE_URL: z.string().optional(),
+  JUDGE0_AUTH_HEADER: z.string().optional(),
+  JUDGE0_AUTH_TOKEN: z.string().optional(),
+  JUDGE0_AUTHZ_HEADER: z.string().optional(),
+  JUDGE0_AUTHZ_TOKEN: z.string().optional(),
+  JUDGE0_TIMEOUT_MS: z.string().optional(),
+  JUDGE0_POLL_INTERVAL_MS: z.string().optional(),
+  JUDGE0_POLL_ATTEMPTS: z.string().optional(),
+  JUDGE0_DEFAULT_LANGUAGE_ID: z.string().optional()
 });
 
 export const env = envSchema.parse(process.env);

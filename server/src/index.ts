@@ -21,10 +21,11 @@ import logsRoutes from './databases/cassandra/routes/logsRoutes.js';
 import redisStatusRoutes from './databases/redis/routes/statusRoutes.js';
 import neo4jStatusRoutes from './databases/neo4j/routes/statusRoutes.js';
 import cassandraStatusRoutes from './databases/cassandra/routes/statusRoutes.js';
+import judge0Routes from './routes/judge0Routes.js';
 import { redisClient } from './databases/redis/client.js';
 import { initSocket } from './databases/redis/services/socketService.js';
 import { neo4jDriver, initNeo4jSchema } from './databases/neo4j/driver.js';
-import { cassandraClient, initCassandraTables } from './databases/cassandra/client.js';
+import { cassandraClient } from './databases/cassandra/client.js';
 import { apiLimiter } from './middleware/rateLimit.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { env, getCorsOrigins } from './config/env.js';
@@ -92,6 +93,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/exams', examRoutes);
 app.use('/api/logs', logsRoutes);
+app.use('/api/judge0', judge0Routes);
 
 app.use(errorHandler);
 
@@ -110,7 +112,6 @@ async function initializeDatabases() {
   await cassandraClient.connect();
   console.log('Connected to Cassandra (Astra DB)');
 
-  await initCassandraTables();
 }
 
 const startServer = async () => {
