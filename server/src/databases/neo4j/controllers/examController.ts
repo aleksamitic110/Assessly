@@ -7,6 +7,7 @@ import { logUserActivity } from '../../cassandra/services/logsService.js';
 import { autoSubmitExam } from '../services/autoSubmitService.js';
 import { emitExamChanged } from '../../redis/services/socketService.js';
 import { runCppCode } from '../../../services/codeRunner.js';
+import { getDefaultLanguageId, isJudge0Configured, runJudge0Code } from '../../../services/judge0.js';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -964,7 +965,7 @@ export const getExamTasks = async (req: any, res: Response) => {
 
 export const runCode = async (req: any, res: Response) => {
   const { examId } = req.params;
-  const { taskId, sourceCode, input } = req.body;
+  const { taskId, sourceCode, input, languageId } = req.body;
   const studentId = req.user?.id;
 
   if (!studentId) {
@@ -1009,6 +1010,19 @@ export const runCode = async (req: any, res: Response) => {
   }
 
   try {
+    if (isJudge0Configured()) {
+      const resolvedLanguageId = languageId ?? await getDefaultLanguageId();
+      if (!resolvedLanguageId) {
+        return res.status(400).json({ error: 'Language is required to run code.' });
+      }
+      const result = await runJudge0Code({
+        sourceCode: String(sourceCode),
+        input: String(input || ''),
+        languageId: Number(resolvedLanguageId)
+      });
+      return res.json(result);
+    }
+
     const result = await runCppCode(String(sourceCode), String(input || ''));
     res.json(result);
   } catch (error) {

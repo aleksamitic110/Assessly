@@ -165,7 +165,8 @@ export const runSchemas = {
   run: z.object({
     taskId: z.string().uuid(),
     sourceCode: z.string().max(50000),
-    input: z.string().max(10000).optional().nullable()
+    input: z.string().max(10000).optional().nullable(),
+    languageId: z.coerce.number().int().positive().optional().nullable()
   })
 };
 

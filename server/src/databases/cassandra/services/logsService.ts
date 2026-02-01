@@ -72,9 +72,13 @@ export async function logSecurityEvent(
   eventType: SecurityEventType,
   details: Record<string, unknown> = {}
 ): Promise<void> {
+  const payload = {
+    timestamp: new Date().toISOString(),
+    ...details
+  };
   const query = `
-    INSERT INTO security_events (exam_id, student_id, event_type, timestamp, details)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO security_events (exam_id, student_id, event_type, details)
+    VALUES (?, ?, ?, ?)
   `;
 
   await cassandraClient.execute(
@@ -83,8 +87,7 @@ export async function logSecurityEvent(
       types.Uuid.fromString(examId),
       types.Uuid.fromString(studentId),
       eventType,
-      new Date(),
-      JSON.stringify(details)
+      JSON.stringify(payload)
     ],
     { prepare: true }
   );
@@ -95,7 +98,7 @@ export async function getSecurityEvents(
   limit: number = 100
 ): Promise<SecurityEventResponse[]> {
   const query = `
-    SELECT exam_id, student_id, event_type, timestamp, details
+    SELECT exam_id, student_id, event_type, details
     FROM security_events
     WHERE exam_id = ?
     LIMIT ?
@@ -110,13 +113,16 @@ export async function getSecurityEvents(
     { prepare: true }
   );
 
-  return result.rows.map(row => ({
-    examId: row.exam_id.toString(),
-    studentId: row.student_id.toString(),
-    eventType: row.event_type as SecurityEventType,
-    timestamp: row.timestamp.toISOString(),
-    details: JSON.parse(row.details || '{}')
-  }));
+  return result.rows.map(row => {
+    const details = JSON.parse(row.details || '{}');
+    return {
+      examId: row.exam_id.toString(),
+      studentId: row.student_id.toString(),
+      eventType: row.event_type as SecurityEventType,
+      timestamp: typeof details.timestamp === 'string' ? details.timestamp : new Date().toISOString(),
+      details
+    };
+  });
 }
 
 export async function getSecurityEventsForStudent(
@@ -124,7 +130,7 @@ export async function getSecurityEventsForStudent(
   studentId: string
 ): Promise<SecurityEventResponse[]> {
   const query = `
-    SELECT exam_id, student_id, event_type, timestamp, details
+    SELECT exam_id, student_id, event_type, details
     FROM security_events
     WHERE exam_id = ?
   `;
@@ -137,13 +143,16 @@ export async function getSecurityEventsForStudent(
 
   return result.rows
     .filter(row => row.student_id.toString() === studentId)
-    .map(row => ({
-      examId: row.exam_id.toString(),
-      studentId: row.student_id.toString(),
-      eventType: row.event_type as SecurityEventType,
-      timestamp: row.timestamp.toISOString(),
-      details: JSON.parse(row.details || '{}')
-    }));
+    .map(row => {
+      const details = JSON.parse(row.details || '{}');
+      return {
+        examId: row.exam_id.toString(),
+        studentId: row.student_id.toString(),
+        eventType: row.event_type as SecurityEventType,
+        timestamp: typeof details.timestamp === 'string' ? details.timestamp : new Date().toISOString(),
+        details
+      };
+    });
 }
 
 export async function countSecurityEvents(

@@ -8,20 +8,30 @@ x-logging:
 services:
   server:
     image: judge0/judge0:1.13.1
+    user: root
     volumes:
       - ./judge0.conf:/judge0.conf:ro
     ports:
       - "2358:2358"
     privileged: true
+    security_opt:
+      - seccomp=unconfined
+    cap_add:
+      - SYS_ADMIN
     <<: *default-logging
     restart: always
 
   workers:
     image: judge0/judge0:1.13.1
     command: ["./scripts/workers"]
+    user: root
     volumes:
       - ./judge0.conf:/judge0.conf:ro
     privileged: true
+    security_opt:
+      - seccomp=unconfined
+    cap_add:
+      - SYS_ADMIN
     <<: *default-logging
     restart: always
 

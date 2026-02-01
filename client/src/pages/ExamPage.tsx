@@ -16,6 +16,196 @@ interface Submission {
   updatedAt?: string | null;
 }
 
+type LanguageOption = {
+  id: number;
+  name: string;
+};
+
+const getMonacoLanguage = (languageName?: string | null) => {
+  if (!languageName) return 'cpp';
+  const name = languageName.toLowerCase();
+  if (name.includes('typescript')) return 'typescript';
+  if (name.includes('javascript')) return 'javascript';
+  if (name.includes('python')) return 'python';
+  if (name.includes('java')) return 'java';
+  if (name.includes('c++')) return 'cpp';
+  if (name.includes('c#')) return 'csharp';
+  if (name === 'c' || name.startsWith('c ')) return 'c';
+  if (name.includes('go')) return 'go';
+  if (name.includes('ruby')) return 'ruby';
+  if (name.includes('php')) return 'php';
+  if (name.includes('rust')) return 'rust';
+  if (name.includes('swift')) return 'swift';
+  if (name.includes('kotlin')) return 'kotlin';
+  if (name.includes('scala')) return 'scala';
+  if (name.includes('sql')) return 'sql';
+  return 'plaintext';
+};
+
+const getCommentedHello = (languageName?: string | null) => {
+  if (!languageName) return '';
+  const name = languageName.toLowerCase();
+  const withLineComments = (prefix: string, lines: string[]) =>
+    `${lines.map((line) => `${prefix} ${line}`).join('\n')}\n`;
+  const withBlockComment = (start: string, end: string, lines: string[]) =>
+    `${start}\n${lines.map((line) => ` ${line}`).join('\n')}\n${end}\n`;
+
+  if (name.includes('python')) {
+    return withLineComments('#', [
+      'Python Hello World:',
+      'print("Hello World")'
+    ]);
+  }
+  if (name.includes('ruby')) {
+    return withLineComments('#', [
+      'Ruby Hello World:',
+      'puts "Hello World"'
+    ]);
+  }
+  if (name.includes('r ') || name === 'r' || name.includes(' r (')) {
+    return withLineComments('#', [
+      'R Hello World:',
+      'print("Hello World")'
+    ]);
+  }
+  if (name.includes('bash') || name.includes('shell')) {
+    return withLineComments('#', [
+      'Bash Hello World:',
+      'echo "Hello World"'
+    ]);
+  }
+  if (name.includes('sql')) {
+    return withBlockComment('/*', '*/', [
+      'SQL Hello World:',
+      "SELECT 'Hello World';"
+    ]);
+  }
+  if (name.includes('lua')) {
+    return withBlockComment('--[[', '--]]', [
+      'Lua Hello World:',
+      'print("Hello World")'
+    ]);
+  }
+  if (name.includes('haskell')) {
+    return withBlockComment('{-', '-}', [
+      'Haskell Hello World:',
+      'main = putStrLn "Hello World"'
+    ]);
+  }
+  if (name.includes('php')) {
+    return withBlockComment('/*', '*/', [
+      'PHP Hello World:',
+      'echo "Hello World";'
+    ]);
+  }
+  if (name.includes('go')) {
+    return withBlockComment('/*', '*/', [
+      'Go Hello World:',
+      'package main',
+      'import "fmt"',
+      'func main() {',
+      '  fmt.Println("Hello World")',
+      '}'
+    ]);
+  }
+  if (name.includes('rust')) {
+    return withBlockComment('/*', '*/', [
+      'Rust Hello World:',
+      'fn main() {',
+      '  println!("Hello World");',
+      '}'
+    ]);
+  }
+  if (name.includes('c#')) {
+    return withBlockComment('/*', '*/', [
+      'C# Hello World:',
+      'using System;',
+      'class Program {',
+      '  static void Main() {',
+      '    Console.WriteLine("Hello World");',
+      '  }',
+      '}'
+    ]);
+  }
+  if (name.includes('kotlin')) {
+    return withBlockComment('/*', '*/', [
+      'Kotlin Hello World:',
+      'fun main() {',
+      '  println("Hello World")',
+      '}'
+    ]);
+  }
+  if (name.includes('swift')) {
+    return withBlockComment('/*', '*/', [
+      'Swift Hello World:',
+      'import Foundation',
+      'print("Hello World")'
+    ]);
+  }
+  if (name.includes('scala')) {
+    return withBlockComment('/*', '*/', [
+      'Scala Hello World:',
+      'object Main extends App {',
+      '  println("Hello World")',
+      '}'
+    ]);
+  }
+  if (name.includes('java')) {
+    return withBlockComment('/*', '*/', [
+      'Java Hello World:',
+      'public class Main {',
+      '  public static void main(String[] args) {',
+      '    System.out.println("Hello World");',
+      '  }',
+      '}'
+    ]);
+  }
+  if (name.includes('javascript') || name.includes('nodejs')) {
+    return withBlockComment('/*', '*/', [
+      'JavaScript Hello World:',
+      'console.log("Hello World");'
+    ]);
+  }
+  if (name.includes('typescript')) {
+    return withBlockComment('/*', '*/', [
+      'TypeScript Hello World:',
+      'const message: string = "Hello World";',
+      'console.log(message);'
+    ]);
+  }
+  if (name.includes('c++') || name.includes('clang')) {
+    return withBlockComment('/*', '*/', [
+      'C++ Hello World:',
+      '#include <iostream>',
+      'int main() {',
+      '  std::cout << "Hello World" << std::endl;',
+      '  return 0;',
+      '}'
+    ]);
+  }
+  if (name === 'c' || name.includes('c (gcc')) {
+    return withBlockComment('/*', '*/', [
+      'C Hello World:',
+      '#include <stdio.h>',
+      'int main() {',
+      '  printf("Hello World\\n");',
+      '  return 0;',
+      '}'
+    ]);
+  }
+  return withBlockComment('/*', '*/', [
+    'Hello World:',
+    'print("Hello World")'
+  ]);
+};
+
+const buildInitialCode = (template: string, starterCode?: string | null) => {
+  const starter = starterCode?.trim() ? `${starterCode.trim()}\n` : '';
+  if (!template && !starter) return '';
+  if (!template) return starter;
+  return `${template}\n${starter}`.trimEnd() + '\n';
+};
+
 export default function ExamPage() {
   const { examId } = useParams<{ examId: string }>();
   const { user } = useAuth();
@@ -45,6 +235,11 @@ export default function ExamPage() {
   const [showOutput, setShowOutput] = useState(true);
   const [leftWidth, setLeftWidth] = useState(33);
   const [outputHeight, setOutputHeight] = useState(220);
+  const [languages, setLanguages] = useState<LanguageOption[]>([]);
+  const [defaultLanguageId, setDefaultLanguageId] = useState<number | null>(null);
+  const [languageByTaskId, setLanguageByTaskId] = useState<Record<string, number>>({});
+  const [autoTemplateByTaskId, setAutoTemplateByTaskId] = useState<Record<string, string>>({});
+  const [languageError, setLanguageError] = useState('');
 
   const rightPanelRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
@@ -54,6 +249,71 @@ export default function ExamPage() {
   useEffect(() => {
     autoSubmittedRef.current = false;
   }, [examId]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadLanguages = async () => {
+      if (isReviewMode) return;
+      try {
+        const response = await api.get<{ languages: LanguageOption[]; defaultLanguageId: number | null }>('/judge0/languages');
+        if (!isMounted) return;
+        setLanguages(response.data.languages || []);
+        setDefaultLanguageId(response.data.defaultLanguageId ?? null);
+        setLanguageError('');
+      } catch (err: any) {
+        if (!isMounted) return;
+        setLanguageError(err.response?.data?.error || 'Failed to load languages.');
+      }
+    };
+
+    loadLanguages();
+    return () => {
+      isMounted = false;
+    };
+  }, [isReviewMode]);
+
+  useEffect(() => {
+    if (!defaultLanguageId || tasks.length === 0) return;
+    setLanguageByTaskId((prev) => {
+      const next = { ...prev };
+      tasks.forEach((task) => {
+        if (!next[task.id]) {
+          next[task.id] = defaultLanguageId;
+        }
+      });
+      return next;
+    });
+  }, [tasks, defaultLanguageId]);
+
+  useEffect(() => {
+    if (!defaultLanguageId || tasks.length === 0 || languages.length === 0) return;
+    const defaultLanguageName = languages.find((lang) => lang.id === defaultLanguageId)?.name || null;
+    const template = getCommentedHello(defaultLanguageName);
+    if (!template) return;
+
+    setCodeByTaskId((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      tasks.forEach((task) => {
+        const current = (next[task.id] ?? '').trim();
+        const starter = (task.starterCode ?? '').trim();
+        const shouldReplace = !current || (starter && current === starter);
+        if (shouldReplace) {
+          next[task.id] = buildInitialCode(template, task.starterCode);
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+
+    setAutoTemplateByTaskId((prev) => {
+      const next = { ...prev };
+      tasks.forEach((task) => {
+        next[task.id] = buildInitialCode(template, task.starterCode);
+      });
+      return next;
+    });
+  }, [tasks, defaultLanguageId, languages]);
 
   useEffect(() => {
     if (isReviewMode) {
@@ -167,6 +427,25 @@ export default function ExamPage() {
       requestFullscreen();
     }
   }, [examStatus, isReviewMode]);
+
+  useEffect(() => {
+    if (!currentTask) return;
+    const nextCode = codeByTaskId[currentTask.id];
+    if (!code.trim() && nextCode) {
+      setCode(nextCode);
+    }
+  }, [currentTask, codeByTaskId, code]);
+
+  useEffect(() => {
+    if (!currentTask) return;
+    const template = autoTemplateByTaskId[currentTask.id];
+    if (!template) return;
+    const starter = (currentTask.starterCode ?? '').trim();
+    const current = (code ?? '').trim();
+    if (!current || (starter && current === starter)) {
+      setCode(template);
+    }
+  }, [currentTask, autoTemplateByTaskId, code]);
 
   useEffect(() => {
     let isMounted = true;
@@ -381,6 +660,13 @@ export default function ExamPage() {
     setIsRunning(true);
     setOutput('Compiling and running...\n');
     const currentCode = codeByTaskId[currentTask.id] ?? code;
+    const selectedLanguageId = languageByTaskId[currentTask.id] ?? defaultLanguageId;
+
+    if (!selectedLanguageId) {
+      setOutput('Please select a language before running the code.');
+      setIsRunning(false);
+      return;
+    }
 
     if (examId) {
       try {
@@ -399,7 +685,8 @@ export default function ExamPage() {
       const response = await api.post(`/exams/${examId}/run`, {
         taskId: currentTask.id,
         sourceCode: currentCode,
-        input: currentTask.exampleInput || ''
+        input: currentTask.exampleInput || '',
+        languageId: selectedLanguageId
       });
 
       const result = response.data as { ok?: boolean; output?: string };
@@ -435,6 +722,9 @@ export default function ExamPage() {
     setCurrentTask(task);
     setCode(codeByTaskId[task.id] || task.starterCode || '');
     setOutput(outputByTaskId[task.id] || '');
+    if (!languageByTaskId[task.id] && defaultLanguageId) {
+      setLanguageByTaskId((prev) => ({ ...prev, [task.id]: defaultLanguageId }));
+    }
   };
 
   const saveSubmission = async (taskId: string, sourceCode: string, outputText: string) => {
@@ -495,6 +785,12 @@ Code saved.` : 'Code saved.'));
       }
     }
   };
+
+  const currentLanguageId = currentTask
+    ? languageByTaskId[currentTask.id] ?? defaultLanguageId
+    : defaultLanguageId;
+  const currentLanguageName = languages.find((lang) => lang.id === currentLanguageId)?.name || null;
+  const monacoLanguage = getMonacoLanguage(currentLanguageName);
 
   const isExamLocked = examStatus !== 'active' || isReviewMode;
 
@@ -745,29 +1041,69 @@ Code saved.` : 'Code saved.'));
         />
         <div className="flex-1 flex flex-col overflow-hidden" ref={rightPanelRef}>
           {showEditor && (
-            <div className="flex-1 border-b border-gray-700 min-h-0 overflow-hidden">
-              <Editor
-                height="100%"
-                defaultLanguage="cpp"
-                theme="vs-dark"
-                value={code}
-                onChange={(value) => {
-                  const next = value || '';
-                  setCode(next);
-                  if (currentTask) {
-                    setCodeByTaskId((prev) => ({ ...prev, [currentTask.id]: next }));
-                  }
-                }}
-                options={{
-                  readOnly: isLoadingTask || !!taskError || isExamLocked,
-                  fontSize: 14,
-                  minimap: { enabled: false },
-                  scrollBeyondLastLine: false,
-                  automaticLayout: true,
-                  tabSize: 4,
-                  wordWrap: 'on',
-                }}
-              />
+            <div className="flex-1 border-b border-gray-700 min-h-0 overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
+                <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-gray-400">
+                  <span>Language</span>
+                  <select
+                    className="bg-gray-900 border border-gray-700 text-gray-200 text-xs rounded px-2 py-1"
+                    value={currentLanguageId ?? ''}
+                    onChange={(event) => {
+                      const nextId = Number(event.target.value);
+                      if (currentTask && Number.isFinite(nextId)) {
+                        setLanguageByTaskId((prev) => ({ ...prev, [currentTask.id]: nextId }));
+                        const nextName = languages.find((lang) => lang.id === nextId)?.name || null;
+                        const template = getCommentedHello(nextName);
+                        const currentCode = codeByTaskId[currentTask.id] ?? code;
+                        const previousTemplate = autoTemplateByTaskId[currentTask.id];
+                        if (template && (!currentCode.trim() || currentCode === previousTemplate)) {
+                          const nextCode = buildInitialCode(template, currentTask.starterCode);
+                          setCode(nextCode);
+                          setCodeByTaskId((prev) => ({ ...prev, [currentTask.id]: nextCode }));
+                          setAutoTemplateByTaskId((prev) => ({ ...prev, [currentTask.id]: nextCode }));
+                        }
+                      }
+                    }}
+                    disabled={!languages.length || isExamLocked || !currentTask}
+                  >
+                    {!languages.length && (
+                      <option value="">Loading...</option>
+                    )}
+                    {languages.map((lang) => (
+                      <option key={lang.id} value={lang.id}>
+                        {lang.name}
+                      </option>
+                    ))}
+                  </select>
+                  {languageError && (
+                    <span className="text-red-400 normal-case">{languageError}</span>
+                  )}
+                </div>
+              </div>
+              <div className="flex-1 min-h-0">
+                <Editor
+                  height="100%"
+                  language={monacoLanguage}
+                  theme="vs-dark"
+                  value={code}
+                  onChange={(value) => {
+                    const next = value || '';
+                    setCode(next);
+                    if (currentTask) {
+                      setCodeByTaskId((prev) => ({ ...prev, [currentTask.id]: next }));
+                    }
+                  }}
+                  options={{
+                    readOnly: isLoadingTask || !!taskError || isExamLocked,
+                    fontSize: 14,
+                    minimap: { enabled: false },
+                    scrollBeyondLastLine: false,
+                    automaticLayout: true,
+                    tabSize: 4,
+                    wordWrap: 'on',
+                  }}
+                />
+              </div>
             </div>
           )}
 
