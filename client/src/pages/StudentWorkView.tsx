@@ -100,7 +100,13 @@ export default function StudentWorkView() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-gray-400">Loading your work...</div>
+        <div className="flex items-center gap-2 text-gray-400">
+          <svg className="animate-spin h-5 w-5 text-indigo-400" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+          Loading your work...
+        </div>
       </div>
     );
   }
@@ -108,10 +114,10 @@ export default function StudentWorkView() {
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       {/* Header */}
-      <header className="bg-gray-800 shadow border-b border-gray-700">
+      <header className="bg-gray-800/95 backdrop-blur-sm shadow-sm border-b border-gray-700/80 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-indigo-400">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-blue-400 bg-clip-text text-transparent">
               {exam?.name || 'Exam Review'}
             </h1>
             <p className="text-sm text-gray-400">
@@ -120,7 +126,7 @@ export default function StudentWorkView() {
           </div>
           <div className="flex items-center gap-4">
             {grade && (
-              <div className="bg-green-900/50 border border-green-700 rounded-lg px-4 py-2">
+              <div className="bg-green-900/40 border border-green-700/60 rounded-xl px-4 py-2">
                 <div className="text-2xl font-bold text-green-400">
                   {grade.value}
                 </div>
@@ -129,7 +135,7 @@ export default function StudentWorkView() {
             )}
             <button
               onClick={() => navigate('/student')}
-              className="px-4 py-2 text-sm font-medium text-gray-300 border border-gray-600 rounded-lg hover:bg-gray-700"
+              className="px-4 py-2 text-sm font-medium text-gray-300 border border-gray-600/80 rounded-xl hover:bg-gray-700/80 hover:border-gray-500 transition-all"
             >
               Back to Dashboard
             </button>
@@ -139,14 +145,17 @@ export default function StudentWorkView() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
-          <div className="mb-6 bg-red-900/30 border border-red-800 text-red-400 px-4 py-3 rounded-lg">
+          <div className="mb-6 bg-red-900/30 border border-red-800 text-red-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
             {error}
           </div>
         )}
 
         {/* Grade Comment */}
         {grade?.comment && (
-          <div className="mb-6 bg-indigo-900/30 border border-indigo-700 rounded-lg p-4">
+          <div className="mb-6 bg-indigo-900/30 border border-indigo-700/60 rounded-xl p-4">
             <h3 className="text-sm font-semibold text-indigo-400 mb-2">Professor's Comment</h3>
             <p className="text-gray-300">{grade.comment}</p>
           </div>
@@ -154,7 +163,7 @@ export default function StudentWorkView() {
 
         {/* General Comments */}
         {generalComments.length > 0 && (
-          <div className="mb-6 bg-yellow-900/20 border border-yellow-800 rounded-lg p-4">
+          <div className="mb-6 bg-yellow-900/20 border border-yellow-800/60 rounded-xl p-4">
             <h3 className="text-sm font-semibold text-yellow-400 mb-3">General Feedback</h3>
             <div className="space-y-2">
               {generalComments.map(comment => (
@@ -172,7 +181,7 @@ export default function StudentWorkView() {
 
         {/* Task Tabs */}
         {submissions.length > 0 ? (
-          <div className="bg-gray-800 rounded-lg shadow border border-gray-700">
+          <div className="bg-gray-800/80 rounded-2xl shadow-lg border border-gray-700/60">
             <div className="border-b border-gray-700">
               <nav className="flex overflow-x-auto">
                 {submissions.map((sub, idx) => (
@@ -304,7 +313,7 @@ export default function StudentWorkView() {
 
         {/* Line Comments Summary */}
         {comments.filter(c => c.line !== null).length > 0 && (
-          <div className="mt-6 bg-yellow-900/20 border border-yellow-800 rounded-lg p-4">
+          <div className="mt-6 bg-yellow-900/20 border border-yellow-800/60 rounded-xl p-4">
             <h3 className="text-sm font-semibold text-yellow-400 mb-3">
               Line-by-Line Feedback ({comments.filter(c => c.line !== null).length})
             </h3>

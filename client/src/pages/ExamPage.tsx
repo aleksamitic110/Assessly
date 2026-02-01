@@ -799,27 +799,33 @@ Code saved.` : 'Code saved.'));
     <div className={`h-screen bg-gray-900 text-white flex flex-col overflow-hidden ${!isReviewMode ? 'pb-20 md:pb-0' : ''}`}
       ref={containerRef}
     >
-      <header className="bg-gray-800 border-b border-gray-700 px-4 py-3 shrink-0">
+      <header className="bg-gray-800/95 backdrop-blur-sm border-b border-gray-700/80 px-4 py-3 shrink-0">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center space-x-4">
-            <h1 className="text-xl font-bold text-indigo-400">Assessly</h1>
-            <span className="text-gray-400">|</span>
-            <span className="text-gray-300">{currentTask?.title || 'Exam'}</span>
+            <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-blue-400 bg-clip-text text-transparent">Assessly</h1>
+            <span className="text-gray-600">|</span>
+            <span className="text-gray-200 font-medium">{currentTask?.title || 'Exam'}</span>
             {examDetails && (
-              <span className="text-gray-500 text-sm">({examDetails.subjectName})</span>
+              <span className="text-gray-500 text-sm font-medium">({examDetails.subjectName})</span>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3">
             {violations > 0 && !isReviewMode && (
-              <div className="flex items-center space-x-2 text-red-400">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="flex items-center space-x-2 bg-red-900/40 border border-red-700/50 rounded-lg px-3 py-1.5 text-red-400">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                <span>{violations} warnings</span>
+                <span className="text-sm font-medium">{violations} warnings</span>
               </div>
             )}
             <div className="flex items-center space-x-3">
-              <span className="text-xs uppercase tracking-wide text-gray-400">
+              <span className={`text-xs uppercase tracking-wider font-semibold px-2.5 py-1 rounded-md ${
+                examStatus === 'active' ? 'bg-green-900/40 text-green-400 border border-green-700/50' :
+                examStatus === 'paused' ? 'bg-yellow-900/40 text-yellow-400 border border-yellow-700/50' :
+                examStatus === 'completed' || examStatus === 'submitted' ? 'bg-blue-900/40 text-blue-400 border border-blue-700/50' :
+                examStatus === 'withdrawn' ? 'bg-red-900/40 text-red-400 border border-red-700/50' :
+                'bg-gray-700/50 text-gray-400 border border-gray-600/50'
+              }`}>
                 {examStatus === 'active' && 'Active'}
                 {examStatus === 'paused' && 'Paused'}
                 {examStatus === 'wait_room' && 'Not scheduled'}
@@ -829,19 +835,19 @@ Code saved.` : 'Code saved.'));
                 {examStatus === 'withdrawn' && 'Withdrawn'}
               </span>
               {!isReviewMode && (
-                <div className={`text-lg font-mono ${timeLeft < 300 ? 'text-red-400' : 'text-green-400'}`}>
+                <div className={`text-lg font-mono font-bold tabular-nums ${timeLeft < 300 ? 'text-red-400' : 'text-green-400'}`}>
                   {formatTime(timeLeft)}
                 </div>
               )}
             </div>
-            <span className="text-gray-400">
+            <span className="text-gray-400 text-sm">
               {user?.firstName} {user?.lastName}
             </span>
             {!isReviewMode && (
               <button
                 type="button"
                 onClick={requestFullscreen}
-                className="px-3 py-2 text-xs border border-gray-600 text-gray-300 rounded hover:bg-gray-700"
+                className="px-3 py-1.5 text-xs border border-gray-600/80 text-gray-300 rounded-lg hover:bg-gray-700/80 hover:border-gray-500 transition-all"
               >
                 {isFullscreen ? 'Fullscreen on' : 'Fullscreen'}
               </button>
@@ -851,13 +857,13 @@ Code saved.` : 'Code saved.'));
                 <button
                   onClick={handleSubmit}
                   disabled={isExamLocked}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors"
+                  className="px-4 py-1.5 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-semibold transition-all shadow-sm shadow-green-900/30 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Submit exam
                 </button>
                 <button
                   onClick={handleCancelExam}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition-colors"
+                  className="px-4 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition-all"
                 >
                   Withdraw
                 </button>
@@ -868,17 +874,17 @@ Code saved.` : 'Code saved.'));
       </header>
 
       {!isReviewMode && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 px-4 py-3 flex gap-2">
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-gray-800/95 backdrop-blur-sm border-t border-gray-700/80 px-4 py-3 flex gap-2">
           <button
             onClick={handleSubmit}
             disabled={isExamLocked}
-            className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors"
+            className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-semibold transition-all shadow-sm shadow-green-900/30 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Submit exam
           </button>
           <button
             onClick={handleCancelExam}
-            className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition-colors"
+            className="flex-1 px-4 py-2.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition-all"
           >
             Withdraw
           </button>
@@ -891,59 +897,68 @@ Code saved.` : 'Code saved.'));
           style={{ width: `${leftWidth}%`, flexShrink: 0 }}
         >
           {isExamLocked && !isReviewMode && (
-            <div className="mb-4 rounded border border-yellow-600/40 bg-yellow-900/20 px-3 py-2 text-sm text-yellow-200">
+            <div className="mb-4 rounded-lg border border-yellow-600/40 bg-yellow-900/20 px-3 py-2.5 text-sm text-yellow-200 flex items-center gap-2">
+              <svg className="w-4 h-4 shrink-0 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span>
               {examStatus === 'wait_room' && 'Exam is not scheduled yet.'}
               {examStatus === 'waiting_start' && 'Waiting for the professor to start the exam.'}
               {examStatus === 'paused' && 'The exam is currently paused.'}
               {examStatus === 'completed' && 'The exam is completed.'}
               {examStatus === 'submitted' && 'You already submitted this exam.'}
+              </span>
             </div>
           )}
           {isReviewMode && (
-            <div className="mb-4 rounded border border-blue-600/40 bg-blue-900/20 px-3 py-2 text-sm text-blue-200">
+            <div className="mb-4 rounded-lg border border-blue-600/40 bg-blue-900/20 px-3 py-2.5 text-sm text-blue-200 flex items-center gap-2">
+              <svg className="w-4 h-4 shrink-0 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
               Review mode: read-only view of your work.
             </div>
           )}
-          <div className="mb-4 rounded border border-gray-700 bg-gray-900 px-3 py-2 text-xs text-gray-300">
-            <div className="mb-2 text-gray-400 uppercase tracking-wide">View</div>
-            <div className="flex flex-wrap gap-3">
-              <label className="flex items-center gap-2">
-                <input type="checkbox" checked={showTaskList} onChange={() => setShowTaskList((prev) => !prev)} />
+          <div className="mb-4 rounded-lg border border-gray-700/80 bg-gray-900/80 px-3 py-2.5 text-xs text-gray-300">
+            <div className="mb-2 text-gray-500 uppercase tracking-wider text-[10px] font-semibold">View</div>
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              <label className="flex items-center gap-1.5 cursor-pointer select-none hover:text-gray-100 transition-colors">
+                <input type="checkbox" checked={showTaskList} onChange={() => setShowTaskList((prev) => !prev)} className="accent-indigo-500 rounded" />
                 Tasks
               </label>
-              <label className="flex items-center gap-2">
-                <input type="checkbox" checked={showTaskDetails} onChange={() => setShowTaskDetails((prev) => !prev)} />
+              <label className="flex items-center gap-1.5 cursor-pointer select-none hover:text-gray-100 transition-colors">
+                <input type="checkbox" checked={showTaskDetails} onChange={() => setShowTaskDetails((prev) => !prev)} className="accent-indigo-500 rounded" />
                 Details
               </label>
-              <label className="flex items-center gap-2">
-                <input type="checkbox" checked={showPdf} onChange={() => setShowPdf((prev) => !prev)} />
+              <label className="flex items-center gap-1.5 cursor-pointer select-none hover:text-gray-100 transition-colors">
+                <input type="checkbox" checked={showPdf} onChange={() => setShowPdf((prev) => !prev)} className="accent-indigo-500 rounded" />
                 PDF
               </label>
-              <label className="flex items-center gap-2">
-                <input type="checkbox" checked={showEditor} onChange={() => setShowEditor((prev) => !prev)} />
+              <label className="flex items-center gap-1.5 cursor-pointer select-none hover:text-gray-100 transition-colors">
+                <input type="checkbox" checked={showEditor} onChange={() => setShowEditor((prev) => !prev)} className="accent-indigo-500 rounded" />
                 Editor
               </label>
-              <label className="flex items-center gap-2">
-                <input type="checkbox" checked={showOutput} onChange={() => setShowOutput((prev) => !prev)} />
+              <label className="flex items-center gap-1.5 cursor-pointer select-none hover:text-gray-100 transition-colors">
+                <input type="checkbox" checked={showOutput} onChange={() => setShowOutput((prev) => !prev)} className="accent-indigo-500 rounded" />
                 Output
               </label>
             </div>
           </div>
           {showTaskList && tasks.length > 1 && (
             <div className="mb-4" style={{ resize: 'vertical', overflow: 'auto', minHeight: '6rem', maxHeight: '40vh' }}>
-              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">
+              <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
                 Tasks
               </h2>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {tasks.map((task) => (
                   <button
                     key={task.id}
                     type="button"
                     onClick={() => handleSelectTask(task)}
-                    className={`w-full text-left px-3 py-2 rounded border text-sm ${
+                    className={`w-full text-left px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
                       currentTask?.id === task.id
-                        ? 'border-indigo-500 bg-indigo-500/10 text-indigo-200'
-                        : 'border-gray-700 bg-gray-900 text-gray-300 hover:border-gray-600'
+                        ? 'border-indigo-500/60 bg-indigo-500/15 text-indigo-200 shadow-sm shadow-indigo-500/10'
+                        : 'border-gray-700/60 bg-gray-900/60 text-gray-300 hover:border-gray-600 hover:bg-gray-800/80'
                     }`}
                   >
                     {task.title}
@@ -954,24 +969,30 @@ Code saved.` : 'Code saved.'));
           )}
           {showTaskDetails && (
             <>
-              <h2 className="text-lg font-semibold mb-4 text-indigo-400">Task</h2>
+              <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-3">Task details</h2>
               <div className="prose prose-invert" style={{ resize: 'vertical', overflow: 'auto', minHeight: '10rem', maxHeight: '60vh' }}>
                 {isLoadingTask && (
-                  <div className="text-gray-400">Loading task...</div>
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Loading task...
+                  </div>
                 )}
                 {!isLoadingTask && taskError && (
-                  <div className="text-red-400">{taskError}</div>
+                  <div className="text-red-400 text-sm">{taskError}</div>
                 )}
                 {!isLoadingTask && !taskError && currentTask && (
                   <>
-                    <h3 className="text-white text-xl mb-2">{currentTask.title}</h3>
-                    <p className="text-gray-300 leading-relaxed">{currentTask.description}</p>
+                    <h3 className="text-white text-xl font-semibold mb-2">{currentTask.title}</h3>
+                    <p className="text-gray-300 leading-relaxed text-sm">{currentTask.description}</p>
                     {showPdf && currentTask.pdfUrl && (
                       <div
-                        className="mt-4 border border-gray-700 rounded-lg overflow-hidden bg-gray-900"
+                        className="mt-4 border border-gray-700/80 rounded-lg overflow-hidden bg-gray-900/80"
                         style={{ resize: 'vertical', overflow: 'auto', minHeight: '12rem', maxHeight: '60vh' }}
                       >
-                        <div className="px-3 py-2 text-xs text-gray-400 border-b border-gray-700">
+                        <div className="px-3 py-2 text-xs text-gray-500 font-medium border-b border-gray-700/80">
                           Task PDF
                         </div>
                         <iframe
@@ -984,24 +1005,24 @@ Code saved.` : 'Code saved.'));
                   </>
                 )}
                 {!isLoadingTask && !taskError && !currentTask && (
-                  <div className="text-gray-400">No tasks available.</div>
+                  <div className="text-gray-500 text-sm">No tasks available.</div>
                 )}
 
                 {currentTask && (
                   <>
                     {(currentTask.exampleInput || currentTask.exampleOutput) && (
-                      <div className="mt-6 p-4 bg-gray-700 rounded-lg">
-                        <h4 className="text-yellow-400 font-medium mb-2">Example input/output:</h4>
-                        <pre className="text-sm text-gray-300 bg-gray-900 p-3 rounded whitespace-pre-wrap">
+                      <div className="mt-6 p-4 bg-gray-700/50 rounded-lg border border-gray-600/40">
+                        <h4 className="text-yellow-400 font-medium text-sm mb-2">Example input/output:</h4>
+                        <pre className="text-sm text-gray-300 bg-gray-900/80 p-3 rounded-lg whitespace-pre-wrap font-mono">
 {`${currentTask.exampleInput ? `Input: ${currentTask.exampleInput}` : ''}${currentTask.exampleInput && currentTask.exampleOutput ? '\n' : ''}${currentTask.exampleOutput ? `Output: ${currentTask.exampleOutput}` : ''}`}
                         </pre>
                       </div>
                     )}
 
                     {currentTask.notes && (
-                      <div className="mt-6 p-4 bg-blue-900/30 border border-blue-700 rounded-lg">
-                        <h4 className="text-blue-400 font-medium mb-2">Notes:</h4>
-                        <p className="text-gray-300 text-sm whitespace-pre-wrap">{currentTask.notes}</p>
+                      <div className="mt-6 p-4 bg-blue-900/20 border border-blue-700/50 rounded-lg">
+                        <h4 className="text-blue-400 font-medium text-sm mb-2">Notes:</h4>
+                        <p className="text-gray-300 text-sm whitespace-pre-wrap leading-relaxed">{currentTask.notes}</p>
                       </div>
                     )}
                   </>
@@ -1012,7 +1033,7 @@ Code saved.` : 'Code saved.'));
         </div>
 
         <div
-          className="w-2 bg-gray-700 cursor-col-resize hover:bg-indigo-500 transition-colors"
+          className="w-1.5 bg-gray-700/60 cursor-col-resize hover:bg-indigo-500/80 active:bg-indigo-400 transition-colors"
           onMouseDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -1089,7 +1110,7 @@ Code saved.` : 'Code saved.'));
 
           {showEditor && showOutput && (
             <div
-              className="h-2 bg-gray-800 cursor-row-resize hover:bg-indigo-500 transition-colors"
+              className="h-1.5 bg-gray-700/60 cursor-row-resize hover:bg-indigo-500/80 active:bg-indigo-400 transition-colors"
               onMouseDown={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -1100,20 +1121,20 @@ Code saved.` : 'Code saved.'));
 
           {showOutput && (
             <div
-              className="bg-gray-900 border-t border-gray-700"
+              className="bg-gray-900 border-t border-gray-700/80"
               style={{ height: `${outputHeight}px`, flexShrink: 0 }}
             >
-              <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
-                <span className="text-sm font-medium text-gray-400">Output</span>
+              <div className="flex items-center justify-between px-4 py-2 bg-gray-800/90 border-b border-gray-700/80">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Output</span>
                 {!isReviewMode && (
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={handleSaveCode}
                       disabled={isSaving || !currentTask || isExamLocked}
-                      className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
+                      className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
                         isSaving || !currentTask || isExamLocked
-                          ? 'bg-gray-600 cursor-not-allowed'
-                          : 'bg-blue-600 hover:bg-blue-700'
+                          ? 'bg-gray-600/80 cursor-not-allowed opacity-50'
+                          : 'bg-blue-600 hover:bg-blue-500 shadow-sm shadow-blue-900/30'
                       }`}
                     >
                       {isSaving ? 'Saving...' : 'Save'}
@@ -1121,10 +1142,10 @@ Code saved.` : 'Code saved.'));
                     <button
                       onClick={handleRunCode}
                       disabled={isRunning || !currentTask || isExamLocked}
-                      className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
+                      className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
                         isRunning || !currentTask || isExamLocked
-                          ? 'bg-gray-600 cursor-not-allowed'
-                          : 'bg-green-600 hover:bg-green-700'
+                          ? 'bg-gray-600/80 cursor-not-allowed opacity-50'
+                          : 'bg-green-600 hover:bg-green-500 shadow-sm shadow-green-900/30'
                       }`}
                     >
                       {isRunning ? 'Running...' : 'Run code (F5)'}
@@ -1132,13 +1153,13 @@ Code saved.` : 'Code saved.'));
                   </div>
                 )}
               </div>
-              <pre className="p-4 text-sm text-gray-300 font-mono overflow-auto h-full">
+              <pre className="p-4 text-sm text-gray-300 font-mono overflow-auto h-full leading-relaxed">
                 {output || 'Click "Run code" to see output...'}
               </pre>
             </div>
           )}
           {!showEditor && !showOutput && (
-            <div className="flex-1 flex items-center justify-center text-sm text-gray-500">
+            <div className="flex-1 flex items-center justify-center text-sm text-gray-500 select-none">
               Editor and output are hidden in view settings.
             </div>
           )}
