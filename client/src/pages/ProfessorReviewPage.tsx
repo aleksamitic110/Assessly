@@ -250,19 +250,25 @@ export default function ProfessorReviewPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-gray-500 dark:text-gray-400">Loading...</div>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+          <svg className="animate-spin h-5 w-5 text-indigo-500" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+          Loading...
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow">
+      <header className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-sm border-b border-gray-200/60 dark:border-gray-700/60 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">
               Review: {exam?.name || 'Exam'}
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -271,7 +277,7 @@ export default function ProfessorReviewPage() {
           </div>
           <button
             onClick={() => navigate('/professor')}
-            className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100"
+            className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             Back to Dashboard
           </button>
@@ -280,16 +286,19 @@ export default function ProfessorReviewPage() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
-          <div className="mb-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg">
-            {error}
-            <button onClick={() => setError('')} className="ml-2 text-sm underline">Dismiss</button>
+          <div className="mb-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="flex-1">{error}</span>
+            <button onClick={() => setError('')} className="text-sm underline shrink-0">Dismiss</button>
           </div>
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Student List */}
           <div className="lg:col-span-1">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-none p-4 border border-gray-200/60 dark:border-gray-700/60">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 Students ({students.length})
               </h2>
@@ -301,13 +310,13 @@ export default function ProfessorReviewPage() {
                     <button
                       key={student.studentId}
                       onClick={() => loadStudentData(student)}
-                      className={`w-full text-left p-3 rounded-lg transition-colors ${
+                      className={`w-full text-left p-3 rounded-xl transition-all ${
                         selectedStudent?.studentId === student.studentId
-                          ? 'bg-indigo-100 dark:bg-indigo-900 border-indigo-500'
-                          : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'
+                          ? 'bg-indigo-100 dark:bg-indigo-900/40 border border-indigo-500/60 shadow-sm'
+                          : 'bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-600/50 border border-transparent'
                       }`}
                     >
-                      <div className="font-medium text-gray-900 dark:text-white">
+                      <div className="font-medium text-gray-900 dark:text-white text-sm">
                         {student.firstName} {student.lastName}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -328,17 +337,17 @@ export default function ProfessorReviewPage() {
           {/* Main Content */}
           <div className="lg:col-span-3">
             {!selectedStudent ? (
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center text-gray-500 dark:text-gray-400">
+              <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-none border border-gray-200/60 dark:border-gray-700/60 p-8 text-center text-gray-500 dark:text-gray-400">
                 Select a student to review their work
               </div>
             ) : isLoadingSubmissions ? (
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center text-gray-500 dark:text-gray-400">
+              <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-none border border-gray-200/60 dark:border-gray-700/60 p-8 text-center text-gray-500 dark:text-gray-400">
                 Loading submissions...
               </div>
             ) : (
               <div className="space-y-6">
                 {/* Student Info & Grade */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-none border border-gray-200/60 dark:border-gray-700/60 p-6">
                   <div className="flex flex-wrap justify-between items-start gap-4">
                     <div>
                       <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
@@ -380,7 +389,7 @@ export default function ProfessorReviewPage() {
                       <button
                         onClick={handleSaveGrade}
                         disabled={isSavingGrade}
-                        className="px-4 py-1.5 text-sm font-medium text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50"
+                        className="px-4 py-1.5 text-sm font-semibold text-white bg-green-600 rounded-xl hover:bg-green-700 shadow-sm shadow-green-500/25 disabled:opacity-50 transition-all"
                       >
                         {isSavingGrade ? 'Saving...' : 'Save Grade'}
                       </button>
@@ -390,7 +399,7 @@ export default function ProfessorReviewPage() {
 
                 {/* Task Tabs */}
                 {submissions.length > 0 && (
-                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+                  <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-none border border-gray-200/60 dark:border-gray-700/60">
                     <div className="border-b border-gray-200 dark:border-gray-700">
                       <nav className="flex overflow-x-auto">
                         {submissions.map((sub, idx) => (
@@ -510,7 +519,7 @@ export default function ProfessorReviewPage() {
                 )}
 
                 {/* Comments Section */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-none border border-gray-200/60 dark:border-gray-700/60 p-6">
                   <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                     Add Feedback
                   </h4>
@@ -546,7 +555,7 @@ export default function ProfessorReviewPage() {
                       <button
                         onClick={handleAddComment}
                         disabled={isSavingComment || !newCommentMessage.trim()}
-                        className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700 disabled:opacity-50"
+                        className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-sm shadow-indigo-500/25 disabled:opacity-50 transition-all"
                       >
                         {isSavingComment ? 'Adding...' : 'Add Comment'}
                       </button>

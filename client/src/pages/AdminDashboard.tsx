@@ -92,22 +92,25 @@ interface AdminTask {
 function Spinner() {
   return (
     <div className="flex justify-center py-12">
-      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-red-500" />
+      <svg className="animate-spin h-10 w-10 text-red-500" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+      </svg>
     </div>
   );
 }
 
-const inputClass = 'w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm';
-const btnPrimary = 'px-4 py-2 bg-red-600 hover:bg-red-700 rounded text-sm font-medium transition-colors';
-const btnSecondary = 'px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors';
+const inputClass = 'w-full px-3 py-2 bg-gray-700 border border-gray-600/80 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm';
+const btnPrimary = 'px-4 py-2 bg-red-600 hover:bg-red-700 rounded-xl text-sm font-medium transition-colors shadow-sm shadow-red-500/25';
+const btnSecondary = 'px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-xl text-sm transition-colors';
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
-      <div className="bg-gray-800 border border-gray-700 rounded-lg w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-gray-800/95 backdrop-blur-sm border border-gray-700/60 rounded-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700/60">
           <h3 className="text-lg font-semibold">{title}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-xl">&times;</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-white text-xl transition-colors">&times;</button>
         </div>
         <div className="p-6">{children}</div>
       </div>
@@ -139,17 +142,17 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
-      <header className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
+      <header className="bg-gray-800/95 backdrop-blur-sm border-b border-gray-700/80 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-4">
-          <h1 className="text-xl font-bold text-red-500">Assessly Admin</h1>
+          <h1 className="text-xl font-bold bg-gradient-to-r from-red-400 to-rose-400 bg-clip-text text-transparent">Assessly Admin</h1>
           <span className="text-sm text-gray-400">Logged in as {user?.email}</span>
         </div>
-        <button onClick={handleLogout} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
+        <button onClick={handleLogout} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-xl text-sm transition-colors border border-gray-600/80">
           Logout
         </button>
       </header>
 
-      <nav className="bg-gray-800 border-b border-gray-700 px-6 flex gap-1 overflow-x-auto">
+      <nav className="bg-gray-800/90 border-b border-gray-700/80 px-6 flex gap-1 overflow-x-auto sticky top-[57px] z-20">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -228,8 +231,8 @@ function OverviewPanel() {
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {statCards.map((s) => (
-            <div key={s.label} className="bg-gray-800 border border-gray-700 rounded-lg p-4 text-center">
-              <p className={`text-3xl font-bold ${s.color}`}>{s.value}</p>
+            <div key={s.label} className="bg-gray-800/80 border border-gray-700/60 rounded-xl p-4 text-center hover:border-gray-600 transition-colors">
+              <p className={`text-3xl font-bold tabular-nums ${s.color}`}>{s.value}</p>
               <p className="text-xs text-gray-400 mt-1">{s.label}</p>
             </div>
           ))}
@@ -240,9 +243,9 @@ function OverviewPanel() {
           <h3 className="text-sm font-medium text-gray-400 mb-3">Service Status</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {services.map((s) => (
-              <div key={s.name} className={`p-4 rounded-lg border ${s.status === 'ok' ? 'bg-green-900/20 border-green-700' : 'bg-red-900/20 border-red-700'}`}>
+              <div key={s.name} className={`p-4 rounded-xl border ${s.status === 'ok' ? 'bg-green-900/20 border-green-700/60' : 'bg-red-900/20 border-red-700/60'}`}>
                 <div className="flex items-center gap-2">
-                  <span className={`w-2.5 h-2.5 rounded-full ${s.status === 'ok' ? 'bg-green-500' : 'bg-red-500'}`} />
+                  <span className={`w-2.5 h-2.5 rounded-full animate-pulse ${s.status === 'ok' ? 'bg-green-500' : 'bg-red-500'}`} />
                   <span className="font-medium text-sm">{s.name}</span>
                   <span className="text-xs text-gray-400 ml-auto">{s.info || s.status}</span>
                 </div>
@@ -290,16 +293,16 @@ function ActiveExamsPanel() {
         <button onClick={fetchActive} className="text-sm text-gray-400 hover:text-white transition-colors">Refresh</button>
       </div>
       {exams.length === 0 ? (
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-8 text-center">
+        <div className="bg-gray-800/80 border border-gray-700/60 rounded-xl p-8 text-center">
           <p className="text-gray-400">No active or paused exams right now.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {exams.map((exam) => (
-            <div key={exam.id} className="bg-gray-800 border border-gray-700 rounded-lg p-5">
+            <div key={exam.id} className="bg-gray-800/80 border border-gray-700/60 rounded-xl p-5 hover:border-gray-600 transition-colors">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-medium">{exam.name}</h3>
-                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${
                   exam.status === 'active' ? 'bg-green-900/40 text-green-400' :
                   exam.status === 'paused' ? 'bg-yellow-900/40 text-yellow-400' :
                   'bg-gray-700 text-gray-400'
@@ -369,8 +372,8 @@ function SecurityEventsPanel() {
             {['TAB_SWITCH', 'COPY_PASTE', 'BLUR', 'FOCUS', 'SUSPICIOUS_ACTIVITY'].map((type) => {
               const count = events.filter(e => e.eventType === type).length;
               return (
-                <div key={type} className="bg-gray-800 border border-gray-700 rounded-lg p-3 text-center">
-                  <p className="text-xl font-bold">{count}</p>
+                <div key={type} className="bg-gray-800/80 border border-gray-700/60 rounded-xl p-3 text-center">
+                  <p className="text-xl font-bold tabular-nums">{count}</p>
                   <p className="text-xs text-gray-400 mt-1">{type.replace('_', ' ')}</p>
                 </div>
               );
@@ -388,7 +391,7 @@ function SecurityEventsPanel() {
                 {events.map((e, i) => (
                   <tr key={i} className="border-b border-gray-800 hover:bg-gray-800/50">
                     <td className="py-3 pr-4 whitespace-nowrap">{new Date(e.timestamp).toLocaleString()}</td>
-                    <td className="py-3 pr-4"><span className={`px-2 py-1 rounded text-xs font-medium ${eventColor(e.eventType)}`}>{e.eventType}</span></td>
+                    <td className="py-3 pr-4"><span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${eventColor(e.eventType)}`}>{e.eventType}</span></td>
                     <td className="py-3 pr-4 font-mono text-xs text-gray-400">{e.examId.slice(0, 8)}...</td>
                     <td className="py-3 pr-4 font-mono text-xs text-gray-400">{e.studentId.slice(0, 8)}...</td>
                     <td className="py-3 text-gray-400 text-xs font-mono max-w-xs truncate">{JSON.stringify(e.details)}</td>
@@ -511,7 +514,7 @@ function UsersPanel() {
 
       <form onSubmit={handleSearch} className="flex gap-2">
         <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by email..."
-          className="flex-1 px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500" />
+          className="flex-1 px-4 py-2 bg-gray-800/80 border border-gray-600/80 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500" />
         <button type="submit" className={btnPrimary}>Search</button>
         {search && <button type="button" onClick={() => { setSearch(''); fetchUsers(); }} className={btnSecondary}>Clear</button>}
       </form>
@@ -531,20 +534,20 @@ function UsersPanel() {
                   <td className="py-3 pr-4">{u.email}</td>
                   <td className="py-3 pr-4">{u.firstName} {u.lastName}</td>
                   <td className="py-3 pr-4">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${u.role === 'PROFESSOR' ? 'bg-blue-900/40 text-blue-400' : 'bg-green-900/40 text-green-400'}`}>{u.role}</span>
+                    <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${u.role === 'PROFESSOR' ? 'bg-blue-900/40 text-blue-400' : 'bg-green-900/40 text-green-400'}`}>{u.role}</span>
                   </td>
                   <td className="py-3 pr-4"><span className={u.isVerified ? 'text-green-400' : 'text-yellow-400'}>{u.isVerified ? 'Yes' : 'No'}</span></td>
                   <td className="py-3 pr-4"><span className={u.disabled ? 'text-red-400' : 'text-green-400'}>{u.disabled ? 'Disabled' : 'Active'}</span></td>
                   <td className="py-3 space-x-2">
-                    <button onClick={() => openEdit(u)} className="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-xs transition-colors">Edit</button>
-                    <button onClick={() => changeRole(u.id, u.role)} className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs transition-colors">
+                    <button onClick={() => openEdit(u)} className="px-3 py-1.5 bg-gray-600 hover:bg-gray-500 rounded-lg text-xs transition-colors">Edit</button>
+                    <button onClick={() => changeRole(u.id, u.role)} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-xs transition-colors">
                       Switch to {u.role === 'STUDENT' ? 'PROF' : 'STUD'}
                     </button>
                     <button onClick={() => toggleDisable(u.id, u.disabled)}
-                      className={`px-3 py-1 rounded text-xs transition-colors ${u.disabled ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}>
+                      className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${u.disabled ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}>
                       {u.disabled ? 'Enable' : 'Disable'}
                     </button>
-                    <button onClick={() => deleteUser(u.id)} className="px-3 py-1 bg-red-800 hover:bg-red-900 rounded text-xs transition-colors">Delete</button>
+                    <button onClick={() => deleteUser(u.id)} className="px-3 py-1.5 bg-red-800 hover:bg-red-900 rounded-lg text-xs transition-colors">Delete</button>
                   </td>
                 </tr>
               ))}
@@ -727,10 +730,10 @@ function ExamsPanel() {
                   <td className="py-3 pr-4">{exam.durationMinutes} min</td>
                   <td className="py-3 pr-4">{exam.taskCount}</td>
                   <td className="py-3 space-x-2">
-                    <button onClick={() => openEdit(exam)} className="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-xs transition-colors">Edit</button>
-                    <button onClick={() => setTasksExam(exam)} className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 rounded text-xs transition-colors">Tasks</button>
-                    <button onClick={() => resetState(exam.id)} className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 rounded text-xs transition-colors">Reset</button>
-                    <button onClick={() => deleteExam(exam.id)} className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-xs transition-colors">Delete</button>
+                    <button onClick={() => openEdit(exam)} className="px-3 py-1.5 bg-gray-600 hover:bg-gray-500 rounded-lg text-xs transition-colors">Edit</button>
+                    <button onClick={() => setTasksExam(exam)} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-xs transition-colors">Tasks</button>
+                    <button onClick={() => resetState(exam.id)} className="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-xs transition-colors">Reset</button>
+                    <button onClick={() => deleteExam(exam.id)} className="px-3 py-1.5 bg-red-600 hover:bg-red-700 rounded-lg text-xs transition-colors">Delete</button>
                   </td>
                 </tr>
               ))}
@@ -853,16 +856,16 @@ function TasksModal({ exam, onClose }: { exam: AdminExam; onClose: () => void })
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-gray-400">{tasks.length} task(s)</p>
-            <button onClick={openCreate} className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-xs font-medium transition-colors">+ Add Task</button>
+            <button onClick={openCreate} className="px-3 py-1.5 bg-red-600 hover:bg-red-700 rounded-lg text-xs font-medium transition-colors">+ Add Task</button>
           </div>
 
           {tasks.map((t) => (
-            <div key={t.id} className="bg-gray-700 rounded p-3 space-y-1">
+            <div key={t.id} className="bg-gray-700/80 rounded-xl p-3 space-y-1">
               <div className="flex items-center justify-between">
                 <span className="font-medium text-sm">{t.title}</span>
                 <div className="space-x-2">
-                  <button onClick={() => openEdit(t)} className="px-2 py-1 bg-gray-600 hover:bg-gray-500 rounded text-xs transition-colors">Edit</button>
-                  <button onClick={() => deleteTask(t.id)} className="px-2 py-1 bg-red-600 hover:bg-red-700 rounded text-xs transition-colors">Delete</button>
+                  <button onClick={() => openEdit(t)} className="px-2 py-1 bg-gray-600 hover:bg-gray-500 rounded-lg text-xs transition-colors">Edit</button>
+                  <button onClick={() => deleteTask(t.id)} className="px-2 py-1 bg-red-600 hover:bg-red-700 rounded-lg text-xs transition-colors">Delete</button>
                 </div>
               </div>
               {t.description && <p className="text-xs text-gray-400 truncate">{t.description}</p>}
@@ -870,7 +873,7 @@ function TasksModal({ exam, onClose }: { exam: AdminExam; onClose: () => void })
           ))}
 
           {showCreate && (
-            <form onSubmit={handleCreate} className="bg-gray-750 border border-gray-600 rounded p-4 space-y-3">
+            <form onSubmit={handleCreate} className="bg-gray-750 border border-gray-600/80 rounded-xl p-4 space-y-3">
               <h4 className="text-sm font-medium">New Task</h4>
               {formError && <p className="text-red-400 text-xs">{formError}</p>}
               <input type="text" placeholder="Title" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={inputClass} />
@@ -882,14 +885,14 @@ function TasksModal({ exam, onClose }: { exam: AdminExam; onClose: () => void })
               </div>
               <textarea placeholder="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={inputClass + ' h-16'} />
               <div className="flex gap-2">
-                <button type="submit" className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-xs font-medium transition-colors">Create</button>
-                <button type="button" onClick={() => setShowCreate(false)} className="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-xs transition-colors">Cancel</button>
+                <button type="submit" className="px-3 py-1.5 bg-red-600 hover:bg-red-700 rounded-lg text-xs font-medium transition-colors">Create</button>
+                <button type="button" onClick={() => setShowCreate(false)} className="px-3 py-1.5 bg-gray-600 hover:bg-gray-500 rounded-lg text-xs transition-colors">Cancel</button>
               </div>
             </form>
           )}
 
           {editTask && (
-            <form onSubmit={handleUpdate} className="bg-gray-750 border border-gray-600 rounded p-4 space-y-3">
+            <form onSubmit={handleUpdate} className="bg-gray-750 border border-gray-600/80 rounded-xl p-4 space-y-3">
               <h4 className="text-sm font-medium">Edit Task</h4>
               {formError && <p className="text-red-400 text-xs">{formError}</p>}
               <input type="text" placeholder="Title" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={inputClass} />
@@ -901,8 +904,8 @@ function TasksModal({ exam, onClose }: { exam: AdminExam; onClose: () => void })
               </div>
               <textarea placeholder="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={inputClass + ' h-16'} />
               <div className="flex gap-2">
-                <button type="submit" className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-xs font-medium transition-colors">Save</button>
-                <button type="button" onClick={() => setEditTask(null)} className="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-xs transition-colors">Cancel</button>
+                <button type="submit" className="px-3 py-1.5 bg-red-600 hover:bg-red-700 rounded-lg text-xs font-medium transition-colors">Save</button>
+                <button type="button" onClick={() => setEditTask(null)} className="px-3 py-1.5 bg-gray-600 hover:bg-gray-500 rounded-lg text-xs transition-colors">Cancel</button>
               </div>
             </form>
           )}
@@ -1019,8 +1022,8 @@ function SubjectsPanel() {
                   <td className="py-3 pr-4">{s.professorEmail || '-'}</td>
                   <td className="py-3 pr-4">{s.examCount}</td>
                   <td className="py-3 space-x-2">
-                    <button onClick={() => openEdit(s)} className="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-xs transition-colors">Edit</button>
-                    <button onClick={() => deleteSubject(s.id)} className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-xs transition-colors">Delete</button>
+                    <button onClick={() => openEdit(s)} className="px-3 py-1.5 bg-gray-600 hover:bg-gray-500 rounded-lg text-xs transition-colors">Edit</button>
+                    <button onClick={() => deleteSubject(s.id)} className="px-3 py-1.5 bg-red-600 hover:bg-red-700 rounded-lg text-xs transition-colors">Delete</button>
                   </td>
                 </tr>
               ))}
@@ -1119,7 +1122,7 @@ function ActivityPanel() {
                     {a.userId === 'ADMIN' ? <span className="text-red-400 font-semibold">ADMIN</span> : `${a.userId.slice(0, 8)}...`}
                   </td>
                   <td className="py-3 pr-4">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${eventColor(a.eventType)}`}>{a.eventType}</span>
+                    <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${eventColor(a.eventType)}`}>{a.eventType}</span>
                   </td>
                   <td className="py-3 text-gray-400 text-xs font-mono max-w-md truncate">{JSON.stringify(a.details)}</td>
                 </tr>
