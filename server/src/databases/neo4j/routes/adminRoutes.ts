@@ -28,7 +28,8 @@ import {
   adminGetTasks,
   adminCreateTask,
   adminUpdateTask,
-  adminDeleteTask
+  adminDeleteTask,
+  getSecurityExamsList
 } from '../controllers/adminController.js';
 
 const router = Router();
@@ -42,6 +43,7 @@ router.use(authenticateJWT, requireRole('ADMIN'));
 router.get('/health', getSystemHealth);
 router.get('/statistics', getStatistics);
 router.get('/active-exams', getActiveExams);
+router.get('/security-events/exams', getSecurityExamsList);
 router.get('/security-events', getSecurityEventsAdmin);
 
 // Users CRUD

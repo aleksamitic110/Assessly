@@ -36,26 +36,25 @@ export async function initCassandraTables(): Promise<void> {
       )
     `);
     console.log('Cassandra exam_comments table ready');
+
+    // Create security_events table if not exists
+    await cassandraClient.execute(`
+      CREATE TABLE IF NOT EXISTS security_events (
+        exam_id uuid,
+        timestamp timestamp,
+        student_id uuid,
+        event_type text,
+        details text,
+        PRIMARY KEY (exam_id, timestamp)
+      ) WITH CLUSTERING ORDER BY (timestamp DESC)
+    `);
+    console.log('Cassandra security_events table ready');
   } catch (error: any) {
-    // Table might already exist or we don't have permission to create it
     if (error.message?.includes('already exists')) {
-      console.log('Cassandra exam_comments table already exists');
+      console.log('Cassandra tables already exist');
     } else {
       console.error('Error initializing Cassandra tables:', error.message);
-      console.log('Please create the table manually in Astra DB CQL Console:');
-      console.log(`
-CREATE TABLE IF NOT EXISTS exam_comments (
-  exam_id uuid,
-  student_id uuid,
-  comment_id timeuuid,
-  line int,
-  message text,
-  author_id uuid,
-  author_name text,
-  created_at timestamp,
-  PRIMARY KEY ((exam_id, student_id), comment_id)
-);
-      `);
+      console.log('Please create tables manually in Astra DB CQL Console if needed.');
     }
   }
 }

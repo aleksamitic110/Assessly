@@ -321,11 +321,13 @@ export const getStudentSubjects = async (req: any, res: Response) => {
 
   const session = neo4jDriver.session();
   try {
+    // Single query: get subjects, exams, and submitted status in one go
     const result = await session.run(
       `
       MATCH (u:User {id: $studentId})-[:ENROLLED_IN]->(s:Subject)
       OPTIONAL MATCH (s)-[:SADRZI]->(e:Exam)
-      RETURN s, collect(e) AS exams
+      OPTIONAL MATCH (u)-[sub:SUBMITTED_EXAM]->(e)
+      RETURN s, collect({ exam: e, submitted: sub IS NOT NULL }) AS examData
       ORDER BY s.name
       `,
       { studentId }
@@ -334,32 +336,48 @@ export const getStudentSubjects = async (req: any, res: Response) => {
     const subjects = [];
     for (const record of result.records) {
       const subject = record.get('s').properties;
-      const exams = (record.get('exams') || [])
-        .filter((exam: any) => exam)
-        .map((exam: any) => ({
-          id: exam.properties.id,
-          name: exam.properties.name,
-          startTime: exam.properties.startTime,
-          durationMinutes: Number(exam.properties.durationMinutes),
-          subjectId: subject.id,
-          subjectName: subject.name
-        }));
+      const examData = (record.get('examData') || [])
+        .filter((item: any) => item.exam != null);
 
-      const examsWithStatus = [];
-      for (const exam of exams) {
-        const state = await resolveExamState(exam.id, exam.startTime);
-        const submitted = await hasSubmittedExam(session, exam.id, studentId);
-        if (submitted) {
-          examsWithStatus.push({ ...exam, status: 'submitted', remainingSeconds: 0 });
-          continue;
+      // Deduplicate exams (collect can produce dupes with multiple optional matches)
+      const seenIds = new Set<string>();
+      const uniqueExamData: any[] = [];
+      for (const item of examData) {
+        const eid = item.exam.properties.id;
+        if (!seenIds.has(eid)) {
+          seenIds.add(eid);
+          uniqueExamData.push(item);
         }
-        const withdrawn = await shouldTreatAsWithdrawn(exam.id, studentId);
-        if (withdrawn) {
-          examsWithStatus.push({ ...exam, status: 'withdrawn', remainingSeconds: 0 });
-          continue;
-        }
-        examsWithStatus.push({ ...exam, ...state });
       }
+
+      const exams = uniqueExamData.map((item: any) => ({
+        id: item.exam.properties.id,
+        name: item.exam.properties.name,
+        startTime: item.exam.properties.startTime,
+        durationMinutes: Number(item.exam.properties.durationMinutes),
+        subjectId: subject.id,
+        subjectName: subject.name,
+        _submitted: item.submitted
+      }));
+
+      // Parallel: resolve state and withdrawal for all exams at once
+      const examsWithStatus = await Promise.all(exams.map(async (exam: any) => {
+        if (exam._submitted) {
+          return { ...exam, status: 'submitted', remainingSeconds: 0, _submitted: undefined };
+        }
+
+        const [state, withdrawn] = await Promise.all([
+          resolveExamState(exam.id, exam.startTime),
+          shouldTreatAsWithdrawn(exam.id, studentId)
+        ]);
+
+        if (withdrawn) {
+          return { ...exam, status: 'withdrawn', remainingSeconds: 0, _submitted: undefined };
+        }
+
+        const { _submitted, ...rest } = exam;
+        return { ...rest, ...state };
+      }));
 
       delete subject.passwordHash;
       subjects.push({

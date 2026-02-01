@@ -327,25 +327,82 @@ function ActiveExamsPanel() {
 
 // ─── Security Events Panel ─────────────────────────────────────────────────────
 
+interface SecurityExam {
+  id: string;
+  name: string;
+  subjectName: string;
+  startTime: string;
+  eventCount: number;
+}
+
+interface SecurityEventsResponse {
+  events: SecurityEvent[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}
+
 function SecurityEventsPanel() {
+  const [exams, setExams] = useState<SecurityExam[]>([]);
+  const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
   const [events, setEvents] = useState<SecurityEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [totalEvents, setTotalEvents] = useState(0);
+  const PAGE_SIZE = 50;
 
-  const fetchEvents = useCallback(async () => {
+  const fetchExams = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get<SecurityEvent[]>('/admin/security-events');
-      setEvents(res.data);
+      const res = await api.get<SecurityExam[]>('/admin/security-events/exams');
+      setExams(res.data);
     } catch {
-      setEvents([]);
+      setExams([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchEvents(); }, [fetchEvents]);
+  useEffect(() => { fetchExams(); }, [fetchExams]);
 
-  if (loading) return <Spinner />;
+  const fetchEvents = useCallback(async (examId: string, pageNum: number) => {
+    setEventsLoading(true);
+    try {
+      const res = await api.get<SecurityEventsResponse>('/admin/security-events', {
+        params: { examId, page: pageNum, limit: PAGE_SIZE }
+      });
+      setEvents(res.data.events);
+      setHasMore(res.data.hasMore);
+      setTotalEvents(res.data.total);
+    } catch {
+      setEvents([]);
+      setHasMore(false);
+      setTotalEvents(0);
+    } finally {
+      setEventsLoading(false);
+    }
+  }, []);
+
+  const handleSelectExam = (examId: string) => {
+    setSelectedExamId(examId);
+    setPage(1);
+    fetchEvents(examId, 1);
+  };
+
+  const handleBack = () => {
+    setSelectedExamId(null);
+    setEvents([]);
+    setPage(1);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    if (!selectedExamId) return;
+    setPage(newPage);
+    fetchEvents(selectedExamId, newPage);
+  };
 
   const eventColor = (type: string) => {
     switch (type) {
@@ -358,49 +415,142 @@ function SecurityEventsPanel() {
     }
   };
 
+  if (loading) return <Spinner />;
+
+  // Exam detail view
+  if (selectedExamId) {
+    const exam = exams.find(e => e.id === selectedExamId);
+    const summaryMap: Record<string, number> = {};
+    events.forEach(e => { summaryMap[e.eventType] = (summaryMap[e.eventType] || 0) + 1; });
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <button onClick={handleBack} className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-1">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back
+          </button>
+          <h2 className="text-lg font-semibold">{exam?.name || 'Exam'}</h2>
+          <span className="text-sm text-gray-400">{exam?.subjectName}</span>
+        </div>
+
+        {/* Summary cards for this exam */}
+        {events.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {['TAB_SWITCH', 'COPY_PASTE', 'BLUR', 'FOCUS', 'SUSPICIOUS_ACTIVITY'].map((type) => (
+              <div key={type} className="bg-gray-800/80 border border-gray-700/60 rounded-xl p-3 text-center">
+                <p className="text-xl font-bold tabular-nums">{summaryMap[type] || 0}</p>
+                <p className="text-xs text-gray-400 mt-1">{type.replace('_', ' ')}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {eventsLoading ? <Spinner /> : events.length === 0 ? (
+          <div className="bg-gray-800/80 border border-gray-700/60 rounded-xl p-8 text-center">
+            <p className="text-gray-400">No security events for this exam.</p>
+          </div>
+        ) : (
+          <>
+            <div className="text-sm text-gray-400">{totalEvents} event(s) total — page {page}</div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-700 text-left text-gray-400">
+                    <th className="pb-3 pr-4">Timestamp</th><th className="pb-3 pr-4">Event</th>
+                    <th className="pb-3 pr-4">Student ID</th><th className="pb-3">Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {events.map((e, i) => (
+                    <tr key={i} className="border-b border-gray-800 hover:bg-gray-800/50">
+                      <td className="py-3 pr-4 whitespace-nowrap">{new Date(e.timestamp).toLocaleString()}</td>
+                      <td className="py-3 pr-4"><span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${eventColor(e.eventType)}`}>{e.eventType}</span></td>
+                      <td className="py-3 pr-4 font-mono text-xs text-gray-400">{e.studentId.slice(0, 8)}...</td>
+                      <td className="py-3 text-gray-400 text-xs font-mono max-w-xs truncate">{JSON.stringify(e.details)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => handlePageChange(page - 1)}
+                disabled={page <= 1}
+                className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-xs transition-colors"
+              >Previous</button>
+              <span className="text-sm text-gray-400">Page {page}</span>
+              <button
+                onClick={() => handlePageChange(page + 1)}
+                disabled={!hasMore}
+                className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-xs transition-colors"
+              >Next</button>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // Exams list view
+  const examsWithEvents = exams.filter(e => e.eventCount > 0);
+  const examsWithoutEvents = exams.filter(e => e.eventCount === 0);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Security Events</h2>
-        <button onClick={fetchEvents} className="text-sm text-gray-400 hover:text-white transition-colors">Refresh</button>
+        <button onClick={fetchExams} className="text-sm text-gray-400 hover:text-white transition-colors">Refresh</button>
       </div>
-      {events.length === 0 ? (
-        <p className="text-gray-400">No security events recorded.</p>
-      ) : (
-        <>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            {['TAB_SWITCH', 'COPY_PASTE', 'BLUR', 'FOCUS', 'SUSPICIOUS_ACTIVITY'].map((type) => {
-              const count = events.filter(e => e.eventType === type).length;
-              return (
-                <div key={type} className="bg-gray-800/80 border border-gray-700/60 rounded-xl p-3 text-center">
-                  <p className="text-xl font-bold tabular-nums">{count}</p>
-                  <p className="text-xs text-gray-400 mt-1">{type.replace('_', ' ')}</p>
+      <p className="text-sm text-gray-400">Select an exam to view its security events.</p>
+
+      {examsWithEvents.length > 0 && (
+        <div>
+          <h3 className="text-sm font-medium text-gray-400 mb-3">Exams with events</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {examsWithEvents.map((exam) => (
+              <button
+                key={exam.id}
+                onClick={() => handleSelectExam(exam.id)}
+                className="bg-gray-800/80 border border-gray-700/60 rounded-xl p-4 text-left hover:border-red-500/50 hover:bg-gray-800 transition-all"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium text-sm truncate">{exam.name}</span>
+                  <span className="bg-red-900/40 text-red-400 text-xs font-medium px-2 py-0.5 rounded-full tabular-nums">{exam.eventCount}</span>
                 </div>
-              );
-            })}
+                <div className="text-xs text-gray-400">{exam.subjectName}</div>
+                <div className="text-xs text-gray-500 mt-1">{new Date(exam.startTime).toLocaleString()}</div>
+              </button>
+            ))}
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-700 text-left text-gray-400">
-                  <th className="pb-3 pr-4">Timestamp</th><th className="pb-3 pr-4">Event</th>
-                  <th className="pb-3 pr-4">Exam ID</th><th className="pb-3 pr-4">Student ID</th><th className="pb-3">Details</th>
-                </tr>
-              </thead>
-              <tbody>
-                {events.map((e, i) => (
-                  <tr key={i} className="border-b border-gray-800 hover:bg-gray-800/50">
-                    <td className="py-3 pr-4 whitespace-nowrap">{new Date(e.timestamp).toLocaleString()}</td>
-                    <td className="py-3 pr-4"><span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${eventColor(e.eventType)}`}>{e.eventType}</span></td>
-                    <td className="py-3 pr-4 font-mono text-xs text-gray-400">{e.examId.slice(0, 8)}...</td>
-                    <td className="py-3 pr-4 font-mono text-xs text-gray-400">{e.studentId.slice(0, 8)}...</td>
-                    <td className="py-3 text-gray-400 text-xs font-mono max-w-xs truncate">{JSON.stringify(e.details)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        </div>
+      )}
+
+      {examsWithoutEvents.length > 0 && (
+        <div>
+          <h3 className="text-sm font-medium text-gray-400 mb-3">Exams without events ({examsWithoutEvents.length})</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {examsWithoutEvents.map((exam) => (
+              <button
+                key={exam.id}
+                onClick={() => handleSelectExam(exam.id)}
+                className="bg-gray-800/40 border border-gray-700/40 rounded-xl p-4 text-left hover:border-gray-600 transition-all opacity-60 hover:opacity-80"
+              >
+                <div className="font-medium text-sm truncate">{exam.name}</div>
+                <div className="text-xs text-gray-400">{exam.subjectName}</div>
+                <div className="text-xs text-gray-500 mt-1">{new Date(exam.startTime).toLocaleString()}</div>
+              </button>
+            ))}
           </div>
-        </>
+        </div>
+      )}
+
+      {exams.length === 0 && (
+        <div className="bg-gray-800/80 border border-gray-700/60 rounded-xl p-8 text-center">
+          <p className="text-gray-400">No exams found.</p>
+        </div>
       )}
     </div>
   );
@@ -628,7 +778,8 @@ function ExamsPanel() {
         api.get<AdminSubject[]>('/admin/subjects'),
       ]);
       setExams(examsRes.data);
-      setSubjects(subjectsRes.data);
+      const uniqueSubjects = subjectsRes.data.filter((s, i, arr) => arr.findIndex(x => x.id === s.id) === i);
+      setSubjects(uniqueSubjects);
     } catch {
       setExams([]);
     } finally {
@@ -933,7 +1084,9 @@ function SubjectsPanel() {
         api.get<AdminSubject[]>('/admin/subjects'),
         api.get<AdminUser[]>('/admin/users'),
       ]);
-      setSubjects(subjectsRes.data);
+      // Deduplicate subjects by id (safety net)
+      const uniqueSubjects = subjectsRes.data.filter((s, i, arr) => arr.findIndex(x => x.id === s.id) === i);
+      setSubjects(uniqueSubjects);
       setProfessors(usersRes.data.filter((u) => u.role === 'PROFESSOR'));
     } catch {
       setSubjects([]);
