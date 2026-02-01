@@ -16,8 +16,3 @@ export const cassandraClient = new cassandra.Client({
   },
   keyspace: process.env.CASSANDRA_KEYSPACE
 });
-
-// Initialize tables
-export async function initCassandraTables(): Promise<void> {
-  console.log('Skipping Cassandra table creation (managed manually).');
-}

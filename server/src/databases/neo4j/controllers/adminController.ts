@@ -242,7 +242,8 @@ export const adminGetSubjects = async (_req: Request, res: Response) => {
       MATCH (s:Subject)
       OPTIONAL MATCH (p:User)-[:PREDAJE]->(s)
       OPTIONAL MATCH (s)-[:SADRZI]->(e:Exam)
-      RETURN s, p.email AS professorEmail, count(e) AS examCount
+      WITH s, collect(DISTINCT p.email) AS professorEmails, count(DISTINCT e) AS examCount
+      RETURN s, professorEmails, examCount
       ORDER BY s.name
     `);
 
@@ -250,11 +251,12 @@ export const adminGetSubjects = async (_req: Request, res: Response) => {
       const s = r.get('s').properties;
       const examCountRaw = r.get('examCount');
       const examCount = typeof examCountRaw?.toNumber === 'function' ? examCountRaw.toNumber() : Number(examCountRaw || 0);
+      const professorEmails: string[] = (r.get('professorEmails') || []).filter((e: any) => e != null);
       return {
         id: s.id,
         name: s.name,
         description: s.description,
-        professorEmail: r.get('professorEmail') || null,
+        professorEmail: professorEmails.length > 0 ? professorEmails.join(', ') : null,
         examCount
       };
     });
@@ -427,18 +429,24 @@ export const getStatistics = async (_req: Request, res: Response) => {
 // ─── Security Events ────────────────────────────────────────────────────────────
 
 export const getSecurityEventsAdmin = async (req: Request, res: Response) => {
-  const { examId } = req.query;
+  const { examId, page: pageStr, limit: limitStr } = req.query;
+  const page = Math.max(1, parseInt(String(pageStr || '1'), 10) || 1);
+  const limit = Math.min(200, Math.max(1, parseInt(String(limitStr || '50'), 10) || 50));
 
   try {
     if (examId) {
-      // Specific exam
+      // Specific exam — paginated
       const result = await cassandraClient.execute(
-        `SELECT exam_id, student_id, event_type, timestamp, details FROM security_events WHERE exam_id = ? LIMIT 200`,
-        [types.Uuid.fromString(String(examId))],
+        `SELECT exam_id, student_id, event_type, timestamp, details FROM security_events WHERE exam_id = ? LIMIT ?`,
+        [types.Uuid.fromString(String(examId)), page * limit],
         { prepare: true }
       );
 
-      const events = result.rows.map(row => ({
+      const allRows = result.rows;
+      const start = (page - 1) * limit;
+      const pageRows = allRows.slice(start, start + limit);
+
+      const events = pageRows.map(row => ({
         examId: row.exam_id.toString(),
         studentId: row.student_id.toString(),
         eventType: row.event_type,
@@ -446,7 +454,13 @@ export const getSecurityEventsAdmin = async (req: Request, res: Response) => {
         details: JSON.parse(row.details || '{}')
       }));
 
-      return res.json(events);
+      return res.json({
+        events,
+        total: allRows.length,
+        page,
+        limit,
+        hasMore: allRows.length >= page * limit
+      });
     }
 
     // No examId — get events from all known exams (latest 10 exams)
@@ -481,10 +495,58 @@ export const getSecurityEventsAdmin = async (req: Request, res: Response) => {
     }
 
     allEvents.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    res.json(allEvents.slice(0, 200));
+    const total = allEvents.length;
+    const start = (page - 1) * limit;
+    const pageEvents = allEvents.slice(start, start + limit);
+    res.json({ events: pageEvents, total, page, limit, hasMore: total > start + limit });
   } catch (error) {
     console.error('[Admin] Error fetching security events:', error);
     res.status(500).json({ error: 'Error fetching security events' });
+  }
+};
+
+export const getSecurityExamsList = async (_req: Request, res: Response) => {
+  const session = neo4jDriver.session();
+  try {
+    const result = await session.run(`
+      MATCH (s:Subject)-[:SADRZI]->(e:Exam)
+      RETURN e.id AS id, e.name AS name, e.startTime AS startTime, s.name AS subjectName
+      ORDER BY e.startTime DESC
+    `);
+
+    const exams: any[] = [];
+    for (const rec of result.records) {
+      const eid = rec.get('id');
+      if (!eid) continue;
+
+      let eventCount = 0;
+      try {
+        const countResult = await cassandraClient.execute(
+          `SELECT COUNT(*) AS cnt FROM security_events WHERE exam_id = ?`,
+          [types.Uuid.fromString(eid)],
+          { prepare: true }
+        );
+        const cnt = countResult.rows[0]?.cnt;
+        eventCount = typeof cnt?.toNumber === 'function' ? cnt.toNumber() : Number(cnt || 0);
+      } catch {
+        // No events for this exam
+      }
+
+      exams.push({
+        id: eid,
+        name: rec.get('name'),
+        subjectName: rec.get('subjectName'),
+        startTime: rec.get('startTime'),
+        eventCount
+      });
+    }
+
+    res.json(exams);
+  } catch (error) {
+    console.error('[Admin] Error fetching security exams list:', error);
+    res.status(500).json({ error: 'Error fetching exams list' });
+  } finally {
+    await session.close();
   }
 };
 

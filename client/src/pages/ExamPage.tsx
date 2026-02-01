@@ -606,35 +606,34 @@ export default function ExamPage() {
   }, [examStatus, timeLeft, isReviewMode]);
 
   useEffect(() => {
-    if (isReviewMode) return;
+    if (isReviewMode || !examId) return;
+
+    const logEvent = (eventType: 'TAB_SWITCH' | 'BLUR' | 'COPY_PASTE', details: Record<string, unknown>) => {
+      logsService.logSecurityEvent(examId, eventType, details).catch((err) => {
+        console.error(`Failed to log security event (${eventType}):`, err?.response?.data || err.message);
+      });
+    };
+
     const handleVisibilityChange = () => {
-      if (document.hidden && examId) {
+      if (document.hidden) {
         setViolations((prev) => prev + 1);
-        logsService.logSecurityEvent(examId, 'TAB_SWITCH', {
-          timestamp: new Date().toISOString(),
-          violations: violations + 1,
-        });
+        logEvent('TAB_SWITCH', { timestamp: new Date().toISOString() });
         socket.emit('violation', { examId, type: 'tab_switch' });
       }
     };
 
     const handleBlur = () => {
-      if (examId) {
+      if (!document.hidden) {
         setViolations((prev) => prev + 1);
-        logsService.logSecurityEvent(examId, 'BLUR', {
-          timestamp: new Date().toISOString(),
-        });
+        logEvent('BLUR', { timestamp: new Date().toISOString() });
         socket.emit('violation', { examId, type: 'tab_blur' });
       }
     };
 
     const handleCopyPaste = (e: ClipboardEvent) => {
-      if (examId && e.type === 'paste') {
+      if (e.type === 'paste') {
         setViolations((prev) => prev + 1);
-        logsService.logSecurityEvent(examId, 'COPY_PASTE', {
-          timestamp: new Date().toISOString(),
-          type: e.type,
-        });
+        logEvent('COPY_PASTE', { timestamp: new Date().toISOString(), type: e.type });
         socket.emit('violation', { examId, type: 'copy_paste' });
       }
     };
@@ -648,7 +647,7 @@ export default function ExamPage() {
       window.removeEventListener('blur', handleBlur);
       document.removeEventListener('paste', handleCopyPaste);
     };
-  }, [examId, violations, isReviewMode]);
+  }, [examId, isReviewMode]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
