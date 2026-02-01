@@ -180,6 +180,6 @@ export const logsSchemas = {
   securityEvent: z.object({
     examId: z.string().uuid(),
     eventType: z.string().trim().min(1).max(100),
-    details: z.record(z.any()).optional().nullable()
+    details: z.any().optional()
   })
 };

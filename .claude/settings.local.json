@@ -5,7 +5,11 @@
       "Bash(pwd:*)",
       "Bash(tree:*)",
       "Bash(wc:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx:*)",
+      "Bash(./node_modules/.bin/tsc:*)",
+      "Bash(node_modules/.bin/tsc:*)"
     ]
   }
 }
