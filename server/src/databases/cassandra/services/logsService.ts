@@ -185,10 +185,7 @@ export async function logUserActivity(
   );
 }
 
-/**
- * Log an admin action into user_activity using a deterministic UUID
- * (the admin has a non-UUID id so we use a fixed UUID for partitioning).
- */
+// Admin nema pravi UUID, pa koristimo fiksni za Cassandra particioniranje
 const ADMIN_ACTIVITY_UUID = '00000000-0000-0000-0000-000000000000';
 
 export async function logAdminActivity(
@@ -216,7 +213,6 @@ export async function logAdminActivity(
   }
 }
 
-// Exam Comments
 export interface ExamComment {
   examId: string;
   studentId: string;
@@ -347,8 +343,6 @@ export async function updateExamComment(
     { prepare: true }
   );
 }
-
-// ========== EXAM CHAT MESSAGES ==========
 
 export interface ChatMessage {
   examId: string;

@@ -352,7 +352,7 @@ export default function ExamPage() {
     return () => window.removeEventListener('resize', handleWindowResize);
   }, []);
 
-  const startDrag = (mode: 'vertical' | 'horizontal', _startX: number, startY: number) => {
+  const startDrag = (mode: 'vertical' | 'horizontal', _startX: number, startY: number): void => {
     const snapOutputHeight = outputHeight;
 
     document.body.style.userSelect = 'none';
@@ -1165,7 +1165,6 @@ Code saved.` : 'Code saved.'));
         </div>
       </div>
 
-      {/* Chat Panel - only show during active exam and not in review mode */}
       {examId && !isReviewMode && (examStatus === 'active' || examStatus === 'waiting_start') && (
         <ExamChatPanel examId={examId} isProfessor={false} />
       )}

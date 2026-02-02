@@ -170,8 +170,6 @@ export const initSocket = (io: Server) => {
   io.on('connection', async (socket: Socket) => {
     const user = socket.user!;
     const role = (user.role || '').toLowerCase();
-    console.log(`Connected: ${user.email} (${user.role})`);
-
     await redisClient.set(`user:status:${user.id}`, 'online', { EX: 60 });
 
     if (role === 'professor' || role === 'admin') {
@@ -181,8 +179,6 @@ export const initSocket = (io: Server) => {
     socket.on('join_exam', async (examId: string) => {
       try {
         socket.join(examId);
-        console.log(`${user.email} joined ${examId}`);
-
         const state = await getExamState(examId);
         socket.emit('exam_state', state);
         if (state.status === 'active') {
@@ -228,8 +224,6 @@ export const initSocket = (io: Server) => {
     });
 
     socket.on('violation', async (data: { examId: string; type: string }) => {
-      console.log(`Violation: ${user.email} -> ${data.type}`);
-
       const violationKey = `user:violations:${data.examId}:${user.id}`;
       const count = await redisClient.incr(violationKey);
 
@@ -401,8 +395,6 @@ export const initSocket = (io: Server) => {
       }
     });
 
-    // ========== CHAT EVENTS ==========
-
     socket.on('chat_message', async (data: { examId: string; message: string }) => {
       try {
         const { examId, message } = data;
@@ -426,11 +418,9 @@ export const initSocket = (io: Server) => {
           approvedAt: null
         };
 
-        // Emit to the student who sent + professors
         socket.emit('chat_update', chatMessage);
         io.to('professors_room').emit('chat_update', chatMessage);
 
-        console.log(`Chat message from ${user.email} in exam ${examId}`);
       } catch (error) {
         console.error('chat_message failed:', error);
       }
@@ -445,24 +435,20 @@ export const initSocket = (io: Server) => {
         const replyAuthorName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
         await replyChatMessage(examId, messageId, replyMessage, user.id, replyAuthorName);
 
-        // Fetch the updated message
         const messages = await getChatMessages(examId);
         const updatedMessage = messages.find(m => m.messageId === messageId);
 
         if (updatedMessage) {
-          // Emit to everyone in the exam room
           io.to(examId).emit('chat_update', updatedMessage);
           io.to('professors_room').emit('chat_update', updatedMessage);
         }
 
-        console.log(`Chat reply from ${user.email} in exam ${examId}`);
       } catch (error) {
         console.error('chat_reply failed:', error);
       }
     });
 
     socket.on('disconnect', async () => {
-      console.log(`Disconnected: ${user.email}`);
       await redisClient.del(`user:status:${user.id}`);
 
       for (const room of socket.rooms) {

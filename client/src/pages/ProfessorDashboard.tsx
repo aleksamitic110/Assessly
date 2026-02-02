@@ -22,7 +22,6 @@ interface SubjectWithExams extends Subject {
   exams: ProfessorExam[];
 }
 
-// Socket alert type
 interface Alert {
   studentId: string;
   email: string;
@@ -49,11 +48,9 @@ export default function ProfessorDashboard() {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
   };
 
-  // State for creating subject
   const [showSubjectForm, setShowSubjectForm] = useState(false);
   const [subjectData, setSubjectData] = useState({ name: '', description: '', password: '' });
 
-  // State for creating exam
   const [showExamForm, setShowExamForm] = useState(false);
   const [examData, setExamData] = useState({
     name: '',
@@ -62,17 +59,14 @@ export default function ProfessorDashboard() {
     subjectId: '',
   });
 
-  // State for subjects list
   const [subjects, setSubjects] = useState<SubjectWithExams[]>([]);
   const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null);
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
   const [addProfessorEmail, setAddProfessorEmail] = useState<Record<string, string>>({});
 
-  // Messages
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  //SOCKET STATES
   const [liveAlerts, setLiveAlerts] = useState<Alert[]>([]);
   const [monitoredExams, setMonitoredExams] = useState<Set<string>>(new Set());
   const [chatExamId, setChatExamId] = useState<string | null>(null);
@@ -146,24 +140,15 @@ export default function ProfessorDashboard() {
     setExpandedSubjectId((prev) => (prev === subjectId ? null : subjectId));
   };
 
-  // Socket: professor live updates
   useEffect(() => {
-    // Connect
     connectSocket();
 
-    // Listen for violations
     socket.on('violation_alert', (data: Alert) => {
-      console.log(' NEW ALERT:', data);
       setLiveAlerts((prev) => [data, ...prev]);
-
-      // Optional alert sound
       new Audio('/alert.mp3').play().catch(() => {});
     });
 
-    // Student status updates
-    socket.on('student_status_update', (data) => {
-      console.log(`Status: ${data.email} -> ${data.status}`);
-    });
+    socket.on('student_status_update', () => {});
 
     socket.on('exam_state', (data: { examId: string; status: ExamType['status'] }) => {
       if (!data?.examId) return;
@@ -188,7 +173,6 @@ export default function ProfessorDashboard() {
     };
   }, []);
 
-  // Socket: start exam handler
   const handleStartExam = (exam: ExamType) => {
     const taskCount = (exam as ProfessorExam).taskCount || 0;
     if (!taskCount) {
@@ -564,7 +548,6 @@ export default function ProfessorDashboard() {
     }
   };
 
-  //SOCKET: Funkcija za pracenje (Join Room)
   const handleMonitorExam = (examId: string) => {
     socket.emit('join_exam', examId);
     setMonitoredExams((prev) => {
@@ -614,7 +597,6 @@ export default function ProfessorDashboard() {
     };
   }, []);
 
-  // Create Subject
   const handleCreateSubject = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -632,7 +614,6 @@ export default function ProfessorDashboard() {
     }
   };
 
-  // Create Exam
   const handleCreateExam = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -665,7 +646,6 @@ export default function ProfessorDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
       <header className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-sm border-b border-gray-200/60 dark:border-gray-700/60 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div>
@@ -696,9 +676,7 @@ export default function ProfessorDashboard() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Messages */}
         {message && (
           <div className="mb-6 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
             <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -716,9 +694,7 @@ export default function ProfessorDashboard() {
           </div>
         )}
 
-        {/* Action Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Create Subject Card */}
           <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-none p-6 border border-gray-200/60 dark:border-gray-700/60 hover:shadow-xl transition-shadow">
             <div className="flex items-center mb-4">
               <div className="p-3 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl">
@@ -740,7 +716,6 @@ export default function ProfessorDashboard() {
               {showSubjectForm ? 'Close' : 'Create subject'}
             </button>
 
-            {/* Subject Form */}
             {showSubjectForm && (
               <form onSubmit={handleCreateSubject} className="mt-4 space-y-4">
                 <div>
@@ -782,7 +757,6 @@ export default function ProfessorDashboard() {
             )}
           </div>
 
-          {/* Create Exam Card */}
           <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-none p-6 border border-gray-200/60 dark:border-gray-700/60 hover:shadow-xl transition-shadow">
             <div className="flex items-center mb-4">
               <div className="p-3 bg-green-100 dark:bg-green-900/40 rounded-xl">
@@ -804,7 +778,6 @@ export default function ProfessorDashboard() {
               {showExamForm ? 'Close' : 'Create exam'}
             </button>
 
-            {/* Exam Form */}
             {showExamForm && (
               <form onSubmit={handleCreateExam} className="mt-4 space-y-4">
                 <div>
@@ -872,7 +845,6 @@ export default function ProfessorDashboard() {
             )}
           </div>
 
-          {/*SOCKET: Live Monitoring Card*/}
           <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-none p-6 border border-gray-200/60 dark:border-gray-700/60 flex flex-col h-96">
             <div className="flex items-center mb-4">
               <div className="p-3 bg-red-100 dark:bg-red-900/40 rounded-xl animate-pulse">
@@ -929,7 +901,6 @@ export default function ProfessorDashboard() {
           </div>
         </div>
 
-        {/* Created Subjects List */}
         {isLoadingSubjects && (
           <div className="mt-8 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-none p-6 text-center text-gray-500 dark:text-gray-400 border border-gray-200/60 dark:border-gray-700/60">
             <div className="flex items-center justify-center gap-2">
@@ -1156,7 +1127,6 @@ export default function ProfessorDashboard() {
                                         </span>
                                       </div>
                                       
-                                      {/*SOCKET: Actions Buttons */}
                                       <div className="flex flex-wrap gap-2 justify-end">
                                         <button
                                           onClick={() =>
@@ -1501,7 +1471,6 @@ export default function ProfessorDashboard() {
         )}
       </main>
 
-      {/* Chat Panel for active exam */}
       {chatExamId && (
         <ExamChatPanel examId={chatExamId} isProfessor={true} />
       )}
