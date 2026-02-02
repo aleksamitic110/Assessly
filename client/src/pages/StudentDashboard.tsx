@@ -71,7 +71,6 @@ export default function StudentDashboard() {
         }))
       }));
 
-      // Fetch grades for submitted exams
       const submittedExams = mapped.flatMap(s => s.exams).filter(e => e.status === 'submitted');
       const gradePromises = submittedExams.map(async (exam) => {
         try {
@@ -84,7 +83,6 @@ export default function StudentDashboard() {
       const grades = await Promise.all(gradePromises);
       const gradeMap = new Map(grades.map(g => [g.examId, g.grade]));
 
-      // Update exams with grades
       const mappedWithGrades = mapped.map(subject => ({
         ...subject,
         exams: subject.exams.map(exam => ({

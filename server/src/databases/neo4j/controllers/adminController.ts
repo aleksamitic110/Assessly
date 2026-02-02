@@ -17,8 +17,8 @@ import { logAdminActivity } from '../../cassandra/services/logsService.js';
 
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS || 10);
 
-const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
+const JWT_SECRET = process.env.JWT_SECRET!;
+const JWT_EXPIRES_IN: string = process.env.JWT_EXPIRES_IN || '1h';
 
 // TODO: Move to env variables for production
 const ADMIN_EMAIL = 'admin';
@@ -41,7 +41,7 @@ export const adminLogin = async (req: Request, res: Response) => {
   const token = jwt.sign(
     { id: ADMIN_ID, email: ADMIN_EMAIL, role: 'ADMIN' },
     JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN }
+    { expiresIn: JWT_EXPIRES_IN } as jwt.SignOptions
   );
 
   const user = {
@@ -289,14 +289,14 @@ export const adminDeleteExam = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Exam not found' });
     }
 
-    await redisClient.del(
+    await redisClient.del([
       `exam:${examId}:status`,
       `exam:${examId}:start_time`,
       `exam:${examId}:end_time`,
       `exam:${examId}:remaining_ms`,
       `exam:${examId}:duration_seconds`,
       `exam:${examId}:session_id`
-    );
+    ]);
 
     await logAdminActivity('ADMIN_EXAM_DELETE', { examId });
     res.json({ message: 'Exam deleted by admin' });
@@ -329,14 +329,14 @@ export const adminDeleteSubject = async (req: Request, res: Response) => {
     if (examIds.length > 0) {
       await Promise.all(
         examIds.map((eid) =>
-          redisClient.del(
+          redisClient.del([
             `exam:${eid}:status`,
             `exam:${eid}:start_time`,
             `exam:${eid}:end_time`,
             `exam:${eid}:remaining_ms`,
             `exam:${eid}:duration_seconds`,
             `exam:${eid}:session_id`
-          )
+          ])
         )
       );
     }
@@ -364,14 +364,14 @@ export const adminResetExamState = async (req: Request, res: Response) => {
   const { examId } = req.params;
 
   try {
-    await redisClient.del(
+    await redisClient.del([
       `exam:${examId}:status`,
       `exam:${examId}:start_time`,
       `exam:${examId}:end_time`,
       `exam:${examId}:remaining_ms`,
       `exam:${examId}:duration_seconds`,
       `exam:${examId}:session_id`
-    );
+    ]);
 
     await logAdminActivity('ADMIN_EXAM_RESET_STATE', { examId });
     res.json({ message: 'Exam Redis state reset' });

@@ -8,10 +8,12 @@ const useTls = redisUrl.startsWith('rediss://') || String(process.env.REDIS_TLS 
 
 export const redisClient = createClient({
   url: redisUrl,
-  socket: {
-    tls: useTls,
-    rejectUnauthorized: String(process.env.REDIS_TLS_REJECT_UNAUTHORIZED || '').toLowerCase() !== 'false'
-  }
+  ...(useTls && {
+    socket: {
+      tls: true as const,
+      rejectUnauthorized: String(process.env.REDIS_TLS_REJECT_UNAUTHORIZED || '').toLowerCase() !== 'false'
+    }
+  })
 });
 
 redisClient.on('error', (err) => console.error('Redis client error:', err));

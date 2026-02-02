@@ -31,7 +31,7 @@ export const recordLoginFailure = async (email: string) => {
 
 export const clearLoginFailures = async (email: string) => {
   if (!redisClient.isOpen) return;
-  await redisClient.del(lockKey(email), failKey(email));
+  await redisClient.del([lockKey(email), failKey(email)]);
 };
 
 export const hashToken = (token: string) =>

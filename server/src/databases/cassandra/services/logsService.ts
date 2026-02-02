@@ -132,35 +132,51 @@ export async function getSecurityEventsForStudent(
   const query = `
     SELECT exam_id, student_id, event_type, details
     FROM security_events
-    WHERE exam_id = ?
+    WHERE exam_id = ? AND student_id = ?
   `;
 
   const result = await cassandraClient.execute(
     query,
-    [types.Uuid.fromString(examId)],
+    [
+      types.Uuid.fromString(examId),
+      types.Uuid.fromString(studentId)
+    ],
     { prepare: true }
   );
 
-  return result.rows
-    .filter(row => row.student_id.toString() === studentId)
-    .map(row => {
-      const details = JSON.parse(row.details || '{}');
-      return {
-        examId: row.exam_id.toString(),
-        studentId: row.student_id.toString(),
-        eventType: row.event_type as SecurityEventType,
-        timestamp: typeof details.timestamp === 'string' ? details.timestamp : new Date().toISOString(),
-        details
-      };
-    });
+  return result.rows.map(row => {
+    const details = JSON.parse(row.details || '{}');
+    return {
+      examId: row.exam_id.toString(),
+      studentId: row.student_id.toString(),
+      eventType: row.event_type as SecurityEventType,
+      timestamp: typeof details.timestamp === 'string' ? details.timestamp : new Date().toISOString(),
+      details
+    };
+  });
 }
 
 export async function countSecurityEvents(
   examId: string,
   studentId: string
 ): Promise<number> {
-  const events = await getSecurityEventsForStudent(examId, studentId);
-  return events.length;
+  const query = `
+    SELECT COUNT(*) AS cnt
+    FROM security_events
+    WHERE exam_id = ? AND student_id = ?
+  `;
+
+  const result = await cassandraClient.execute(
+    query,
+    [
+      types.Uuid.fromString(examId),
+      types.Uuid.fromString(studentId)
+    ],
+    { prepare: true }
+  );
+
+  const cnt = result.rows[0]?.cnt;
+  return typeof cnt?.toNumber === 'function' ? cnt.toNumber() : Number(cnt || 0);
 }
 
 export async function logUserActivity(
@@ -185,10 +201,7 @@ export async function logUserActivity(
   );
 }
 
-/**
- * Log an admin action into user_activity using a deterministic UUID
- * (the admin has a non-UUID id so we use a fixed UUID for partitioning).
- */
+// Admin nema pravi UUID, pa koristimo fiksni za Cassandra particioniranje
 const ADMIN_ACTIVITY_UUID = '00000000-0000-0000-0000-000000000000';
 
 export async function logAdminActivity(
@@ -216,7 +229,6 @@ export async function logAdminActivity(
   }
 }
 
-// Exam Comments
 export interface ExamComment {
   examId: string;
   studentId: string;
@@ -347,8 +359,6 @@ export async function updateExamComment(
     { prepare: true }
   );
 }
-
-// ========== EXAM CHAT MESSAGES ==========
 
 export interface ChatMessage {
   examId: string;

@@ -4,7 +4,7 @@ import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 
 const uploadsRoot = path.join(process.cwd(), 'uploads');
-const tasksDir = path.join(uploadsRoot, 'tasks');
+export const tasksDir = path.join(uploadsRoot, 'tasks');
 
 if (!fs.existsSync(tasksDir)) {
   fs.mkdirSync(tasksDir, { recursive: true });

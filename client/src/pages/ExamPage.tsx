@@ -21,6 +21,10 @@ type LanguageOption = {
   name: string;
 };
 
+const LOCAL_CPP_LANGUAGE: LanguageOption = { id: 0, name: 'C++ (local)' };
+const MAX_SECURITY_VIOLATIONS = 5;
+const VIOLATION_DEDUP_MS = 1200;
+
 const getMonacoLanguage = (languageName?: string | null) => {
   if (!languageName) return 'cpp';
   const name = languageName.toLowerCase();
@@ -226,6 +230,7 @@ export default function ExamPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [violations, setViolations] = useState(0);
+  const [lockdownWarning, setLockdownWarning] = useState('');
   const [examStatus, setExamStatus] = useState<'wait_room' | 'waiting_start' | 'active' | 'paused' | 'completed' | 'withdrawn' | 'submitted'>('wait_room');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showTaskList, setShowTaskList] = useState(true);
@@ -235,7 +240,9 @@ export default function ExamPage() {
   const [showOutput, setShowOutput] = useState(true);
   const [leftWidth, setLeftWidth] = useState(33);
   const [outputHeight, setOutputHeight] = useState(220);
+  const [pdfHeight, setPdfHeight] = useState(352);
   const [languages, setLanguages] = useState<LanguageOption[]>([]);
+  const [isJudge0Enabled, setIsJudge0Enabled] = useState(false);
   const [defaultLanguageId, setDefaultLanguageId] = useState<number | null>(null);
   const [languageByTaskId, setLanguageByTaskId] = useState<Record<string, number>>({});
   const [autoTemplateByTaskId, setAutoTemplateByTaskId] = useState<Record<string, string>>({});
@@ -245,6 +252,7 @@ export default function ExamPage() {
   const contentRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const autoSubmittedRef = useRef(false);
+  const lastViolationAtRef = useRef(0);
 
   useEffect(() => {
     autoSubmittedRef.current = false;
@@ -255,13 +263,19 @@ export default function ExamPage() {
     const loadLanguages = async () => {
       if (isReviewMode) return;
       try {
-        const response = await api.get<{ languages: LanguageOption[]; defaultLanguageId: number | null }>('/judge0/languages');
+        const response = await api.get<{ languages: LanguageOption[]; defaultLanguageId: number | null; useJudge0?: boolean }>('/judge0/languages');
         if (!isMounted) return;
-        setLanguages(response.data.languages || []);
-        setDefaultLanguageId(response.data.defaultLanguageId ?? null);
+        const loadedLanguages = response.data.languages?.length ? response.data.languages : [LOCAL_CPP_LANGUAGE];
+        const loadedDefaultLanguageId = response.data.defaultLanguageId ?? loadedLanguages[0]?.id ?? null;
+        setLanguages(loadedLanguages);
+        setDefaultLanguageId(loadedDefaultLanguageId);
+        setIsJudge0Enabled(Boolean(response.data.useJudge0));
         setLanguageError('');
       } catch (err: any) {
         if (!isMounted) return;
+        setLanguages([LOCAL_CPP_LANGUAGE]);
+        setDefaultLanguageId(LOCAL_CPP_LANGUAGE.id);
+        setIsJudge0Enabled(false);
         setLanguageError(err.response?.data?.error || 'Failed to load languages.');
       }
     };
@@ -273,11 +287,11 @@ export default function ExamPage() {
   }, [isReviewMode]);
 
   useEffect(() => {
-    if (!defaultLanguageId || tasks.length === 0) return;
+    if (defaultLanguageId == null || tasks.length === 0) return;
     setLanguageByTaskId((prev) => {
       const next = { ...prev };
       tasks.forEach((task) => {
-        if (!next[task.id]) {
+        if (next[task.id] === undefined) {
           next[task.id] = defaultLanguageId;
         }
       });
@@ -286,7 +300,7 @@ export default function ExamPage() {
   }, [tasks, defaultLanguageId]);
 
   useEffect(() => {
-    if (!defaultLanguageId || tasks.length === 0 || languages.length === 0) return;
+    if (defaultLanguageId == null || tasks.length === 0 || languages.length === 0) return;
     const defaultLanguageName = languages.find((lang) => lang.id === defaultLanguageId)?.name || null;
     const template = getCommentedHello(defaultLanguageName);
     if (!template) return;
@@ -332,6 +346,12 @@ export default function ExamPage() {
   }, [examStatus, examId, isReviewMode, navigate]);
 
   useEffect(() => {
+    if (examStatus !== 'active') {
+      setLockdownWarning('');
+    }
+  }, [examStatus]);
+
+  useEffect(() => {
     if (isReviewMode) return;
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
@@ -352,7 +372,7 @@ export default function ExamPage() {
     return () => window.removeEventListener('resize', handleWindowResize);
   }, []);
 
-  const startDrag = (mode: 'vertical' | 'horizontal', _startX: number, startY: number) => {
+  const startDrag = (mode: 'vertical' | 'horizontal', _startX: number, startY: number): void => {
     const snapOutputHeight = outputHeight;
 
     document.body.style.userSelect = 'none';
@@ -389,6 +409,11 @@ export default function ExamPage() {
     } catch {
       // Ignore if browser blocks non-user-initiated fullscreen
     }
+  };
+
+  const forceReturnToExam = async () => {
+    window.focus();
+    await requestFullscreen();
   };
 
   useEffect(() => {
@@ -606,6 +631,13 @@ export default function ExamPage() {
   }, [examStatus, timeLeft, isReviewMode]);
 
   useEffect(() => {
+    if (isReviewMode) return;
+    if (examStatus === 'active' && violations >= MAX_SECURITY_VIOLATIONS) {
+      void submitExam({ silent: true, reason: 'security_violations_limit', redirect: 'review' });
+    }
+  }, [examStatus, violations, isReviewMode]);
+
+  useEffect(() => {
     if (isReviewMode || !examId) return;
 
     const logEvent = (eventType: 'TAB_SWITCH' | 'BLUR' | 'COPY_PASTE', details: Record<string, unknown>) => {
@@ -614,40 +646,98 @@ export default function ExamPage() {
       });
     };
 
+    const registerViolation = (
+      eventType: 'TAB_SWITCH' | 'BLUR' | 'COPY_PASTE',
+      socketType: 'tab_switch' | 'tab_blur' | 'copy_paste',
+      details: Record<string, unknown>
+    ) => {
+      if (examStatus !== 'active') return;
+      const now = Date.now();
+      if (now - lastViolationAtRef.current < VIOLATION_DEDUP_MS) return;
+      lastViolationAtRef.current = now;
+      setViolations((prev) => prev + 1);
+      logEvent(eventType, details);
+      socket.emit('violation', { examId, type: socketType });
+    };
+
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        setViolations((prev) => prev + 1);
-        logEvent('TAB_SWITCH', { timestamp: new Date().toISOString() });
-        socket.emit('violation', { examId, type: 'tab_switch' });
+        setLockdownWarning('Tab switch detected. Return to full-screen exam mode.');
+        registerViolation('TAB_SWITCH', 'tab_switch', { timestamp: new Date().toISOString() });
       }
     };
 
     const handleBlur = () => {
-      if (!document.hidden) {
-        setViolations((prev) => prev + 1);
-        logEvent('BLUR', { timestamp: new Date().toISOString() });
-        socket.emit('violation', { examId, type: 'tab_blur' });
+      if (!document.hidden && examStatus === 'active') {
+        setLockdownWarning('Focus lost. Return to full-screen exam mode.');
+        registerViolation('BLUR', 'tab_blur', { timestamp: new Date().toISOString() });
       }
     };
 
     const handleCopyPaste = (e: ClipboardEvent) => {
       if (e.type === 'paste') {
-        setViolations((prev) => prev + 1);
-        logEvent('COPY_PASTE', { timestamp: new Date().toISOString(), type: e.type });
-        socket.emit('violation', { examId, type: 'copy_paste' });
+        registerViolation('COPY_PASTE', 'copy_paste', { timestamp: new Date().toISOString(), type: e.type });
+      }
+    };
+
+    const handleFullscreenChange = () => {
+      if (examStatus !== 'active') return;
+      if (!document.fullscreenElement) {
+        setLockdownWarning('Fullscreen exit detected. Returning to full-screen mode...');
+        registerViolation('TAB_SWITCH', 'tab_switch', { timestamp: new Date().toISOString(), type: 'fullscreen_exit' });
+        void forceReturnToExam();
+      } else {
+        setLockdownWarning('');
+      }
+    };
+
+    const handleKeydown = (e: KeyboardEvent) => {
+      if (examStatus !== 'active') return;
+      if (e.key === 'F11' || e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setLockdownWarning(`${e.key} is blocked during active exam.`);
+        registerViolation('TAB_SWITCH', 'tab_switch', {
+          timestamp: new Date().toISOString(),
+          type: `blocked_${e.key.toLowerCase()}`
+        });
+        void forceReturnToExam();
+      }
+    };
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (examStatus !== 'active') return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+
+    const handleFocus = () => {
+      if (examStatus !== 'active') return;
+      if (!document.fullscreenElement) {
+        void forceReturnToExam();
+      } else {
+        setLockdownWarning('');
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handleBlur);
     document.addEventListener('paste', handleCopyPaste);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('keydown', handleKeydown, true);
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleBlur);
       document.removeEventListener('paste', handleCopyPaste);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('keydown', handleKeydown, true);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [examId, isReviewMode]);
+  }, [examId, isReviewMode, examStatus]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -658,11 +748,11 @@ export default function ExamPage() {
   const handleRunCode = async () => {
     if (!currentTask || !examId || examStatus !== 'active' || isReviewMode) return;
     setIsRunning(true);
-    setOutput('Compiling and running...\n');
+    setOutput(isJudge0Enabled ? 'Compiling and running...\n' : 'Compiling and running C++ locally...\n');
     const currentCode = codeByTaskId[currentTask.id] ?? code;
     const selectedLanguageId = languageByTaskId[currentTask.id] ?? defaultLanguageId;
 
-    if (!selectedLanguageId) {
+    if (isJudge0Enabled && !selectedLanguageId) {
       setOutput('Please select a language before running the code.');
       setIsRunning(false);
       return;
@@ -686,7 +776,7 @@ export default function ExamPage() {
         taskId: currentTask.id,
         sourceCode: currentCode,
         input: currentTask.exampleInput || '',
-        languageId: selectedLanguageId
+        languageId: isJudge0Enabled ? selectedLanguageId : undefined
       });
 
       const result = response.data as { ok?: boolean; output?: string };
@@ -722,7 +812,7 @@ export default function ExamPage() {
     setCurrentTask(task);
     setCode(codeByTaskId[task.id] || task.starterCode || '');
     setOutput(outputByTaskId[task.id] || '');
-    if (!languageByTaskId[task.id] && defaultLanguageId) {
+    if (languageByTaskId[task.id] === undefined && defaultLanguageId != null) {
       setLanguageByTaskId((prev) => ({ ...prev, [task.id]: defaultLanguageId }));
     }
   };
@@ -872,6 +962,12 @@ Code saved.` : 'Code saved.'));
         </div>
       </header>
 
+      {!isReviewMode && examStatus === 'active' && lockdownWarning && (
+        <div className="px-4 py-2 bg-red-900/40 border-b border-red-700/50 text-red-200 text-sm">
+          {lockdownWarning} ({violations}/{MAX_SECURITY_VIOLATIONS})
+        </div>
+      )}
+
       {!isReviewMode && (
         <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-gray-800/95 backdrop-blur-sm border-t border-gray-700/80 px-4 py-3 flex gap-2">
           <button
@@ -989,7 +1085,11 @@ Code saved.` : 'Code saved.'));
                     {showPdf && currentTask.pdfUrl && (
                       <div
                         className="mt-4 border border-gray-700/80 rounded-lg overflow-hidden bg-gray-900/80"
-                        style={{ resize: 'vertical', overflow: 'auto', minHeight: '12rem', maxHeight: '60vh' }}
+                        style={{ resize: 'vertical', overflow: 'hidden', minHeight: '12rem', maxHeight: '60vh', height: `${pdfHeight}px` }}
+                        onMouseUp={(event) => {
+                          const nextHeight = (event.currentTarget as HTMLDivElement).offsetHeight;
+                          setPdfHeight(nextHeight);
+                        }}
                       >
                         <div className="px-3 py-2 text-xs text-gray-500 font-medium border-b border-gray-700/80">
                           Task PDF
@@ -997,7 +1097,8 @@ Code saved.` : 'Code saved.'));
                         <iframe
                           src={currentTask.pdfUrl}
                           title="Task PDF"
-                          className="w-full h-72"
+                          className="w-full border-0"
+                          style={{ height: 'calc(100% - 34px)' }}
                         />
                       </div>
                     )}
@@ -1064,7 +1165,7 @@ Code saved.` : 'Code saved.'));
                         }
                       }
                     }}
-                    disabled={!languages.length || isExamLocked || !currentTask}
+                    disabled={!languages.length || !isJudge0Enabled || isExamLocked || !currentTask}
                   >
                     {!languages.length && (
                       <option value="">Loading...</option>
@@ -1077,6 +1178,9 @@ Code saved.` : 'Code saved.'));
                   </select>
                   {languageError && (
                     <span className="text-red-400 normal-case">{languageError}</span>
+                  )}
+                  {!languageError && !isJudge0Enabled && (
+                    <span className="text-amber-300 normal-case">Local C++ runner</span>
                   )}
                 </div>
               </div>
@@ -1165,7 +1269,6 @@ Code saved.` : 'Code saved.'));
         </div>
       </div>
 
-      {/* Chat Panel - only show during active exam and not in review mode */}
       {examId && !isReviewMode && (examStatus === 'active' || examStatus === 'waiting_start') && (
         <ExamChatPanel examId={examId} isProfessor={false} />
       )}

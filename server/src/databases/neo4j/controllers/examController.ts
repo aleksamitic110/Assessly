@@ -191,13 +191,13 @@ export const deleteSubject = async (req: any, res: Response) => {
     if (examIds.length > 0) {
       await Promise.all(
         examIds.map((examId) =>
-          redisClient.del(
+          redisClient.del([
             `exam:${examId}:status`,
             `exam:${examId}:start_time`,
             `exam:${examId}:end_time`,
             `exam:${examId}:remaining_ms`,
             `exam:${examId}:duration_seconds`
-          )
+          ])
         )
       );
     }
@@ -322,7 +322,6 @@ export const getStudentSubjects = async (req: any, res: Response) => {
 
   const session = neo4jDriver.session();
   try {
-    // Single query: get subjects, exams, and submitted status in one go
     const result = await session.run(
       `
       MATCH (u:User {id: $studentId})-[:ENROLLED_IN]->(s:Subject)
@@ -340,7 +339,7 @@ export const getStudentSubjects = async (req: any, res: Response) => {
       const examData = (record.get('examData') || [])
         .filter((item: any) => item.exam != null);
 
-      // Deduplicate exams (collect can produce dupes with multiple optional matches)
+      // Neo4j collect() moze da dupira redove kad ima vise OPTIONAL MATCH-eva
       const seenIds = new Set<string>();
       const uniqueExamData: any[] = [];
       for (const item of examData) {
@@ -361,7 +360,6 @@ export const getStudentSubjects = async (req: any, res: Response) => {
         _submitted: item.submitted
       }));
 
-      // Parallel: resolve state and withdrawal for all exams at once
       const examsWithStatus = await Promise.all(exams.map(async (exam: any) => {
         if (exam._submitted) {
           return { ...exam, status: 'submitted', remainingSeconds: 0, _submitted: undefined };
@@ -479,13 +477,13 @@ export const deleteExam = async (req: any, res: Response) => {
       return res.status(404).json({ error: 'Exam not found' });
     }
 
-    await redisClient.del(
+    await redisClient.del([
       `exam:${examId}:status`,
       `exam:${examId}:start_time`,
       `exam:${examId}:end_time`,
       `exam:${examId}:remaining_ms`,
       `exam:${examId}:duration_seconds`
-    );
+    ]);
 
     res.json({ message: 'Exam deleted' });
     emitExamChanged(examId, 'exam_deleted');
@@ -825,6 +823,8 @@ export const getProfessorSubjects = async (req: any, res: Response) => {
       id: string;
       name: string;
       description: string;
+      createdBy: string | null;
+      isCreator: boolean;
       exams: any[];
     }>();
 
@@ -1251,7 +1251,6 @@ export const withdrawExam = async (req: any, res: Response) => {
   }
 };
 
-// Grade Management
 export const setGrade = async (req: any, res: Response) => {
   const { examId, studentId } = req.params;
   const { value, comment } = req.body;
@@ -1285,7 +1284,6 @@ export const setGrade = async (req: any, res: Response) => {
       return res.status(403).json({ error: 'You do not have access to this exam' });
     }
 
-    // Create or update Grade node
     const result = await session.run(
       `
       MATCH (e:Exam {id: $examId})
@@ -1409,7 +1407,6 @@ export const getExamStudents = async (req: any, res: Response) => {
       return res.status(403).json({ error: 'You do not have access to this exam' });
     }
 
-    // Get all students who submitted the exam
     const result = await session.run(
       `
       MATCH (s:User)-[sub:SUBMITTED_EXAM]->(e:Exam {id: $examId})
