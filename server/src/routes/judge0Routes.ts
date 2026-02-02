@@ -1,8 +1,11 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import { authenticateJWT } from '../databases/neo4j/middleware/authMiddleware.js';
 import { getDefaultLanguageId, getJudge0Languages, isJudge0Configured } from '../services/judge0.js';
+import { tasksDir } from '../middleware/upload.js';
 
 const router = Router();
+
+router.use('/uploads/tasks', express.static(tasksDir));
 
 router.get('/languages', authenticateJWT, async (_req, res) => {
   if (!isJudge0Configured()) {

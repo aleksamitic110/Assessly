@@ -420,6 +420,7 @@ export const initSocket = (io: Server) => {
 
         socket.emit('chat_update', chatMessage);
         io.to('professors_room').emit('chat_update', chatMessage);
+        io.to('professors_room').emit('new_message_notification', { examId, messageId });
 
       } catch (error) {
         console.error('chat_message failed:', error);

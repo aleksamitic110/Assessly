@@ -70,6 +70,7 @@ export default function ProfessorDashboard() {
   const [liveAlerts, setLiveAlerts] = useState<Alert[]>([]);
   const [monitoredExams, setMonitoredExams] = useState<Set<string>>(new Set());
   const [chatExamId, setChatExamId] = useState<string | null>(null);
+  const [unreadMessages, setUnreadMessages] = useState<Set<string>>(new Set());
   const [taskExamId, setTaskExamId] = useState<string | null>(null);
   const [tasksByExam, setTasksByExam] = useState<Record<string, TaskType[]>>({});
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
@@ -164,11 +165,16 @@ export default function ProfessorDashboard() {
       }
     });
 
+    socket.on('new_message_notification', (data: { examId: string }) => {
+        setUnreadMessages((prev) => new Set(prev).add(data.examId));
+    });
+
     return () => {
       socket.off('violation_alert');
       socket.off('student_status_update');
       socket.off('exam_state');
       socket.off('exam_start_error');
+      socket.off('new_message_notification');
       disconnectSocket();
     };
   }, []);
@@ -1145,12 +1151,24 @@ export default function ProfessorDashboard() {
 
                                         {(status === 'active' || status === 'waiting_start') && (
                                           <button
-                                            onClick={() => setChatExamId(chatExamId === exam.id ? null : exam.id)}
+                                            onClick={() => {
+                                                setChatExamId(chatExamId === exam.id ? null : exam.id);
+                                                if (unreadMessages.has(exam.id)) {
+                                                    setUnreadMessages((prev) => {
+                                                        const newSet = new Set(prev);
+                                                        newSet.delete(exam.id);
+                                                        return newSet;
+                                                    });
+                                                }
+                                            }}
                                             className={`px-3 py-1.5 text-xs rounded-lg border ${
                                               chatExamId === exam.id
                                                 ? 'bg-indigo-100 text-indigo-700 border-indigo-300'
+                                                : unreadMessages.has(exam.id)
+                                                ? 'bg-blue-200 text-blue-800 border-blue-400'
                                                 : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
                                             }`}
+                                            title={unreadMessages.has(exam.id) ? 'New messages' : 'Chat'}
                                           >
                                             {chatExamId === exam.id ? 'Close Chat' : 'Chat'}
                                           </button>

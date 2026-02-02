@@ -40,6 +40,12 @@ if (env.TRUST_PROXY) {
 }
 
 const corsOrigins = getCorsOrigins();
+const frameAncestors = [
+  "'self'",
+  ...corsOrigins,
+  'http://localhost:5173',
+  'http://127.0.0.1:5173'
+];
 const corsOptions: cors.CorsOptions = {
   origin: corsOrigins.length
     ? (origin, callback) => {
@@ -59,7 +65,7 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       baseUri: ["'self'"],
-      frameAncestors: ["'none'"],
+      frameAncestors: Array.from(new Set(frameAncestors)),
       imgSrc: ["'self'", 'data:', 'https:'],
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", 'https:', "'unsafe-inline'"],

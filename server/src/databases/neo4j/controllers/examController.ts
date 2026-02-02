@@ -540,12 +540,11 @@ export const createTask = async (req: any, res: Response) => {
     }
 
     const task = result.records[0].get('t').properties;
-    const serverBaseUrl = process.env.SERVER_BASE_URL || 'http://localhost:3000';
-    res.status(201).json({
-      ...task,
-      pdfUrl: task.pdfPath ? `${serverBaseUrl}${task.pdfPath}` : null
-    });
-  } catch (error) {
+            const serverBaseUrl = process.env.SERVER_BASE_URL || 'http://localhost:3000';
+            res.status(201).json({
+                ...task,
+                pdfUrl: task.pdfPath ? `${serverBaseUrl}/api/judge0${task.pdfPath}` : null
+            });  } catch (error) {
     res.status(500).json({ error: 'Error while creating task' });
   } finally {
     await session.close();
@@ -614,7 +613,7 @@ export const updateTask = async (req: any, res: Response) => {
     const serverBaseUrl = process.env.SERVER_BASE_URL || 'http://localhost:3000';
     res.json({
       ...task,
-      pdfUrl: task.pdfPath ? `${serverBaseUrl}${task.pdfPath}` : null
+      pdfUrl: task.pdfPath ? `${serverBaseUrl}/api/judge0${task.pdfPath}` : null
     });
   } catch (error) {
     res.status(500).json({ error: 'Error while updating task' });
@@ -946,7 +945,7 @@ export const getExamTasks = async (req: any, res: Response) => {
         description: task.description,
         starterCode: task.starterCode,
         testCases: task.testCases,
-        pdfUrl: task.pdfPath ? `${serverBaseUrl}${task.pdfPath}` : null,
+        pdfUrl: task.pdfPath ? `${serverBaseUrl}/api/judge0${task.pdfPath}` : null,
         exampleInput: task.exampleInput || null,
         exampleOutput: task.exampleOutput || null,
         notes: task.notes || null
