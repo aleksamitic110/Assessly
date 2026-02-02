@@ -191,13 +191,13 @@ export const deleteSubject = async (req: any, res: Response) => {
     if (examIds.length > 0) {
       await Promise.all(
         examIds.map((examId) =>
-          redisClient.del(
+          redisClient.del([
             `exam:${examId}:status`,
             `exam:${examId}:start_time`,
             `exam:${examId}:end_time`,
             `exam:${examId}:remaining_ms`,
             `exam:${examId}:duration_seconds`
-          )
+          ])
         )
       );
     }
@@ -477,13 +477,13 @@ export const deleteExam = async (req: any, res: Response) => {
       return res.status(404).json({ error: 'Exam not found' });
     }
 
-    await redisClient.del(
+    await redisClient.del([
       `exam:${examId}:status`,
       `exam:${examId}:start_time`,
       `exam:${examId}:end_time`,
       `exam:${examId}:remaining_ms`,
       `exam:${examId}:duration_seconds`
-    );
+    ]);
 
     res.json({ message: 'Exam deleted' });
     emitExamChanged(examId, 'exam_deleted');
@@ -823,6 +823,8 @@ export const getProfessorSubjects = async (req: any, res: Response) => {
       id: string;
       name: string;
       description: string;
+      createdBy: string | null;
+      isCreator: boolean;
       exams: any[];
     }>();
 

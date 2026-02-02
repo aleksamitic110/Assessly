@@ -148,8 +148,6 @@ export default function ProfessorDashboard() {
       new Audio('/alert.mp3').play().catch(() => {});
     });
 
-    socket.on('student_status_update', () => {});
-
     socket.on('exam_state', (data: { examId: string; status: ExamType['status'] }) => {
       if (!data?.examId) return;
       if (data.status === 'active' || data.status === 'paused' || data.status === 'completed') {
@@ -166,7 +164,6 @@ export default function ProfessorDashboard() {
 
     return () => {
       socket.off('violation_alert');
-      socket.off('student_status_update');
       socket.off('exam_state');
       socket.off('exam_start_error');
       disconnectSocket();

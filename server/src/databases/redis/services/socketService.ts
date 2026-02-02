@@ -69,30 +69,23 @@ export const initSocket = (io: Server) => {
     }
   };
 
-  const clearWithdrawnForExam = async (examId: string) => {
-    const pattern = `${WITHDRAWN_KEY_PREFIX(examId)}*`;
+  const scanAndDelete = async (pattern: string) => {
     let cursor = 0;
     do {
-      const result = await redisClient.scan(cursor, { MATCH: pattern, COUNT: 100 });
+      const result = await redisClient.scan(String(cursor), { MATCH: pattern, COUNT: 100 });
       cursor = Number(result.cursor);
-      const keys = result.keys;
-      if (keys.length > 0) {
-        await redisClient.del(keys);
+      if (result.keys.length > 0) {
+        await redisClient.del(result.keys);
       }
     } while (cursor !== 0);
   };
 
+  const clearWithdrawnForExam = async (examId: string) => {
+    await scanAndDelete(`${WITHDRAWN_KEY_PREFIX(examId)}*`);
+  };
+
   const clearStartedForExam = async (examId: string) => {
-    const pattern = `${STARTED_KEY_PREFIX(examId)}*`;
-    let cursor = 0;
-    do {
-      const result = await redisClient.scan(cursor, { MATCH: pattern, COUNT: 100 });
-      cursor = Number(result.cursor);
-      const keys = result.keys;
-      if (keys.length > 0) {
-        await redisClient.del(keys);
-      }
-    } while (cursor !== 0);
+    await scanAndDelete(`${STARTED_KEY_PREFIX(examId)}*`);
     await redisClient.del(STARTED_SET_KEY(examId));
   };
 

@@ -9,7 +9,8 @@
       "Bash(npx tsc --noEmit)",
       "Bash(npx:*)",
       "Bash(./node_modules/.bin/tsc:*)",
-      "Bash(node_modules/.bin/tsc:*)"
+      "Bash(node_modules/.bin/tsc:*)",
+      "Bash(npm install:*)"
     ]
   }
 }

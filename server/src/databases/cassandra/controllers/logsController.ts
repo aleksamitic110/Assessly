@@ -21,6 +21,8 @@ interface AuthenticatedRequest extends Request {
     id: string;
     email: string;
     role: string;
+    firstName?: string;
+    lastName?: string;
   };
 }
 
@@ -47,7 +49,7 @@ export async function createExecutionLog(req: AuthenticatedRequest, res: Respons
 
 export async function getMyExecutionLogs(req: AuthenticatedRequest, res: Response) {
   try {
-    const { examId } = req.params;
+    const examId = String(req.params.examId);
     const studentId = req.user?.id;
 
     if (!studentId) {
@@ -64,7 +66,8 @@ export async function getMyExecutionLogs(req: AuthenticatedRequest, res: Respons
 
 export async function getStudentExecutionLogs(req: AuthenticatedRequest, res: Response) {
   try {
-    const { examId, studentId } = req.params;
+    const examId = String(req.params.examId);
+    const studentId = String(req.params.studentId);
     const userRole = req.user?.role;
 
     if (userRole !== 'PROFESSOR') {
@@ -102,7 +105,7 @@ export async function createSecurityEvent(req: AuthenticatedRequest, res: Respon
 
 export async function getExamSecurityEvents(req: AuthenticatedRequest, res: Response) {
   try {
-    const { examId } = req.params;
+    const examId = String(req.params.examId);
     const userRole = req.user?.role;
 
     if (userRole !== 'PROFESSOR') {
@@ -119,7 +122,8 @@ export async function getExamSecurityEvents(req: AuthenticatedRequest, res: Resp
 
 export async function getStudentSecurityEvents(req: AuthenticatedRequest, res: Response) {
   try {
-    const { examId, studentId } = req.params;
+    const examId = String(req.params.examId);
+    const studentId = String(req.params.studentId);
     const userRole = req.user?.role;
 
     if (userRole !== 'PROFESSOR') {
@@ -136,7 +140,8 @@ export async function getStudentSecurityEvents(req: AuthenticatedRequest, res: R
 
 export async function getViolationCount(req: AuthenticatedRequest, res: Response) {
   try {
-    const { examId, studentId } = req.params;
+    const examId = String(req.params.examId);
+    const studentId = String(req.params.studentId);
     const count = await countSecurityEvents(examId, studentId);
     res.json({ count });
   } catch (error) {
@@ -145,10 +150,10 @@ export async function getViolationCount(req: AuthenticatedRequest, res: Response
   }
 }
 
-// Exam Comments
 export async function createExamComment(req: AuthenticatedRequest, res: Response) {
   try {
-    const { examId, studentId } = req.params;
+    const examId = String(req.params.examId);
+    const studentId = String(req.params.studentId);
     const { line, message } = req.body;
     const authorId = req.user?.id;
     const authorName = `${req.user?.email || 'Unknown'}`;
@@ -173,15 +178,6 @@ export async function createExamComment(req: AuthenticatedRequest, res: Response
         parsedLine = numLine;
       }
     }
-
-    console.log('Adding comment with:', {
-      examId,
-      studentId,
-      parsedLine,
-      message: message.substring(0, 50),
-      authorId,
-      authorName
-    });
 
     const commentId = await addExamComment(
       examId,
@@ -211,7 +207,8 @@ export async function createExamComment(req: AuthenticatedRequest, res: Response
 
 export async function fetchExamComments(req: AuthenticatedRequest, res: Response) {
   try {
-    const { examId, studentId } = req.params;
+    const examId = String(req.params.examId);
+    const studentId = String(req.params.studentId);
     const userId = req.user?.id;
     const userRole = req.user?.role;
 
@@ -234,7 +231,9 @@ export async function fetchExamComments(req: AuthenticatedRequest, res: Response
 
 export async function removeExamComment(req: AuthenticatedRequest, res: Response) {
   try {
-    const { examId, studentId, commentId } = req.params;
+    const examId = String(req.params.examId);
+    const studentId = String(req.params.studentId);
+    const commentId = String(req.params.commentId);
     const userId = req.user?.id;
 
     if (!userId) {
@@ -255,7 +254,9 @@ export async function removeExamComment(req: AuthenticatedRequest, res: Response
 
 export async function editExamComment(req: AuthenticatedRequest, res: Response) {
   try {
-    const { examId, studentId, commentId } = req.params;
+    const examId = String(req.params.examId);
+    const studentId = String(req.params.studentId);
+    const commentId = String(req.params.commentId);
     const { line, message } = req.body;
     const authorId = req.user?.id;
     const authorName = `${req.user?.email || 'Unknown'}`;
@@ -306,11 +307,9 @@ export async function editExamComment(req: AuthenticatedRequest, res: Response) 
   }
 }
 
-// ========== EXAM CHAT ==========
-
 export async function fetchChatMessages(req: AuthenticatedRequest, res: Response) {
   try {
-    const { examId } = req.params;
+    const examId = String(req.params.examId);
     const userId = req.user?.id;
     const userRole = req.user?.role;
 
@@ -320,9 +319,7 @@ export async function fetchChatMessages(req: AuthenticatedRequest, res: Response
 
     const messages = await getChatMessages(examId);
 
-    // Filter messages based on role
-    // Professor sees all messages
-    // Student sees: approved messages + own pending messages
+    // Student vidi samo approved poruke + sopstvene pending
     const filteredMessages = userRole === 'PROFESSOR'
       ? messages
       : messages.filter(msg => msg.status === 'approved' || msg.senderId === userId);
@@ -336,7 +333,7 @@ export async function fetchChatMessages(req: AuthenticatedRequest, res: Response
 
 export async function sendChatMessage(req: AuthenticatedRequest, res: Response) {
   try {
-    const { examId } = req.params;
+    const examId = String(req.params.examId);
     const { message } = req.body;
     const senderId = req.user?.id;
     const senderName = `${req.user?.firstName || ''} ${req.user?.lastName || ''}`.trim() || req.user?.email || 'Unknown';
@@ -375,7 +372,8 @@ export async function sendChatMessage(req: AuthenticatedRequest, res: Response) 
 
 export async function replyToChatMessage(req: AuthenticatedRequest, res: Response) {
   try {
-    const { examId, messageId } = req.params;
+    const examId = String(req.params.examId);
+    const messageId = String(req.params.messageId);
     const { replyMessage } = req.body;
     const replyAuthorId = req.user?.id;
     const replyAuthorName = `${req.user?.firstName || ''} ${req.user?.lastName || ''}`.trim() || req.user?.email || 'Unknown';
