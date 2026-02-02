@@ -17,7 +17,12 @@ export const validate = (schemas: Schemas) => (req: Request, res: Response, next
       req.params = schemas.params.parse(req.params) as typeof req.params;
     }
     if (schemas.query) {
-      req.query = schemas.query.parse(req.query) as typeof req.query;
+      const parsedQuery = schemas.query.parse(req.query) as Record<string, unknown>;
+      // Express can expose req.query as a getter-only property in some setups.
+      // Mutate the existing query object to keep validated values without reassigning.
+      const currentQuery = req.query as Record<string, unknown>;
+      Object.keys(currentQuery).forEach((key) => delete currentQuery[key]);
+      Object.assign(currentQuery, parsedQuery);
     }
     next();
   } catch (error) {

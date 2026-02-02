@@ -15,18 +15,26 @@ export default function VerifyEmail() {
       return;
     }
 
-    const verify = async () => {
+    let active = true;
+    // In React StrictMode (dev), effects run twice (mount/unmount/mount).
+    // Delay + cleanup prevents firing the first (throwaway) request.
+    const timer = window.setTimeout(async () => {
       try {
         const response = await api.get(`/auth/verify?token=${token}`);
+        if (!active) return;
         setStatus('success');
         setMessage(response.data?.message || 'Email verified successfully.');
       } catch (err: any) {
+        if (!active) return;
         setStatus('error');
         setMessage(err.response?.data?.error || 'Verification failed.');
       }
-    };
+    }, 0);
 
-    verify();
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
   }, [searchParams]);
 
   return (

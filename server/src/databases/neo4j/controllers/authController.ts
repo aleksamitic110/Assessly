@@ -197,6 +197,7 @@ export const verifyEmail = async (req: Request, res: Response) => {
 
     res.json({ message: 'Email verified successfully', role });
   } catch (error) {
+    console.error('[auth.verifyEmail] Failed to verify email token:', error);
     res.status(500).json({ error: 'Error while verifying email' });
   } finally {
     await session.close();
