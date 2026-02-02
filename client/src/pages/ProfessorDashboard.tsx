@@ -1,9 +1,9 @@
 import { Fragment, useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import api from '../services/api';
+import api, { chatApi } from '../services/api';
 import { socket, connectSocket, disconnectSocket } from '../services/socket';
-import type { Exam as ExamType, Task as TaskType } from '../types';
+import type { Exam as ExamType, Task as TaskType, ChatMessage } from '../types';
 import ExamChatPanel from '../components/ExamChatPanel';
 
 interface Subject {
@@ -70,6 +70,7 @@ export default function ProfessorDashboard() {
   const [liveAlerts, setLiveAlerts] = useState<Alert[]>([]);
   const [monitoredExams, setMonitoredExams] = useState<Set<string>>(new Set());
   const [chatExamId, setChatExamId] = useState<string | null>(null);
+  const [pendingMessageIdsByExam, setPendingMessageIdsByExam] = useState<Record<string, string[]>>({});
   const [taskExamId, setTaskExamId] = useState<string | null>(null);
   const [tasksByExam, setTasksByExam] = useState<Record<string, TaskType[]>>({});
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
@@ -120,6 +121,56 @@ export default function ProfessorDashboard() {
     return map;
   }, [subjects]);
 
+  const upsertPendingMessage = (message: ChatMessage) => {
+    if (!message.examId || !message.messageId) return;
+    setPendingMessageIdsByExam((prev) => {
+      const existing = new Set(prev[message.examId] || []);
+      if (message.status === 'pending') {
+        existing.add(message.messageId);
+      } else {
+        existing.delete(message.messageId);
+      }
+
+      const next = { ...prev };
+      if (existing.size === 0) {
+        delete next[message.examId];
+      } else {
+        next[message.examId] = Array.from(existing);
+      }
+      return next;
+    });
+  };
+
+  const loadPendingMessages = async (examIds: string[]) => {
+    const uniqueExamIds = Array.from(new Set(examIds.filter(Boolean)));
+    if (uniqueExamIds.length === 0) {
+      setPendingMessageIdsByExam({});
+      return;
+    }
+
+    const responses = await Promise.all(
+      uniqueExamIds.map(async (examId) => {
+        try {
+          const response = await chatApi.getMessages(examId);
+          const pendingIds = response.data
+            .filter((message) => message.status === 'pending')
+            .map((message) => message.messageId);
+          return { examId, pendingIds };
+        } catch {
+          return { examId, pendingIds: [] as string[] };
+        }
+      })
+    );
+
+    const nextState: Record<string, string[]> = {};
+    responses.forEach(({ examId, pendingIds }) => {
+      if (pendingIds.length > 0) {
+        nextState[examId] = pendingIds;
+      }
+    });
+    setPendingMessageIdsByExam(nextState);
+  };
+
   const updateExamStatus = (examId: string, status: ExamType['status']) => {
     setSubjects((prev) =>
       prev.map((subject) => ({
@@ -162,10 +213,15 @@ export default function ProfessorDashboard() {
       }
     });
 
+    socket.on('chat_update', (message: ChatMessage) => {
+      upsertPendingMessage(message);
+    });
+
     return () => {
       socket.off('violation_alert');
       socket.off('exam_state');
       socket.off('exam_start_error');
+      socket.off('chat_update');
       disconnectSocket();
     };
   }, []);
@@ -576,6 +632,8 @@ export default function ProfessorDashboard() {
         const response = await api.get<SubjectWithExams[]>('/exams/subjects');
         if (isMounted) {
           setSubjects(response.data);
+          const examIds = response.data.flatMap((subject) => subject.exams.map((exam) => exam.id));
+          void loadPendingMessages(examIds);
         }
       } catch (err: any) {
         if (isMounted) {
@@ -1094,6 +1152,8 @@ export default function ProfessorDashboard() {
                                   const taskCount = exam.taskCount || 0;
                                   const hasTasks = taskCount > 0;
                                   const status = exam.status || 'waiting_start';
+                                  const pendingCount = (pendingMessageIdsByExam[exam.id] || []).length;
+                                  const hasPendingChat = pendingCount > 0;
 
                                   return (
                                     <Fragment key={exam.id}>
@@ -1103,6 +1163,12 @@ export default function ProfessorDashboard() {
                                         <div className="flex flex-col">
                                         <div className="flex items-center gap-2">
                                           <span className="font-semibold">{exam.name}</span>
+                                          {hasPendingChat && (
+                                            <span
+                                              title={`${pendingCount} unanswered chat message${pendingCount === 1 ? '' : 's'}`}
+                                              className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse"
+                                            />
+                                          )}
                                           <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${
                                             status === 'active'
                                               ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'
@@ -1146,10 +1212,12 @@ export default function ProfessorDashboard() {
                                             className={`px-3 py-1.5 text-xs rounded-lg border ${
                                               chatExamId === exam.id
                                                 ? 'bg-indigo-100 text-indigo-700 border-indigo-300'
+                                                : hasPendingChat
+                                                  ? 'bg-red-100 text-red-700 border-red-300 hover:bg-red-200'
                                                 : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
                                             }`}
                                           >
-                                            {chatExamId === exam.id ? 'Close Chat' : 'Chat'}
+                                            {chatExamId === exam.id ? 'Close Chat' : hasPendingChat ? `Chat (${pendingCount})` : 'Chat'}
                                           </button>
                                         )}
 

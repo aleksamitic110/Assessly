@@ -21,6 +21,8 @@ type LanguageOption = {
   name: string;
 };
 
+const LOCAL_CPP_LANGUAGE: LanguageOption = { id: 0, name: 'C++ (local)' };
+
 const getMonacoLanguage = (languageName?: string | null) => {
   if (!languageName) return 'cpp';
   const name = languageName.toLowerCase();
@@ -235,7 +237,9 @@ export default function ExamPage() {
   const [showOutput, setShowOutput] = useState(true);
   const [leftWidth, setLeftWidth] = useState(33);
   const [outputHeight, setOutputHeight] = useState(220);
+  const [pdfHeight, setPdfHeight] = useState(352);
   const [languages, setLanguages] = useState<LanguageOption[]>([]);
+  const [isJudge0Enabled, setIsJudge0Enabled] = useState(false);
   const [defaultLanguageId, setDefaultLanguageId] = useState<number | null>(null);
   const [languageByTaskId, setLanguageByTaskId] = useState<Record<string, number>>({});
   const [autoTemplateByTaskId, setAutoTemplateByTaskId] = useState<Record<string, string>>({});
@@ -255,13 +259,19 @@ export default function ExamPage() {
     const loadLanguages = async () => {
       if (isReviewMode) return;
       try {
-        const response = await api.get<{ languages: LanguageOption[]; defaultLanguageId: number | null }>('/judge0/languages');
+        const response = await api.get<{ languages: LanguageOption[]; defaultLanguageId: number | null; useJudge0?: boolean }>('/judge0/languages');
         if (!isMounted) return;
-        setLanguages(response.data.languages || []);
-        setDefaultLanguageId(response.data.defaultLanguageId ?? null);
+        const loadedLanguages = response.data.languages?.length ? response.data.languages : [LOCAL_CPP_LANGUAGE];
+        const loadedDefaultLanguageId = response.data.defaultLanguageId ?? loadedLanguages[0]?.id ?? null;
+        setLanguages(loadedLanguages);
+        setDefaultLanguageId(loadedDefaultLanguageId);
+        setIsJudge0Enabled(Boolean(response.data.useJudge0));
         setLanguageError('');
       } catch (err: any) {
         if (!isMounted) return;
+        setLanguages([LOCAL_CPP_LANGUAGE]);
+        setDefaultLanguageId(LOCAL_CPP_LANGUAGE.id);
+        setIsJudge0Enabled(false);
         setLanguageError(err.response?.data?.error || 'Failed to load languages.');
       }
     };
@@ -273,11 +283,11 @@ export default function ExamPage() {
   }, [isReviewMode]);
 
   useEffect(() => {
-    if (!defaultLanguageId || tasks.length === 0) return;
+    if (defaultLanguageId == null || tasks.length === 0) return;
     setLanguageByTaskId((prev) => {
       const next = { ...prev };
       tasks.forEach((task) => {
-        if (!next[task.id]) {
+        if (next[task.id] === undefined) {
           next[task.id] = defaultLanguageId;
         }
       });
@@ -286,7 +296,7 @@ export default function ExamPage() {
   }, [tasks, defaultLanguageId]);
 
   useEffect(() => {
-    if (!defaultLanguageId || tasks.length === 0 || languages.length === 0) return;
+    if (defaultLanguageId == null || tasks.length === 0 || languages.length === 0) return;
     const defaultLanguageName = languages.find((lang) => lang.id === defaultLanguageId)?.name || null;
     const template = getCommentedHello(defaultLanguageName);
     if (!template) return;
@@ -658,11 +668,11 @@ export default function ExamPage() {
   const handleRunCode = async () => {
     if (!currentTask || !examId || examStatus !== 'active' || isReviewMode) return;
     setIsRunning(true);
-    setOutput('Compiling and running...\n');
+    setOutput(isJudge0Enabled ? 'Compiling and running...\n' : 'Compiling and running C++ locally...\n');
     const currentCode = codeByTaskId[currentTask.id] ?? code;
     const selectedLanguageId = languageByTaskId[currentTask.id] ?? defaultLanguageId;
 
-    if (!selectedLanguageId) {
+    if (isJudge0Enabled && !selectedLanguageId) {
       setOutput('Please select a language before running the code.');
       setIsRunning(false);
       return;
@@ -686,7 +696,7 @@ export default function ExamPage() {
         taskId: currentTask.id,
         sourceCode: currentCode,
         input: currentTask.exampleInput || '',
-        languageId: selectedLanguageId
+        languageId: isJudge0Enabled ? selectedLanguageId : undefined
       });
 
       const result = response.data as { ok?: boolean; output?: string };
@@ -722,7 +732,7 @@ export default function ExamPage() {
     setCurrentTask(task);
     setCode(codeByTaskId[task.id] || task.starterCode || '');
     setOutput(outputByTaskId[task.id] || '');
-    if (!languageByTaskId[task.id] && defaultLanguageId) {
+    if (languageByTaskId[task.id] === undefined && defaultLanguageId != null) {
       setLanguageByTaskId((prev) => ({ ...prev, [task.id]: defaultLanguageId }));
     }
   };
@@ -989,7 +999,11 @@ Code saved.` : 'Code saved.'));
                     {showPdf && currentTask.pdfUrl && (
                       <div
                         className="mt-4 border border-gray-700/80 rounded-lg overflow-hidden bg-gray-900/80"
-                        style={{ resize: 'vertical', overflow: 'auto', minHeight: '12rem', maxHeight: '60vh' }}
+                        style={{ resize: 'vertical', overflow: 'hidden', minHeight: '12rem', maxHeight: '60vh', height: `${pdfHeight}px` }}
+                        onMouseUp={(event) => {
+                          const nextHeight = (event.currentTarget as HTMLDivElement).offsetHeight;
+                          setPdfHeight(nextHeight);
+                        }}
                       >
                         <div className="px-3 py-2 text-xs text-gray-500 font-medium border-b border-gray-700/80">
                           Task PDF
@@ -997,7 +1011,8 @@ Code saved.` : 'Code saved.'));
                         <iframe
                           src={currentTask.pdfUrl}
                           title="Task PDF"
-                          className="w-full h-72"
+                          className="w-full border-0"
+                          style={{ height: 'calc(100% - 34px)' }}
                         />
                       </div>
                     )}
@@ -1064,7 +1079,7 @@ Code saved.` : 'Code saved.'));
                         }
                       }
                     }}
-                    disabled={!languages.length || isExamLocked || !currentTask}
+                    disabled={!languages.length || !isJudge0Enabled || isExamLocked || !currentTask}
                   >
                     {!languages.length && (
                       <option value="">Loading...</option>
@@ -1077,6 +1092,9 @@ Code saved.` : 'Code saved.'));
                   </select>
                   {languageError && (
                     <span className="text-red-400 normal-case">{languageError}</span>
+                  )}
+                  {!languageError && !isJudge0Enabled && (
+                    <span className="text-amber-300 normal-case">Local C++ runner</span>
                   )}
                 </div>
               </div>
