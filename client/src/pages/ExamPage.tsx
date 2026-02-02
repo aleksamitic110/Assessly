@@ -22,6 +22,8 @@ type LanguageOption = {
 };
 
 const LOCAL_CPP_LANGUAGE: LanguageOption = { id: 0, name: 'C++ (local)' };
+const MAX_SECURITY_VIOLATIONS = 5;
+const VIOLATION_DEDUP_MS = 1200;
 
 const getMonacoLanguage = (languageName?: string | null) => {
   if (!languageName) return 'cpp';
@@ -228,6 +230,7 @@ export default function ExamPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [violations, setViolations] = useState(0);
+  const [lockdownWarning, setLockdownWarning] = useState('');
   const [examStatus, setExamStatus] = useState<'wait_room' | 'waiting_start' | 'active' | 'paused' | 'completed' | 'withdrawn' | 'submitted'>('wait_room');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showTaskList, setShowTaskList] = useState(true);
@@ -249,6 +252,7 @@ export default function ExamPage() {
   const contentRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const autoSubmittedRef = useRef(false);
+  const lastViolationAtRef = useRef(0);
 
   useEffect(() => {
     autoSubmittedRef.current = false;
@@ -342,6 +346,12 @@ export default function ExamPage() {
   }, [examStatus, examId, isReviewMode, navigate]);
 
   useEffect(() => {
+    if (examStatus !== 'active') {
+      setLockdownWarning('');
+    }
+  }, [examStatus]);
+
+  useEffect(() => {
     if (isReviewMode) return;
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
@@ -399,6 +409,11 @@ export default function ExamPage() {
     } catch {
       // Ignore if browser blocks non-user-initiated fullscreen
     }
+  };
+
+  const forceReturnToExam = async () => {
+    window.focus();
+    await requestFullscreen();
   };
 
   useEffect(() => {
@@ -616,6 +631,13 @@ export default function ExamPage() {
   }, [examStatus, timeLeft, isReviewMode]);
 
   useEffect(() => {
+    if (isReviewMode) return;
+    if (examStatus === 'active' && violations >= MAX_SECURITY_VIOLATIONS) {
+      void submitExam({ silent: true, reason: 'security_violations_limit', redirect: 'review' });
+    }
+  }, [examStatus, violations, isReviewMode]);
+
+  useEffect(() => {
     if (isReviewMode || !examId) return;
 
     const logEvent = (eventType: 'TAB_SWITCH' | 'BLUR' | 'COPY_PASTE', details: Record<string, unknown>) => {
@@ -624,40 +646,98 @@ export default function ExamPage() {
       });
     };
 
+    const registerViolation = (
+      eventType: 'TAB_SWITCH' | 'BLUR' | 'COPY_PASTE',
+      socketType: 'tab_switch' | 'tab_blur' | 'copy_paste',
+      details: Record<string, unknown>
+    ) => {
+      if (examStatus !== 'active') return;
+      const now = Date.now();
+      if (now - lastViolationAtRef.current < VIOLATION_DEDUP_MS) return;
+      lastViolationAtRef.current = now;
+      setViolations((prev) => prev + 1);
+      logEvent(eventType, details);
+      socket.emit('violation', { examId, type: socketType });
+    };
+
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        setViolations((prev) => prev + 1);
-        logEvent('TAB_SWITCH', { timestamp: new Date().toISOString() });
-        socket.emit('violation', { examId, type: 'tab_switch' });
+        setLockdownWarning('Tab switch detected. Return to full-screen exam mode.');
+        registerViolation('TAB_SWITCH', 'tab_switch', { timestamp: new Date().toISOString() });
       }
     };
 
     const handleBlur = () => {
-      if (!document.hidden) {
-        setViolations((prev) => prev + 1);
-        logEvent('BLUR', { timestamp: new Date().toISOString() });
-        socket.emit('violation', { examId, type: 'tab_blur' });
+      if (!document.hidden && examStatus === 'active') {
+        setLockdownWarning('Focus lost. Return to full-screen exam mode.');
+        registerViolation('BLUR', 'tab_blur', { timestamp: new Date().toISOString() });
       }
     };
 
     const handleCopyPaste = (e: ClipboardEvent) => {
       if (e.type === 'paste') {
-        setViolations((prev) => prev + 1);
-        logEvent('COPY_PASTE', { timestamp: new Date().toISOString(), type: e.type });
-        socket.emit('violation', { examId, type: 'copy_paste' });
+        registerViolation('COPY_PASTE', 'copy_paste', { timestamp: new Date().toISOString(), type: e.type });
+      }
+    };
+
+    const handleFullscreenChange = () => {
+      if (examStatus !== 'active') return;
+      if (!document.fullscreenElement) {
+        setLockdownWarning('Fullscreen exit detected. Returning to full-screen mode...');
+        registerViolation('TAB_SWITCH', 'tab_switch', { timestamp: new Date().toISOString(), type: 'fullscreen_exit' });
+        void forceReturnToExam();
+      } else {
+        setLockdownWarning('');
+      }
+    };
+
+    const handleKeydown = (e: KeyboardEvent) => {
+      if (examStatus !== 'active') return;
+      if (e.key === 'F11' || e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setLockdownWarning(`${e.key} is blocked during active exam.`);
+        registerViolation('TAB_SWITCH', 'tab_switch', {
+          timestamp: new Date().toISOString(),
+          type: `blocked_${e.key.toLowerCase()}`
+        });
+        void forceReturnToExam();
+      }
+    };
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (examStatus !== 'active') return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+
+    const handleFocus = () => {
+      if (examStatus !== 'active') return;
+      if (!document.fullscreenElement) {
+        void forceReturnToExam();
+      } else {
+        setLockdownWarning('');
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handleBlur);
     document.addEventListener('paste', handleCopyPaste);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('keydown', handleKeydown, true);
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleBlur);
       document.removeEventListener('paste', handleCopyPaste);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('keydown', handleKeydown, true);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [examId, isReviewMode]);
+  }, [examId, isReviewMode, examStatus]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -881,6 +961,12 @@ Code saved.` : 'Code saved.'));
           </div>
         </div>
       </header>
+
+      {!isReviewMode && examStatus === 'active' && lockdownWarning && (
+        <div className="px-4 py-2 bg-red-900/40 border-b border-red-700/50 text-red-200 text-sm">
+          {lockdownWarning} ({violations}/{MAX_SECURITY_VIOLATIONS})
+        </div>
+      )}
 
       {!isReviewMode && (
         <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-gray-800/95 backdrop-blur-sm border-t border-gray-700/80 px-4 py-3 flex gap-2">
