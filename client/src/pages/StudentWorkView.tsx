@@ -70,8 +70,8 @@ export default function StudentWorkView() {
           const lineComments = getLineComments(lineNum);
           return (
             <div key={idx}>
-              <div className="flex hover:bg-gray-700">
-                <span className="w-12 text-right pr-3 text-gray-500 select-none border-r border-gray-700">
+              <div className="flex hover:bg-[#1a1a2e]">
+                <span className="w-12 text-right pr-3 text-gray-500 select-none border-r border-[#2a2a3e]">
                   {lineNum}
                 </span>
                 <pre className="flex-1 pl-3 whitespace-pre-wrap break-all text-gray-200">{line || ' '}</pre>
@@ -99,9 +99,9 @@ export default function StudentWorkView() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-[#0a0a12] flex items-center justify-center">
         <div className="flex items-center gap-2 text-gray-400">
-          <svg className="animate-spin h-5 w-5 text-indigo-400" viewBox="0 0 24 24">
+          <svg className="animate-spin h-5 w-5 text-emerald-400" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
           </svg>
@@ -112,12 +112,12 @@ export default function StudentWorkView() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen bg-[#0a0a12] text-white">
       {/* Header */}
-      <header className="bg-gray-800/95 backdrop-blur-sm shadow-sm border-b border-gray-700/80 sticky top-0 z-30">
+      <header className="bg-[#13131f]/95 backdrop-blur-sm shadow-sm border-b border-[#2a2a3e] sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-blue-400 bg-clip-text text-transparent">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
               {exam?.name || 'Exam Review'}
             </h1>
             <p className="text-sm text-gray-400">
@@ -135,7 +135,7 @@ export default function StudentWorkView() {
             )}
             <button
               onClick={() => navigate('/student')}
-              className="px-4 py-2 text-sm font-medium text-gray-300 border border-gray-600/80 rounded-xl hover:bg-gray-700/80 hover:border-gray-500 transition-all"
+              className="px-4 py-2 text-sm font-medium text-gray-300 border border-[#2a2a3e] rounded-xl hover:bg-[#252540] transition-all cursor-pointer"
             >
               Back to Dashboard
             </button>
@@ -155,8 +155,8 @@ export default function StudentWorkView() {
 
         {/* Grade Comment */}
         {grade?.comment && (
-          <div className="mb-6 bg-indigo-900/30 border border-indigo-700/60 rounded-xl p-4">
-            <h3 className="text-sm font-semibold text-indigo-400 mb-2">Professor's Comment</h3>
+          <div className="mb-6 bg-emerald-900/30 border border-emerald-700/60 rounded-xl p-4">
+            <h3 className="text-sm font-semibold text-emerald-400 mb-2">Professor's Comment</h3>
             <p className="text-gray-300">{grade.comment}</p>
           </div>
         )}
@@ -181,16 +181,16 @@ export default function StudentWorkView() {
 
         {/* Task Tabs */}
         {submissions.length > 0 ? (
-          <div className="bg-gray-800/80 rounded-2xl shadow-lg border border-gray-700/60">
-            <div className="border-b border-gray-700">
+          <div className="bg-[#13131f] rounded-2xl shadow-lg border border-[#2a2a3e]">
+            <div className="border-b border-[#2a2a3e]">
               <nav className="flex overflow-x-auto">
                 {submissions.map((sub, idx) => (
                   <button
                     key={sub.taskId}
                     onClick={() => setSelectedTaskIndex(idx)}
-                    className={`px-4 py-3 text-sm font-medium whitespace-nowrap ${
+                    className={`px-4 py-3 text-sm font-medium whitespace-nowrap cursor-pointer ${
                       selectedTaskIndex === idx
-                        ? 'border-b-2 border-indigo-500 text-indigo-400 bg-gray-700/50'
+                        ? 'border-b-2 border-emerald-500 text-emerald-400 bg-[#1a1a2e]'
                         : 'text-gray-400 hover:text-gray-200'
                     }`}
                   >
@@ -210,8 +210,8 @@ export default function StudentWorkView() {
 
                   {/* Task Description */}
                   {currentTask && (
-                    <div className="mb-4 p-4 bg-blue-900/20 rounded-lg border border-blue-800">
-                      <h5 className="text-sm font-semibold text-blue-300 mb-2">
+                    <div className="mb-4 p-4 bg-sky-900/20 rounded-lg border border-sky-800/50">
+                      <h5 className="text-sm font-semibold text-sky-300 mb-2">
                         Task Description
                       </h5>
                       {currentTask.description && (
@@ -225,16 +225,16 @@ export default function StudentWorkView() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                           {currentTask.exampleInput && (
                             <div>
-                              <span className="text-xs font-medium text-blue-400">Example Input:</span>
-                              <pre className="mt-1 p-2 bg-gray-900 rounded text-xs font-mono overflow-x-auto text-gray-300">
+                              <span className="text-xs font-medium text-sky-400">Example Input:</span>
+                              <pre className="mt-1 p-2 bg-[#0a0a12] rounded text-xs font-mono overflow-x-auto text-gray-300">
                                 {currentTask.exampleInput}
                               </pre>
                             </div>
                           )}
                           {currentTask.exampleOutput && (
                             <div>
-                              <span className="text-xs font-medium text-blue-400">Example Output:</span>
-                              <pre className="mt-1 p-2 bg-gray-900 rounded text-xs font-mono overflow-x-auto text-gray-300">
+                              <span className="text-xs font-medium text-sky-400">Example Output:</span>
+                              <pre className="mt-1 p-2 bg-[#0a0a12] rounded text-xs font-mono overflow-x-auto text-gray-300">
                                 {currentTask.exampleOutput}
                               </pre>
                             </div>
@@ -245,7 +245,7 @@ export default function StudentWorkView() {
                       {/* Notes */}
                       {currentTask.notes && (
                         <div className="mb-3">
-                          <span className="text-xs font-medium text-blue-400">Notes:</span>
+                          <span className="text-xs font-medium text-sky-400">Notes:</span>
                           <p className="mt-1 text-sm text-gray-400">{currentTask.notes}</p>
                         </div>
                       )}
@@ -256,7 +256,7 @@ export default function StudentWorkView() {
                           href={currentTask.pdfUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-300 bg-blue-900/50 rounded hover:bg-blue-900"
+                          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-sky-300 bg-sky-900/40 rounded hover:bg-sky-900/60 cursor-pointer"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -270,13 +270,13 @@ export default function StudentWorkView() {
                   {/* Student Code */}
                   <h5 className="text-sm font-semibold text-gray-400 mb-2">Your Code</h5>
                   {currentSubmission.sourceCode ? (
-                    <div className="bg-gray-900 rounded-lg border border-gray-700 overflow-hidden">
+                    <div className="bg-[#0a0a12] rounded-lg border border-[#2a2a3e] overflow-hidden">
                       <div className="max-h-[500px] overflow-y-auto">
                         {renderCode(currentSubmission.sourceCode)}
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-gray-800 rounded-lg p-6 text-center text-gray-500">
+                    <div className="bg-[#1a1a2e] rounded-lg p-6 text-center text-gray-500">
                       No code submitted for this task.
                     </div>
                   )}
@@ -285,7 +285,7 @@ export default function StudentWorkView() {
                   {currentSubmission.output && (
                     <div className="mt-4">
                       <h5 className="text-sm font-medium text-gray-400 mb-2">Output:</h5>
-                      <pre className="bg-gray-900 border border-gray-700 p-3 rounded text-sm text-gray-300 overflow-x-auto">
+                      <pre className="bg-[#0a0a12] border border-[#2a2a3e] p-3 rounded text-sm text-gray-300 overflow-x-auto">
                         {currentSubmission.output}
                       </pre>
                     </div>
@@ -306,7 +306,7 @@ export default function StudentWorkView() {
             </div>
           </div>
         ) : (
-          <div className="bg-gray-800 rounded-lg p-8 text-center text-gray-500">
+          <div className="bg-[#1a1a2e] rounded-lg p-8 text-center text-gray-500">
             No submissions found for this exam.
           </div>
         )}
@@ -322,7 +322,7 @@ export default function StudentWorkView() {
                 .filter(c => c.line !== null)
                 .sort((a, b) => (a.line || 0) - (b.line || 0))
                 .map(comment => (
-                  <div key={comment.commentId} className="text-sm p-2 bg-gray-800 rounded">
+                  <div key={comment.commentId} className="text-sm p-2 bg-[#1a1a2e] rounded">
                     <span className="font-medium text-yellow-400">Line {comment.line}:</span>
                     <span className="ml-2 text-gray-300">{comment.message}</span>
                     <span className="ml-2 text-xs text-gray-500">

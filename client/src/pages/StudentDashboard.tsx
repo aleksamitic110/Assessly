@@ -196,43 +196,43 @@ export default function StudentDashboard() {
     switch (status) {
       case 'wait_room':
         return (
-          <span className="px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+          <span className="px-3 py-1 text-xs font-medium rounded-full bg-sky-900/40 text-sky-400 border border-sky-800/40">
             Inactive (scheduled)
           </span>
         );
       case 'waiting_start':
         return (
-          <span className="px-3 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
+          <span className="px-3 py-1 text-xs font-medium rounded-full bg-violet-900/40 text-violet-400 border border-violet-800/40">
             Waiting to start
           </span>
         );
       case 'active':
         return (
-          <span className="px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+          <span className="px-3 py-1 text-xs font-medium rounded-full bg-emerald-900/40 text-emerald-400 border border-emerald-800/40">
             Active
           </span>
         );
       case 'paused':
         return (
-          <span className="px-3 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+          <span className="px-3 py-1 text-xs font-medium rounded-full bg-amber-900/40 text-amber-400 border border-amber-800/40">
             Paused
           </span>
         );
       case 'completed':
         return (
-          <span className="px-3 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+          <span className="px-3 py-1 text-xs font-medium rounded-full bg-gray-800/60 text-gray-400 border border-gray-700/40">
             Completed
           </span>
         );
       case 'submitted':
         return (
-          <span className="px-3 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
+          <span className="px-3 py-1 text-xs font-medium rounded-full bg-violet-900/40 text-violet-400 border border-violet-800/40">
             Submitted
           </span>
         );
       case 'withdrawn':
         return (
-          <span className="px-3 py-1 text-xs font-medium rounded-full bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+          <span className="px-3 py-1 text-xs font-medium rounded-full bg-gray-800/60 text-gray-500 border border-gray-700/40">
             Withdrawn
           </span>
         );
@@ -251,30 +251,30 @@ export default function StudentDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <header className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-sm border-b border-gray-200/60 dark:border-gray-700/60 sticky top-0 z-10">
+    <div className="min-h-screen bg-[#0a0a12]">
+      <header className="bg-[#13131f]/95 backdrop-blur-sm border-b border-[#2a2a3e] sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
               Assessly
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-gray-400">
               Student Dashboard
             </p>
           </div>
           <div className="flex items-center space-x-3">
-            <span className="text-sm text-gray-600 dark:text-gray-300 hidden sm:inline">
+            <span className="text-sm text-gray-300 hidden sm:inline">
               {user?.firstName} {user?.lastName}
             </span>
             <Link
               to="/change-password"
-              className="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              className="px-3 py-2 text-sm font-medium text-gray-300 bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl hover:bg-[#252540] transition-colors"
             >
               Change Password
             </Link>
             <button
               onClick={handleLogout}
-              className="px-3 py-2 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors"
+              className="px-3 py-2 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-500 transition-colors cursor-pointer"
             >
               Sign out
             </button>
@@ -284,7 +284,7 @@ export default function StudentDashboard() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {hasUpdates && (
-          <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50/80 px-4 py-3 text-blue-800 shadow-sm dark:border-blue-900 dark:bg-blue-900/30 dark:text-blue-100">
+          <div className="mb-6 rounded-xl border border-sky-800/50 bg-sky-900/20 px-4 py-3 text-sky-200">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="text-sm font-medium flex items-center gap-2">
                 <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -292,21 +292,21 @@ export default function StudentDashboard() {
                 </svg>
                 Updates available. Refresh to see the latest exam changes.
                 {lastUpdateAt ? (
-                  <span className="ml-2 text-xs text-blue-700/80 dark:text-blue-200/80">
+                  <span className="ml-2 text-xs text-sky-300/80">
                     Last change: {new Date(lastUpdateAt).toLocaleTimeString('en-US')}
                   </span>
                 ) : null}
               </div>
               <button
                 onClick={handleRefresh}
-                className="px-3 py-1.5 text-xs font-semibold text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-100 dark:border-blue-700 dark:text-blue-100 dark:hover:bg-blue-900/60 transition-colors"
+                className="px-3 py-1.5 text-xs font-semibold text-sky-300 border border-sky-700 rounded-lg hover:bg-sky-900/40 transition-colors cursor-pointer"
               >
                 Refresh now
               </button>
             </div>
           </div>
         )}
-        <div className="bg-gradient-to-r from-indigo-600 via-indigo-500 to-blue-600 rounded-2xl shadow-lg shadow-indigo-500/20 p-8 mb-8 text-white">
+        <div className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 rounded-2xl shadow-lg shadow-emerald-500/20 p-8 mb-8 text-white">
           <h2 className="text-2xl font-bold mb-2">
             Welcome, {user?.firstName}!
           </h2>
@@ -315,11 +315,11 @@ export default function StudentDashboard() {
           </p>
         </div>
 
-        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/60 dark:border-gray-700/60 p-6 mb-8">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+        <div className="bg-[#13131f] rounded-2xl border border-[#2a2a3e] p-6 mb-8">
+          <h3 className="text-lg font-semibold text-white mb-1">
             Add a subject
           </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+          <p className="text-sm text-gray-400 mb-4">
             Enter the subject password given by your professor.
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
@@ -328,17 +328,17 @@ export default function StudentDashboard() {
               value={enrollPassword}
               onChange={(e) => setEnrollPassword(e.target.value)}
               placeholder="Subject password"
-              className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl dark:bg-gray-700/50 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
+              className="flex-1 px-4 py-2.5 border border-[#2a2a3e] rounded-xl bg-[#1a1a2e] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500"
             />
             <button
               onClick={handleEnroll}
-              className="px-5 py-2.5 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-sm shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-all"
+              className="px-5 py-2.5 text-sm font-semibold text-white bg-emerald-600 rounded-xl hover:bg-emerald-500 shadow-sm shadow-emerald-500/20 transition-all cursor-pointer"
             >
               Add subject
             </button>
           </div>
           {enrollMessage && (
-            <div className="mt-3 text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
+            <div className="mt-3 text-sm text-emerald-400 flex items-center gap-1">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
@@ -346,7 +346,7 @@ export default function StudentDashboard() {
             </div>
           )}
           {enrollError && (
-            <div className="mt-3 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+            <div className="mt-3 text-sm text-red-400 flex items-center gap-1">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
@@ -356,48 +356,48 @@ export default function StudentDashboard() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/60 dark:border-gray-700/60 p-6 hover:shadow-md transition-shadow">
+          <div className="bg-[#13131f] rounded-2xl border border-[#2a2a3e] p-6 hover:border-[#3a3a5e] transition-colors">
             <div className="flex items-center">
-              <div className="p-3 bg-blue-100 dark:bg-blue-900/40 rounded-xl">
-                <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="p-3 bg-sky-900/40 rounded-xl">
+                <svg className="w-6 h-6 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Upcoming exams</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                <p className="text-sm font-medium text-gray-400">Upcoming exams</p>
+                <p className="text-2xl font-bold text-white">
                   {allExams.filter(e => e.status === 'wait_room' || e.status === 'waiting_start').length}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/60 dark:border-gray-700/60 p-6 hover:shadow-md transition-shadow">
+          <div className="bg-[#13131f] rounded-2xl border border-[#2a2a3e] p-6 hover:border-[#3a3a5e] transition-colors">
             <div className="flex items-center">
-              <div className="p-3 bg-green-100 dark:bg-green-900/40 rounded-xl">
-                <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="p-3 bg-emerald-900/40 rounded-xl">
+                <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Active exams</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                <p className="text-sm font-medium text-gray-400">Active exams</p>
+                <p className="text-2xl font-bold text-white">
                   {allExams.filter(e => e.status === 'active' || e.status === 'paused').length}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/60 dark:border-gray-700/60 p-6 hover:shadow-md transition-shadow">
+          <div className="bg-[#13131f] rounded-2xl border border-[#2a2a3e] p-6 hover:border-[#3a3a5e] transition-colors">
             <div className="flex items-center">
-              <div className="p-3 bg-purple-100 dark:bg-purple-900/40 rounded-xl">
-                <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="p-3 bg-violet-900/40 rounded-xl">
+                <svg className="w-6 h-6 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Finished exams</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                <p className="text-sm font-medium text-gray-400">Finished exams</p>
+                <p className="text-2xl font-bold text-white">
                   {allExams.filter(e => e.status === 'completed' || e.status === 'withdrawn' || e.status === 'submitted').length}
                 </p>
               </div>
@@ -407,66 +407,66 @@ export default function StudentDashboard() {
 
         {isLoading && (
           <div className="p-12 text-center">
-            <svg className="animate-spin h-8 w-8 text-indigo-600 dark:text-indigo-400 mx-auto mb-3" viewBox="0 0 24 24">
+            <svg className="animate-spin h-8 w-8 text-emerald-400 mx-auto mb-3" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
-            <p className="text-gray-500 dark:text-gray-400">Loading subjects...</p>
+            <p className="text-gray-400">Loading subjects...</p>
           </div>
         )}
 
         {!isLoading && error && (
-          <div className="p-6 text-center text-red-600 dark:text-red-400">
+          <div className="p-6 text-center text-red-400">
             {error}
           </div>
         )}
 
         {!isLoading && !error && subjects.length === 0 ? (
-          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/60 dark:border-gray-700/60 p-12 text-center">
-            <svg className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="bg-[#13131f] rounded-2xl border border-[#2a2a3e] p-12 text-center">
+            <svg className="w-12 h-12 text-gray-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
             </svg>
-            <p className="text-gray-500 dark:text-gray-400">You are not enrolled in any subjects.</p>
-            <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Use the form above to add your first subject.</p>
+            <p className="text-gray-400">You are not enrolled in any subjects.</p>
+            <p className="text-sm text-gray-500 mt-1">Use the form above to add your first subject.</p>
           </div>
         ) : null}
 
         {!isLoading && !error && subjects.length > 0 ? (
           <div className="space-y-6">
             {subjects.map((subject) => (
-              <div key={subject.id} className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/60 dark:border-gray-700/60 overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200/80 dark:border-gray-700/80 flex flex-wrap items-center justify-between gap-3">
+              <div key={subject.id} className="bg-[#13131f] rounded-2xl border border-[#2a2a3e] overflow-hidden">
+                <div className="px-6 py-4 border-b border-[#2a2a3e] flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    <h3 className="text-lg font-semibold text-white">
                       {subject.name}
                     </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-gray-400">
                       {subject.description || 'No description'}
                     </p>
                   </div>
                   <button
                     onClick={() => handleUnenroll(subject.id)}
-                    className="px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                    className="px-3 py-1.5 text-xs font-medium text-red-400 border border-red-800/60 rounded-lg hover:bg-red-900/20 transition-colors cursor-pointer"
                   >
                     Unenroll
                   </button>
                 </div>
 
                 {subject.exams.length === 0 ? (
-                  <div className="p-8 text-center text-gray-400 dark:text-gray-500 text-sm">
+                  <div className="p-8 text-center text-gray-500 text-sm">
                     No exams for this subject yet.
                   </div>
                 ) : (
-                  <div className="divide-y divide-gray-100 dark:divide-gray-700/60">
+                  <div className="divide-y divide-[#2a2a3e]/60">
                     {subject.exams.map((exam) => (
                       <div
                         key={exam.id}
-                        className="p-6 hover:bg-gray-50/80 dark:hover:bg-gray-700/30 transition-colors"
+                        className="p-6 hover:bg-[#1a1a2e]/50 transition-colors"
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1">
                             <div className="flex flex-wrap items-center gap-3">
-                              <h4 className="text-lg font-medium text-gray-900 dark:text-white">
+                              <h4 className="text-lg font-medium text-white">
                                 {exam.name}
                               </h4>
                               {getStatusBadge(exam.status)}
@@ -474,8 +474,8 @@ export default function StudentDashboard() {
                                 <span
                                   className={`px-3 py-1 text-sm font-bold rounded-full ${
                                     exam.grade.value === 5
-                                      ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                      : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                      ? 'bg-red-900/40 text-red-400 border border-red-800/40'
+                                      : 'bg-emerald-900/40 text-emerald-400 border border-emerald-800/40'
                                   }`}
                                 >
                                   {exam.grade.value === 5 ? 'Ispit pao' : `Grade: ${exam.grade.value}`}
@@ -483,19 +483,19 @@ export default function StudentDashboard() {
                               )}
                             </div>
                             {exam.grade?.comment && (
-                              <div className="mt-1.5 text-sm text-gray-600 dark:text-gray-400 italic">
+                              <div className="mt-1.5 text-sm text-gray-400 italic">
                                 "{exam.grade.comment}"
                               </div>
                             )}
-                            <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                            <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-gray-400">
                               <span className="flex items-center">
-                                <svg className="w-4 h-4 mr-1.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-4 h-4 mr-1.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                 </svg>
                                 {formatDateTime(exam.startTime)}
                               </span>
                               <span className="flex items-center">
-                                <svg className="w-4 h-4 mr-1.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-4 h-4 mr-1.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 {exam.durationMinutes} min
@@ -506,7 +506,7 @@ export default function StudentDashboard() {
                             {exam.status === 'active' && (
                               <button
                                 onClick={() => handleStartExam(exam.id)}
-                                className="px-6 py-2.5 text-sm font-semibold text-white bg-green-600 rounded-xl hover:bg-green-700 shadow-sm shadow-green-500/25 hover:shadow-green-500/40 transition-all"
+                                className="px-6 py-2.5 text-sm font-semibold text-white bg-emerald-600 rounded-xl hover:bg-emerald-500 shadow-sm shadow-emerald-500/20 transition-all cursor-pointer"
                               >
                                 Start exam
                               </button>
@@ -514,7 +514,7 @@ export default function StudentDashboard() {
                             {exam.status === 'wait_room' && (
                               <button
                                 disabled
-                                className="px-6 py-2.5 text-sm font-medium text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-xl cursor-not-allowed"
+                                className="px-6 py-2.5 text-sm font-medium text-gray-500 bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl cursor-not-allowed"
                               >
                                 Inactive
                               </button>
@@ -522,7 +522,7 @@ export default function StudentDashboard() {
                             {exam.status === 'waiting_start' && (
                               <button
                                 disabled
-                                className="px-6 py-2.5 text-sm font-medium text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-xl cursor-not-allowed"
+                                className="px-6 py-2.5 text-sm font-medium text-gray-500 bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl cursor-not-allowed"
                               >
                                 Waiting to start
                               </button>
@@ -530,7 +530,7 @@ export default function StudentDashboard() {
                             {exam.status === 'paused' && (
                               <button
                                 disabled
-                                className="px-6 py-2.5 text-sm font-medium text-yellow-700 bg-yellow-50 dark:bg-yellow-900/30 rounded-xl cursor-not-allowed"
+                                className="px-6 py-2.5 text-sm font-medium text-amber-400 bg-amber-900/20 border border-amber-800/40 rounded-xl cursor-not-allowed"
                               >
                                 Paused
                               </button>
@@ -538,7 +538,7 @@ export default function StudentDashboard() {
                             {(exam.status === 'completed' || exam.status === 'submitted') && (
                               <button
                                 onClick={() => handleViewWork(exam.id)}
-                                className="px-6 py-2.5 text-sm font-semibold text-indigo-600 dark:text-indigo-400 border border-indigo-300 dark:border-indigo-600 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+                                className="px-6 py-2.5 text-sm font-semibold text-violet-400 border border-violet-700/60 rounded-xl hover:bg-violet-900/20 transition-colors cursor-pointer"
                               >
                                 View your work
                               </button>
@@ -546,7 +546,7 @@ export default function StudentDashboard() {
                             {exam.status === 'withdrawn' && (
                               <button
                                 disabled
-                                className="px-6 py-2.5 text-sm font-medium text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-xl cursor-not-allowed"
+                                className="px-6 py-2.5 text-sm font-medium text-gray-500 bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl cursor-not-allowed"
                               >
                                 Withdrawn
                               </button>

@@ -642,30 +642,30 @@ export default function ProfessorDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <header className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-sm border-b border-gray-200/60 dark:border-gray-700/60 sticky top-0 z-30">
+    <div className="min-h-screen bg-[#0a0a12]">
+      <header className="bg-[#13131f]/95 backdrop-blur-sm border-b border-[#2a2a3e] sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
               Assessly
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-gray-400">
               Professor Dashboard
             </p>
           </div>
           <div className="flex items-center space-x-4">
-            <span className="text-gray-700 dark:text-gray-300 text-sm">
+            <span className="text-gray-300 text-sm">
               {user?.firstName} {user?.lastName}
             </span>
             <Link
               to="/change-password"
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              className="px-4 py-2 text-sm font-medium text-gray-300 bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl hover:bg-[#252540] transition-colors"
             >
               Change Password
             </Link>
             <button
               onClick={handleLogout}
-              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 shadow-sm shadow-red-500/20 transition-all"
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-500 shadow-sm shadow-red-500/20 transition-all cursor-pointer"
             >
               Sign out
             </button>
@@ -675,7 +675,7 @@ export default function ProfessorDashboard() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {message && (
-          <div className="mb-6 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+          <div className="mb-6 bg-emerald-900/30 border border-emerald-800/60 text-emerald-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
             <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -683,7 +683,7 @@ export default function ProfessorDashboard() {
           </div>
         )}
         {error && (
-          <div className="mb-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+          <div className="mb-6 bg-red-900/30 border border-red-800/60 text-red-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
             <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -692,23 +692,23 @@ export default function ProfessorDashboard() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-none p-6 border border-gray-200/60 dark:border-gray-700/60 hover:shadow-xl transition-shadow">
+          <div className="bg-[#13131f] rounded-2xl p-6 border border-[#2a2a3e] hover:border-[#3a3a5e] transition-colors">
             <div className="flex items-center mb-4">
-              <div className="p-3 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl">
-                <svg className="w-6 h-6 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="p-3 bg-emerald-900/40 rounded-xl">
+                <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                 </svg>
               </div>
-              <h3 className="ml-3 text-lg font-semibold text-gray-900 dark:text-white">
+              <h3 className="ml-3 text-lg font-semibold text-white">
                 Subjects
               </h3>
             </div>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">
+            <p className="text-gray-400 text-sm mb-4">
               Create a new subject you teach
             </p>
             <button
               onClick={() => setShowSubjectForm(!showSubjectForm)}
-              className="w-full px-4 py-2.5 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-sm shadow-indigo-500/25 transition-all"
+              className="w-full px-4 py-2.5 text-sm font-semibold text-white bg-emerald-600 rounded-xl hover:bg-emerald-500 shadow-sm shadow-emerald-500/20 transition-all cursor-pointer"
             >
               {showSubjectForm ? 'Close' : 'Create subject'}
             </button>
@@ -722,7 +722,7 @@ export default function ProfessorDashboard() {
                     value={subjectData.name}
                     onChange={(e) => setSubjectData({ ...subjectData, name: e.target.value })}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                    className="w-full px-4 py-2 border border-[#2a2a3e] rounded-lg bg-[#1a1a2e] text-white placeholder-gray-500"
                   />
                 </div>
                 <div>
@@ -731,7 +731,7 @@ export default function ProfessorDashboard() {
                     value={subjectData.description}
                     onChange={(e) => setSubjectData({ ...subjectData, description: e.target.value })}
                     rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                    className="w-full px-4 py-2 border border-[#2a2a3e] rounded-lg bg-[#1a1a2e] text-white placeholder-gray-500"
                   />
                 </div>
                 <div>
@@ -741,12 +741,12 @@ export default function ProfessorDashboard() {
                     value={subjectData.password}
                     onChange={(e) => setSubjectData({ ...subjectData, password: e.target.value })}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                    className="w-full px-4 py-2 border border-[#2a2a3e] rounded-lg bg-[#1a1a2e] text-white placeholder-gray-500"
                   />
                 </div>
                 <button
                   type="submit"
-                  className="w-full px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
+                  className="w-full px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-500 transition-colors cursor-pointer"
                 >
                   Save subject
                 </button>
@@ -754,23 +754,23 @@ export default function ProfessorDashboard() {
             )}
           </div>
 
-          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-none p-6 border border-gray-200/60 dark:border-gray-700/60 hover:shadow-xl transition-shadow">
+          <div className="bg-[#13131f] rounded-2xl p-6 border border-[#2a2a3e] hover:border-[#3a3a5e] transition-colors">
             <div className="flex items-center mb-4">
-              <div className="p-3 bg-green-100 dark:bg-green-900/40 rounded-xl">
-                <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="p-3 bg-sky-900/40 rounded-xl">
+                <svg className="w-6 h-6 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                 </svg>
               </div>
-              <h3 className="ml-3 text-lg font-semibold text-gray-900 dark:text-white">
+              <h3 className="ml-3 text-lg font-semibold text-white">
                 Exams
               </h3>
             </div>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">
+            <p className="text-gray-400 text-sm mb-4">
               Create a new exam for students
             </p>
             <button
               onClick={() => setShowExamForm(!showExamForm)}
-              className="w-full px-4 py-2.5 text-sm font-semibold text-white bg-green-600 rounded-xl hover:bg-green-700 shadow-sm shadow-green-500/25 transition-all"
+              className="w-full px-4 py-2.5 text-sm font-semibold text-white bg-sky-600 rounded-xl hover:bg-sky-500 shadow-sm shadow-sky-500/20 transition-all cursor-pointer"
             >
               {showExamForm ? 'Close' : 'Create exam'}
             </button>
@@ -784,11 +784,11 @@ export default function ProfessorDashboard() {
                     value={examData.name}
                     onChange={(e) => setExamData({ ...examData, name: e.target.value })}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                    className="w-full px-4 py-2 border border-[#2a2a3e] rounded-lg bg-[#1a1a2e] text-white placeholder-gray-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                  <label className="block text-sm text-gray-400 mb-1">
                     Start time
                   </label>
                   <input
@@ -796,11 +796,11 @@ export default function ProfessorDashboard() {
                     value={examData.startTime}
                     onChange={(e) => setExamData({ ...examData, startTime: e.target.value })}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                    className="w-full px-4 py-2 border border-[#2a2a3e] rounded-lg bg-[#1a1a2e] text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                  <label className="block text-sm text-gray-400 mb-1">
                     Duration (minutes)
                   </label>
                   <input
@@ -809,18 +809,18 @@ export default function ProfessorDashboard() {
                     onChange={(e) => setExamData({ ...examData, durationMinutes: parseInt(e.target.value) })}
                     min={1}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                    className="w-full px-4 py-2 border border-[#2a2a3e] rounded-lg bg-[#1a1a2e] text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                  <label className="block text-sm text-gray-400 mb-1">
                     Subject
                   </label>
                   <select
                     value={examData.subjectId}
                     onChange={(e) => setExamData({ ...examData, subjectId: e.target.value })}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                    className="w-full px-4 py-2 border border-[#2a2a3e] rounded-lg bg-[#1a1a2e] text-white"
                   >
                     <option value="" disabled>
                       {subjects.length > 0 ? 'Select a subject' : 'No subjects available'}
@@ -834,7 +834,7 @@ export default function ProfessorDashboard() {
                 </div>
                 <button
                   type="submit"
-                  className="w-full px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
+                  className="w-full px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-500 transition-colors cursor-pointer"
                 >
                   Save exam
                 </button>
@@ -842,20 +842,20 @@ export default function ProfessorDashboard() {
             )}
           </div>
 
-          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-none p-6 border border-gray-200/60 dark:border-gray-700/60 flex flex-col h-96">
+          <div className="bg-[#13131f] rounded-2xl p-6 border border-[#2a2a3e] flex flex-col h-96">
             <div className="flex items-center mb-4">
-              <div className="p-3 bg-red-100 dark:bg-red-900/40 rounded-xl animate-pulse">
-                <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="p-3 bg-red-900/40 rounded-xl animate-pulse">
+                <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                 </svg>
               </div>
-              <h3 className="ml-3 text-lg font-semibold text-gray-900 dark:text-white">
+              <h3 className="ml-3 text-lg font-semibold text-white">
                 Live Alerts ({liveAlerts.length})
               </h3>
             </div>
 
-            <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 rounded-xl p-2 border border-gray-200/60 dark:border-gray-700/60">
+            <div className="flex-1 overflow-y-auto bg-[#0a0a12] rounded-xl p-2 border border-[#2a2a3e]">
               {liveAlerts.length === 0 ? (
                 <p className="text-center text-gray-500 mt-10">No active alerts.</p>
               ) : (
@@ -867,18 +867,18 @@ export default function ProfessorDashboard() {
                       return bLatest - aLatest;
                     })
                     .map(([examId, alerts]) => (
-                      <div key={examId} className="rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                        <div className="px-3 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
+                      <div key={examId} className="rounded border border-[#2a2a3e] bg-[#1a1a2e]">
+                        <div className="px-3 py-2 text-xs font-semibold text-gray-300 border-b border-[#2a2a3e]">
                           {examNameById[examId] || `Exam ${examId.substring(0, 8)}...`}
                         </div>
                         <div className="p-2 space-y-2">
                           {alerts.map((alert, idx) => (
-                            <div key={`${alert.studentId}-${idx}`} className="p-2 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 rounded text-sm">
-                              <div className="flex justify-between font-bold text-red-700 dark:text-red-400">
+                            <div key={`${alert.studentId}-${idx}`} className="p-2 bg-red-900/20 border-l-4 border-red-500 rounded text-sm">
+                              <div className="flex justify-between font-bold text-red-400">
                                 <span>{alert.email}</span>
                                 <span>{new Date(alert.timestamp).toLocaleTimeString()}</span>
                               </div>
-                              <div className="text-gray-600 dark:text-gray-300">
+                              <div className="text-gray-400">
                                 Type: {alert.type} | Count: {alert.count}
                               </div>
                             </div>
@@ -889,9 +889,9 @@ export default function ProfessorDashboard() {
                 </div>
               )}
             </div>
-            <button 
+            <button
               onClick={() => setLiveAlerts([])}
-              className="mt-2 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-right"
+              className="mt-2 text-xs text-gray-500 hover:text-gray-300 text-right cursor-pointer"
             >
               Clear logs
             </button>
@@ -899,9 +899,9 @@ export default function ProfessorDashboard() {
         </div>
 
         {isLoadingSubjects && (
-          <div className="mt-8 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-none p-6 text-center text-gray-500 dark:text-gray-400 border border-gray-200/60 dark:border-gray-700/60">
+          <div className="mt-8 bg-[#13131f] rounded-2xl p-6 text-center text-gray-400 border border-[#2a2a3e]">
             <div className="flex items-center justify-center gap-2">
-              <svg className="animate-spin h-5 w-5 text-indigo-500" viewBox="0 0 24 24">
+              <svg className="animate-spin h-5 w-5 text-emerald-400" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
@@ -912,62 +912,62 @@ export default function ProfessorDashboard() {
 
         {!isLoadingSubjects && subjects.length > 0 && (
           <div className="mt-8">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            <h3 className="text-lg font-semibold text-white mb-4">
               Created subjects
             </h3>
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-none overflow-hidden border border-gray-200/60 dark:border-gray-700/60">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-700">
+            <div className="bg-[#13131f] rounded-2xl overflow-hidden border border-[#2a2a3e]">
+              <table className="min-w-full divide-y divide-[#2a2a3e]">
+                <thead className="bg-[#1a1a2e]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                       ID
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                       Name
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                       Description
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody className="divide-y divide-[#2a2a3e]">
                   {subjects.map((subject) => (
                     <Fragment key={subject.id}>
                       <tr>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
                           <button
                             type="button"
                             onClick={() => toggleSubject(subject.id)}
-                            className="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+                            className="text-emerald-400 hover:text-emerald-300 cursor-pointer"
                           >
                             {subject.id.substring(0, 8)}...
                           </button>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                           <button
                             type="button"
                             onClick={() => toggleSubject(subject.id)}
-                            className="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+                            className="text-emerald-400 hover:text-emerald-300 cursor-pointer"
                           >
                             {subject.name}
                           </button>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                        <td className="px-6 py-4 text-sm text-gray-400">
                           <div className="flex items-center justify-between gap-3">
                             <span>{subject.description}</span>
                               <button
                               type="button"
                               onClick={() => toggleSubject(subject.id)}
-                              className="text-xs text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+                              className="text-xs text-emerald-400 hover:text-emerald-300 cursor-pointer"
                             >
                               Details
                             </button>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-right text-sm text-gray-500 dark:text-gray-400">
+                        <td className="px-6 py-4 text-right text-sm text-gray-400">
                           <div className="flex justify-end gap-2">
                             <button
                               type="button"
@@ -976,14 +976,14 @@ export default function ProfessorDashboard() {
                                   ? cancelEditSubject()
                                   : startEditSubject(subject)
                               }
-                              className="px-3 py-1.5 text-xs rounded-lg border border-indigo-300 text-indigo-600 hover:bg-indigo-50"
+                              className="px-3 py-1.5 text-xs rounded-lg border border-emerald-700/60 text-emerald-400 hover:bg-emerald-900/20 cursor-pointer"
                             >
                               {editingSubjectId === subject.id ? 'Close edit' : 'Edit'}
                             </button>
                             <button
                               type="button"
                               onClick={() => handleDeleteSubject(subject)}
-                              className="px-3 py-1.5 text-xs rounded-lg border border-red-300 text-red-600 hover:bg-red-50"
+                              className="px-3 py-1.5 text-xs rounded-lg border border-red-800/60 text-red-400 hover:bg-red-900/20 cursor-pointer"
                             >
                               Delete
                             </button>
@@ -992,8 +992,8 @@ export default function ProfessorDashboard() {
                       </tr>
                       {editingSubjectId === subject.id && (
                         <tr>
-                          <td colSpan={4} className="px-6 py-4 bg-indigo-50/60 dark:bg-indigo-900/20">
-                            <div className="text-sm font-semibold text-indigo-700 dark:text-indigo-200 mb-3">
+                          <td colSpan={4} className="px-6 py-4 bg-emerald-900/10">
+                            <div className="text-sm font-semibold text-emerald-400 mb-3">
                               Edit subject
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1002,14 +1002,14 @@ export default function ProfessorDashboard() {
                                 value={subjectEditForm.name}
                                 onChange={handleSubjectEditChange}
                                 placeholder="Subject name"
-                                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                className="w-full px-3 py-2 text-sm border border-[#2a2a3e] rounded bg-[#1a1a2e] text-white placeholder-gray-500"
                               />
                               <input
                                 name="description"
                                 value={subjectEditForm.description}
                                 onChange={handleSubjectEditChange}
                                 placeholder="Subject description"
-                                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                className="w-full px-3 py-2 text-sm border border-[#2a2a3e] rounded bg-[#1a1a2e] text-white placeholder-gray-500"
                               />
                               <input
                                 name="password"
@@ -1017,9 +1017,9 @@ export default function ProfessorDashboard() {
                                 value={subjectEditForm.password}
                                 onChange={handleSubjectEditChange}
                                 placeholder="New subject password (optional)"
-                                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                className="w-full px-3 py-2 text-sm border border-[#2a2a3e] rounded bg-[#1a1a2e] text-white placeholder-gray-500"
                               />
-                              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                              <label className="flex items-center gap-2 text-sm text-gray-300">
                                 <input
                                   type="checkbox"
                                   name="invalidateEnrollments"
@@ -1034,14 +1034,14 @@ export default function ProfessorDashboard() {
                               <button
                                 type="button"
                                 onClick={() => handleSaveSubject(subject.id)}
-                                className="px-4 py-2 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                                className="px-4 py-2 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-500 cursor-pointer"
                               >
                                 Save subject
                               </button>
                               <button
                                 type="button"
                                 onClick={cancelEditSubject}
-                                className="px-4 py-2 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-100"
+                                className="px-4 py-2 text-xs border border-[#2a2a3e] text-gray-400 rounded hover:bg-[#252540] cursor-pointer"
                               >
                                 Cancel
                               </button>
@@ -1051,13 +1051,13 @@ export default function ProfessorDashboard() {
                       )}
                       {expandedSubjectId === subject.id && (
                         <tr>
-                          <td colSpan={4} className="px-6 py-4 bg-gray-50 dark:bg-gray-900/30">
-                            <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                              Subject ID: <span className="text-gray-800 dark:text-gray-200">{subject.id}</span>
+                          <td colSpan={4} className="px-6 py-4 bg-[#0e0e1a]">
+                            <div className="text-sm text-gray-400 mb-3">
+                              Subject ID: <span className="text-gray-200">{subject.id}</span>
                             </div>
                             {subject.isCreator && (
                               <div className="mb-4">
-                                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                                <label className="block text-sm text-gray-400 mb-1">
                                   Add professor to this subject
                                 </label>
                                 <div className="flex flex-col sm:flex-row gap-2">
@@ -1068,23 +1068,23 @@ export default function ProfessorDashboard() {
                                     onChange={(e) =>
                                       setAddProfessorEmail((prev) => ({ ...prev, [subject.id]: e.target.value }))
                                     }
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                                    className="w-full px-3 py-2 border border-[#2a2a3e] rounded-lg bg-[#1a1a2e] text-white placeholder-gray-500"
                                   />
                                   <button
                                     type="button"
                                     onClick={() => handleAddProfessor(subject.id)}
-                                    className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+                                    className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-500 transition-colors cursor-pointer"
                                   >
                                     Add
                                   </button>
                                 </div>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                <p className="text-xs text-gray-500 mt-2">
                                   Only the subject creator can add other professors.
                                 </p>
                               </div>
                             )}
                             {subject.exams.length === 0 ? (
-                              <div className="text-sm text-gray-500 dark:text-gray-400">
+                              <div className="text-sm text-gray-500">
                                 No exams for this subject
                               </div>
                             ) : (
@@ -1098,19 +1098,19 @@ export default function ProfessorDashboard() {
                                   return (
                                     <Fragment key={exam.id}>
                                       <li
-                                        className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700/60 hover:shadow-md transition-shadow"
+                                        className="flex items-center justify-between text-sm text-gray-300 bg-[#1a1a2e] p-4 rounded-xl border border-[#2a2a3e] hover:border-[#3a3a5e] transition-colors"
                                       >
                                         <div className="flex flex-col">
                                         <div className="flex items-center gap-2">
-                                          <span className="font-semibold">{exam.name}</span>
-                                          <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${
+                                          <span className="font-semibold text-white">{exam.name}</span>
+                                          <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full border ${
                                             status === 'active'
-                                              ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'
+                                              ? 'bg-emerald-900/40 text-emerald-400 border-emerald-800/40'
                                               : status === 'paused'
-                                                ? 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400'
+                                                ? 'bg-amber-900/40 text-amber-400 border-amber-800/40'
                                                 : status === 'completed'
-                                                  ? 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                                                  : 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400'
+                                                  ? 'bg-gray-800/60 text-gray-400 border-gray-700/40'
+                                                  : 'bg-sky-900/40 text-sky-400 border-sky-800/40'
                                           }`}>
                                             {status === 'active' && 'Active'}
                                             {status === 'paused' && 'Paused'}
@@ -1119,11 +1119,11 @@ export default function ProfessorDashboard() {
                                             {status === 'waiting_start' && 'Waiting to start'}
                                           </span>
                                         </div>
-                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                        <span className="text-xs text-gray-500">
                                           ID: {exam.id} | Start: {new Date(exam.startTime).toLocaleString()} | Tasks: {taskCount}
                                         </span>
                                       </div>
-                                      
+
                                       <div className="flex flex-wrap gap-2 justify-end">
                                         <button
                                           onClick={() =>
@@ -1131,10 +1131,10 @@ export default function ProfessorDashboard() {
                                               ? handleStopMonitorExam(exam.id)
                                               : handleMonitorExam(exam.id)
                                           }
-                                          className={`px-3 py-1.5 text-xs rounded-lg border ${
+                                          className={`px-3 py-1.5 text-xs rounded-lg border cursor-pointer ${
                                             monitoredExams.has(exam.id)
-                                              ? 'bg-yellow-100 text-yellow-700 border-yellow-300'
-                                              : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                              ? 'bg-amber-900/30 text-amber-400 border-amber-800/40'
+                                              : 'bg-[#13131f] text-gray-400 border-[#2a2a3e] hover:bg-[#252540]'
                                           }`}
                                         >
                                           {monitoredExams.has(exam.id) ? 'Monitoring on' : 'Monitor'}
@@ -1143,10 +1143,10 @@ export default function ProfessorDashboard() {
                                         {(status === 'active' || status === 'waiting_start') && (
                                           <button
                                             onClick={() => setChatExamId(chatExamId === exam.id ? null : exam.id)}
-                                            className={`px-3 py-1.5 text-xs rounded-lg border ${
+                                            className={`px-3 py-1.5 text-xs rounded-lg border cursor-pointer ${
                                               chatExamId === exam.id
-                                                ? 'bg-indigo-100 text-indigo-700 border-indigo-300'
-                                                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                                ? 'bg-violet-900/30 text-violet-400 border-violet-800/40'
+                                                : 'bg-[#13131f] text-gray-400 border-[#2a2a3e] hover:bg-[#252540]'
                                             }`}
                                           >
                                             {chatExamId === exam.id ? 'Close Chat' : 'Chat'}
@@ -1154,13 +1154,13 @@ export default function ProfessorDashboard() {
                                         )}
 
                                         {(status === 'wait_room' || status === 'waiting_start') && (
-                                          <button 
+                                          <button
                                             onClick={() => handleStartExam(exam)}
                                             disabled={!hasTasks}
-                                            className={`px-3 py-1 text-xs rounded ${
+                                            className={`px-3 py-1 text-xs rounded cursor-pointer ${
                                               hasTasks
-                                                ? 'bg-green-600 text-white hover:bg-green-700'
-                                                : 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                                                ? 'bg-emerald-600 text-white hover:bg-emerald-500'
+                                                : 'bg-[#1a1a2e] text-gray-500 cursor-not-allowed'
                                             }`}
                                           >
                                             {hasTasks ? 'Start' : 'Add tasks first'}
@@ -1168,69 +1168,69 @@ export default function ProfessorDashboard() {
                                         )}
 
                                         {status === 'active' && (
-                                          <button 
+                                          <button
                                             onClick={() => handlePauseExam(exam)}
-                                            className="px-3 py-1.5 text-xs bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
+                                            className="px-3 py-1.5 text-xs bg-amber-600 text-white rounded-lg hover:bg-amber-500 cursor-pointer"
                                           >
                                             Pause
                                           </button>
                                         )}
 
                                         {status === 'paused' && (
-                                          <button 
+                                          <button
                                             onClick={() => handleResumeExam(exam)}
-                                            className="px-3 py-1.5 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700"
+                                            className="px-3 py-1.5 text-xs bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 cursor-pointer"
                                           >
                                             Resume
                                           </button>
                                         )}
 
                                         {(status === 'active' || status === 'paused') && (
-                                          <button 
+                                          <button
                                             onClick={() => handleExtendExam(exam)}
-                                            className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                            className="px-3 py-1.5 text-xs bg-sky-600 text-white rounded-lg hover:bg-sky-500 cursor-pointer"
                                           >
                                             Extend
                                           </button>
                                         )}
 
                                         {(status === 'active' || status === 'paused') && (
-                                          <button 
+                                          <button
                                             onClick={() => handleEndExam(exam)}
-                                            className="px-3 py-1.5 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700"
+                                            className="px-3 py-1.5 text-xs bg-red-600 text-white rounded-lg hover:bg-red-500 cursor-pointer"
                                           >
                                             End
                                           </button>
                                         )}
 
                                         {status === 'completed' && (
-                                          <button 
+                                          <button
                                             onClick={() => handleRestartExam(exam)}
                                             disabled={!hasTasks}
-                                            className={`px-3 py-1 text-xs rounded ${
+                                            className={`px-3 py-1 text-xs rounded cursor-pointer ${
                                               hasTasks
-                                                ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                                                : 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                                                ? 'bg-violet-600 text-white hover:bg-violet-500'
+                                                : 'bg-[#1a1a2e] text-gray-500 cursor-not-allowed'
                                             }`}
                                           >
                                             Restart
                                           </button>
                                         )}
 
-                                        <button 
+                                        <button
                                           onClick={() =>
                                             editingExamId === exam.id
                                               ? cancelEditExam()
                                               : startEditExam(exam)
                                           }
-                                          className="px-3 py-1 text-xs border border-indigo-300 text-indigo-600 rounded hover:bg-indigo-50"
+                                          className="px-3 py-1 text-xs border border-emerald-700/60 text-emerald-400 rounded hover:bg-emerald-900/20 cursor-pointer"
                                         >
                                           {editingExamId === exam.id ? 'Close edit' : 'Edit'}
                                         </button>
 
-                                        <button 
+                                        <button
                                           onClick={() => handleDeleteExam(exam)}
-                                          className="px-3 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
+                                          className="px-3 py-1 text-xs border border-red-800/60 text-red-400 rounded hover:bg-red-900/20 cursor-pointer"
                                         >
                                           Delete
                                         </button>
@@ -1238,22 +1238,22 @@ export default function ProfessorDashboard() {
 
                                         <button
                                           onClick={() => toggleTaskPanel(exam.id)}
-                                          className="px-3 py-1 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-50"
+                                          className="px-3 py-1 text-xs border border-[#2a2a3e] text-gray-400 rounded hover:bg-[#252540] cursor-pointer"
                                         >
                                           Tasks
                                         </button>
 
                                         <button
                                           onClick={() => navigate(`/professor/exam/${exam.id}/review`)}
-                                          className="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                                          className="px-3 py-1.5 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-500 cursor-pointer"
                                         >
                                           Review
                                         </button>
                                       </div>
                                     </li>
                                     {editingExamId === exam.id && (
-                                      <li className="bg-indigo-50/70 dark:bg-indigo-900/20 rounded p-3 border border-indigo-200 dark:border-indigo-800">
-                                        <div className="text-sm font-semibold text-indigo-700 dark:text-indigo-200 mb-3">
+                                      <li className="bg-emerald-900/10 rounded p-3 border border-emerald-800/30">
+                                        <div className="text-sm font-semibold text-emerald-400 mb-3">
                                           Edit exam
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -1262,7 +1262,7 @@ export default function ProfessorDashboard() {
                                             value={examEditForm.name}
                                             onChange={handleExamEditChange}
                                             placeholder="Exam name"
-                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                            className="w-full px-3 py-2 text-sm border border-[#2a2a3e] rounded bg-[#1a1a2e] text-white placeholder-gray-500"
                                           />
                                           <input
                                             name="startTime"
@@ -1270,7 +1270,7 @@ export default function ProfessorDashboard() {
                                             value={examEditForm.startTime}
                                             onChange={handleExamEditChange}
                                             placeholder="Start time (YYYY-MM-DDTHH:mm)"
-                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                            className="w-full px-3 py-2 text-sm border border-[#2a2a3e] rounded bg-[#1a1a2e] text-white"
                                           />
                                           <input
                                             name="durationMinutes"
@@ -1278,21 +1278,21 @@ export default function ProfessorDashboard() {
                                             min="1"
                                             value={examEditForm.durationMinutes}
                                             onChange={handleExamEditChange}
-                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                            className="w-full px-3 py-2 text-sm border border-[#2a2a3e] rounded bg-[#1a1a2e] text-white"
                                           />
                                         </div>
                                         <div className="mt-3 flex gap-2">
                                           <button
                                             type="button"
                                             onClick={() => handleSaveExam(exam.id)}
-                                            className="px-4 py-2 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                                            className="px-4 py-2 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-500 cursor-pointer"
                                           >
                                             Save exam
                                           </button>
                                           <button
                                             type="button"
                                             onClick={cancelEditExam}
-                                            className="px-4 py-2 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-100"
+                                            className="px-4 py-2 text-xs border border-[#2a2a3e] text-gray-400 rounded hover:bg-[#252540] cursor-pointer"
                                           >
                                             Cancel
                                           </button>
@@ -1300,13 +1300,13 @@ export default function ProfessorDashboard() {
                                       </li>
                                     )}
                                     {taskExamId === exam.id && (
-                                      <li className="bg-gray-50 dark:bg-gray-900/40 rounded p-3 border border-gray-200 dark:border-gray-700">
-                                        <div className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">
+                                      <li className="bg-[#0e0e1a] rounded p-3 border border-[#2a2a3e]">
+                                        <div className="text-sm font-semibold text-gray-200 mb-3">
                                           {editingTask ? 'Edit task' : 'New task'}
                                         </div>
 
                                         {taskError && (
-                                          <div className="mb-3 text-xs text-red-600 dark:text-red-400">
+                                          <div className="mb-3 text-xs text-red-400">
                                             {taskError}
                                           </div>
                                         )}
@@ -1321,7 +1321,7 @@ export default function ProfessorDashboard() {
                                             onChange={handleTaskInputChange}
                                             placeholder="Task title"
                                             required
-                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                            className="w-full px-3 py-2 text-sm border border-[#2a2a3e] rounded bg-[#1a1a2e] text-white placeholder-gray-500"
                                           />
                                           <textarea
                                             name="description"
@@ -1329,7 +1329,7 @@ export default function ProfessorDashboard() {
                                             onChange={handleTaskInputChange}
                                             placeholder="Task description"
                                             rows={3}
-                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                            className="w-full px-3 py-2 text-sm border border-[#2a2a3e] rounded bg-[#1a1a2e] text-white placeholder-gray-500"
                                           />
 
                                           <textarea
@@ -1338,7 +1338,7 @@ export default function ProfessorDashboard() {
                                             onChange={handleTaskInputChange}
                                             placeholder="Example input"
                                             rows={2}
-                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white font-mono"
+                                            className="w-full px-3 py-2 text-sm border border-[#2a2a3e] rounded bg-[#1a1a2e] text-white placeholder-gray-500 font-mono"
                                           />
                                           <textarea
                                             name="exampleOutput"
@@ -1346,7 +1346,7 @@ export default function ProfessorDashboard() {
                                             onChange={handleTaskInputChange}
                                             placeholder="Example output"
                                             rows={2}
-                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white font-mono"
+                                            className="w-full px-3 py-2 text-sm border border-[#2a2a3e] rounded bg-[#1a1a2e] text-white placeholder-gray-500 font-mono"
                                           />
                                           <textarea
                                             name="notes"
@@ -1354,7 +1354,7 @@ export default function ProfessorDashboard() {
                                             onChange={handleTaskInputChange}
                                             placeholder="Notes"
                                             rows={2}
-                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                            className="w-full px-3 py-2 text-sm border border-[#2a2a3e] rounded bg-[#1a1a2e] text-white placeholder-gray-500"
                                           />
                                           <textarea
                                             name="starterCode"
@@ -1362,7 +1362,7 @@ export default function ProfessorDashboard() {
                                             onChange={handleTaskInputChange}
                                             placeholder="Starter code"
                                             rows={3}
-                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white font-mono"
+                                            className="w-full px-3 py-2 text-sm border border-[#2a2a3e] rounded bg-[#1a1a2e] text-white placeholder-gray-500 font-mono"
                                           />
                                           <textarea
                                             name="testCases"
@@ -1370,18 +1370,18 @@ export default function ProfessorDashboard() {
                                             onChange={handleTaskInputChange}
                                             placeholder='Test cases JSON (npr. [{"input":"1","output":"2"}])'
                                             rows={3}
-                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white font-mono"
+                                            className="w-full px-3 py-2 text-sm border border-[#2a2a3e] rounded bg-[#1a1a2e] text-white placeholder-gray-500 font-mono"
                                           />
                                           <input
                                             type="file"
                                             accept="application/pdf"
                                             onChange={handleTaskFileChange}
-                                            className="text-sm text-gray-600 dark:text-gray-300"
+                                            className="text-sm text-gray-400"
                                           />
                                           <div className="flex gap-2">
                                             <button
                                               type="submit"
-                                              className="px-3 py-2 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                                              className="px-3 py-2 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-500 cursor-pointer"
                                             >
                                               {editingTask ? 'Save changes' : 'Add task'}
                                             </button>
@@ -1389,7 +1389,7 @@ export default function ProfessorDashboard() {
                                               <button
                                                 type="button"
                                                 onClick={resetTaskForm}
-                                                className="px-3 py-2 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-100"
+                                                className="px-3 py-2 text-xs border border-[#2a2a3e] text-gray-400 rounded hover:bg-[#252540] cursor-pointer"
                                               >
                                                 Cancel
                                               </button>
@@ -1398,7 +1398,7 @@ export default function ProfessorDashboard() {
                                         </form>
 
                                         <div className="mt-4">
-                                          <div className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                                          <div className="text-sm font-semibold text-gray-200 mb-2">
                                             Existing tasks
                                           </div>
                                           {isLoadingTasks ? (
@@ -1411,10 +1411,10 @@ export default function ProfessorDashboard() {
                                               {(tasksByExam[exam.id] || []).map((task) => (
                                                 <div
                                                   key={task.id}
-                                                  className="flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-xs"
+                                                  className="flex items-center justify-between bg-[#1a1a2e] border border-[#2a2a3e] rounded px-3 py-2 text-xs"
                                                 >
                                                   <div className="flex flex-col">
-                                                    <span className="font-semibold text-gray-700 dark:text-gray-200">
+                                                    <span className="font-semibold text-gray-200">
                                                       {task.title}
                                                     </span>
                                                     {task.pdfUrl && (
@@ -1422,7 +1422,7 @@ export default function ProfessorDashboard() {
                                                         href={task.pdfUrl}
                                                         target="_blank"
                                                         rel="noreferrer"
-                                                        className="text-indigo-600 hover:text-indigo-500"
+                                                        className="text-emerald-400 hover:text-emerald-300"
                                                       >
                                                         Task PDF
                                                       </a>
@@ -1432,14 +1432,14 @@ export default function ProfessorDashboard() {
                                                     <button
                                                       type="button"
                                                       onClick={() => handleEditTask(task)}
-                                                      className="px-2 py-1 text-xs border border-indigo-300 text-indigo-600 rounded hover:bg-indigo-50"
+                                                      className="px-2 py-1 text-xs border border-emerald-700/60 text-emerald-400 rounded hover:bg-emerald-900/20 cursor-pointer"
                                                     >
                                                       Edit
                                                     </button>
                                                     <button
                                                       type="button"
                                                       onClick={() => handleDeleteTask(exam.id, task)}
-                                                      className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
+                                                      className="px-2 py-1 text-xs border border-red-800/60 text-red-400 rounded hover:bg-red-900/20 cursor-pointer"
                                                     >
                                                       Delete
                                                     </button>

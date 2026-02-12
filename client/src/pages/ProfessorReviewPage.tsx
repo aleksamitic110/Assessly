@@ -209,31 +209,31 @@ export default function ProfessorReviewPage() {
           const lineComment = lineComments.find(c => c.line === lineNum);
           return (
             <div key={idx}>
-              <div className="flex hover:bg-gray-100 dark:hover:bg-gray-700">
-                <span className="w-12 text-right pr-3 text-gray-400 select-none border-r border-gray-300 dark:border-gray-600">
+              <div className="flex hover:bg-[#1a1a2e]">
+                <span className="w-12 text-right pr-3 text-gray-400 select-none border-r border-[#2a2a3e]">
                   {lineNum}
                 </span>
                 <pre className="flex-1 pl-3 whitespace-pre-wrap break-all">{line || ' '}</pre>
               </div>
                   {lineComment && (
-                    <div className="ml-12 pl-3 py-2 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 text-sm">
+                    <div className="ml-12 pl-3 py-2 bg-amber-900/20 border-l-4 border-yellow-400 text-sm">
                       <div className="flex justify-between items-start">
                         <div>
-                          <span className="font-medium text-yellow-700 dark:text-yellow-300">
+                          <span className="font-medium text-amber-400">
                             {lineComment.authorName}:
                           </span>
-                          <span className="ml-2 text-gray-700 dark:text-gray-300">{lineComment.message}</span>
+                          <span className="ml-2 text-gray-300">{lineComment.message}</span>
                         </div>
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleEditComment(lineComment)}
-                            className="text-xs text-blue-500 hover:text-blue-700"
+                            className="text-xs text-sky-400 hover:text-sky-300 cursor-pointer"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => handleDeleteComment(lineComment.commentId)}
-                            className="text-xs text-red-500 hover:text-red-700"
+                            className="text-xs text-red-400 hover:text-red-300 cursor-pointer"
                           >
                             Delete
                           </button>
@@ -250,9 +250,9 @@ export default function ProfessorReviewPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-          <svg className="animate-spin h-5 w-5 text-indigo-500" viewBox="0 0 24 24">
+      <div className="min-h-screen bg-[#0a0a12] flex items-center justify-center">
+        <div className="flex items-center gap-2 text-gray-400">
+          <svg className="animate-spin h-5 w-5 text-emerald-400" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
           </svg>
@@ -263,21 +263,21 @@ export default function ProfessorReviewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-[#0a0a12]">
       {/* Header */}
-      <header className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-sm border-b border-gray-200/60 dark:border-gray-700/60 sticky top-0 z-30">
+      <header className="bg-[#13131f]/95 backdrop-blur-sm shadow-sm border-b border-[#2a2a3e] sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
               Review: {exam?.name || 'Exam'}
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-gray-400">
               {exam?.subjectName}
             </p>
           </div>
           <button
             onClick={() => navigate('/professor')}
-            className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="px-4 py-2 text-sm font-medium text-gray-300 border border-[#2a2a3e] rounded-xl hover:bg-[#252540] transition-colors cursor-pointer"
           >
             Back to Dashboard
           </button>
@@ -286,20 +286,20 @@ export default function ProfessorReviewPage() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
-          <div className="mb-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+          <div className="mb-6 bg-red-900/30 border border-red-800 text-red-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
             <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <span className="flex-1">{error}</span>
-            <button onClick={() => setError('')} className="text-sm underline shrink-0">Dismiss</button>
+            <button onClick={() => setError('')} className="text-sm underline shrink-0 cursor-pointer">Dismiss</button>
           </div>
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Student List */}
           <div className="lg:col-span-1">
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-none p-4 border border-gray-200/60 dark:border-gray-700/60">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            <div className="bg-[#13131f] border border-[#2a2a3e] rounded-2xl p-4">
+              <h2 className="text-lg font-semibold text-white mb-4">
                 Students ({students.length})
               </h2>
               <div className="space-y-2 max-h-[600px] overflow-y-auto">
@@ -310,20 +310,20 @@ export default function ProfessorReviewPage() {
                     <button
                       key={student.studentId}
                       onClick={() => loadStudentData(student)}
-                      className={`w-full text-left p-3 rounded-xl transition-all ${
+                      className={`w-full text-left p-3 rounded-xl transition-all cursor-pointer ${
                         selectedStudent?.studentId === student.studentId
-                          ? 'bg-indigo-100 dark:bg-indigo-900/40 border border-indigo-500/60 shadow-sm'
-                          : 'bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-600/50 border border-transparent'
+                          ? 'bg-emerald-900/30 border border-emerald-500/60 shadow-sm'
+                          : 'bg-[#1a1a2e] hover:bg-[#252540] border border-transparent'
                       }`}
                     >
-                      <div className="font-medium text-gray-900 dark:text-white text-sm">
+                      <div className="font-medium text-white text-sm">
                         {student.firstName} {student.lastName}
                       </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                      <div className="text-xs text-gray-400">
                         {student.email}
                       </div>
                       {student.grade && (
-                        <div className="mt-1 text-sm font-semibold text-green-600 dark:text-green-400">
+                        <div className="mt-1 text-sm font-semibold text-green-400">
                           Grade: {student.grade.value}
                         </div>
                       )}
@@ -337,23 +337,23 @@ export default function ProfessorReviewPage() {
           {/* Main Content */}
           <div className="lg:col-span-3">
             {!selectedStudent ? (
-              <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-none border border-gray-200/60 dark:border-gray-700/60 p-8 text-center text-gray-500 dark:text-gray-400">
+              <div className="bg-[#13131f] border border-[#2a2a3e] rounded-2xl p-8 text-center text-gray-400">
                 Select a student to review their work
               </div>
             ) : isLoadingSubmissions ? (
-              <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-none border border-gray-200/60 dark:border-gray-700/60 p-8 text-center text-gray-500 dark:text-gray-400">
+              <div className="bg-[#13131f] border border-[#2a2a3e] rounded-2xl p-8 text-center text-gray-400">
                 Loading submissions...
               </div>
             ) : (
               <div className="space-y-6">
                 {/* Student Info & Grade */}
-                <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-none border border-gray-200/60 dark:border-gray-700/60 p-6">
+                <div className="bg-[#13131f] border border-[#2a2a3e] rounded-2xl p-6">
                   <div className="flex flex-wrap justify-between items-start gap-4">
                     <div>
-                      <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                      <h3 className="text-xl font-semibold text-white">
                         {selectedStudent.firstName} {selectedStudent.lastName}
                       </h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                      <p className="text-sm text-gray-400">
                         {selectedStudent.email}
                       </p>
                       {selectedStudent.submittedAt && (
@@ -373,7 +373,7 @@ export default function ProfessorReviewPage() {
                           max="10"
                           value={gradeValue}
                           onChange={(e) => setGradeValue(Number(e.target.value))}
-                          className="w-20 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
+                          className="w-20 px-2 py-1 text-sm bg-[#1a1a2e] border border-[#2a2a3e] text-white rounded"
                         />
                       </div>
                       <div>
@@ -383,13 +383,13 @@ export default function ProfessorReviewPage() {
                           value={gradeComment}
                           onChange={(e) => setGradeComment(e.target.value)}
                           placeholder="General comment..."
-                          className="w-48 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
+                          className="w-48 px-2 py-1 text-sm bg-[#1a1a2e] border border-[#2a2a3e] text-white rounded"
                         />
                       </div>
                       <button
                         onClick={handleSaveGrade}
                         disabled={isSavingGrade}
-                        className="px-4 py-1.5 text-sm font-semibold text-white bg-green-600 rounded-xl hover:bg-green-700 shadow-sm shadow-green-500/25 disabled:opacity-50 transition-all"
+                        className="px-4 py-1.5 text-sm font-semibold text-white bg-emerald-600 rounded-xl hover:bg-emerald-500 shadow-sm shadow-emerald-500/25 disabled:opacity-50 transition-all cursor-pointer"
                       >
                         {isSavingGrade ? 'Saving...' : 'Save Grade'}
                       </button>
@@ -399,17 +399,17 @@ export default function ProfessorReviewPage() {
 
                 {/* Task Tabs */}
                 {submissions.length > 0 && (
-                  <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-none border border-gray-200/60 dark:border-gray-700/60">
-                    <div className="border-b border-gray-200 dark:border-gray-700">
+                  <div className="bg-[#13131f] border border-[#2a2a3e] rounded-2xl">
+                    <div className="border-b border-[#2a2a3e]">
                       <nav className="flex overflow-x-auto">
                         {submissions.map((sub, idx) => (
                           <button
                             key={sub.taskId}
                             onClick={() => setSelectedTaskIndex(idx)}
-                            className={`px-4 py-3 text-sm font-medium whitespace-nowrap ${
+                            className={`px-4 py-3 text-sm font-medium whitespace-nowrap cursor-pointer ${
                               selectedTaskIndex === idx
-                                ? 'border-b-2 border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                                : 'text-gray-500 hover:text-gray-700'
+                                ? 'border-b-2 border-emerald-500 text-emerald-400'
+                                : 'text-gray-500 hover:text-gray-300'
                             }`}
                           >
                             {sub.taskTitle || `Task ${idx + 1}`}
@@ -422,18 +422,18 @@ export default function ProfessorReviewPage() {
                     <div className="p-4">
                       {currentSubmission ? (
                         <div>
-                          <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                          <h4 className="text-lg font-semibold text-white mb-3">
                             {currentSubmission.taskTitle}
                           </h4>
 
                           {/* Task Description */}
                           {currentTask && (
-                            <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                              <h5 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">
+                            <div className="mb-4 p-4 bg-sky-900/20 rounded-lg border border-sky-800/50">
+                              <h5 className="text-sm font-semibold text-sky-300 mb-2">
                                 Task Description
                               </h5>
                               {currentTask.description && (
-                                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap mb-3">
+                                <p className="text-sm text-gray-300 whitespace-pre-wrap mb-3">
                                   {currentTask.description}
                                 </p>
                               )}
@@ -443,16 +443,16 @@ export default function ProfessorReviewPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                                   {currentTask.exampleInput && (
                                     <div>
-                                      <span className="text-xs font-medium text-blue-700 dark:text-blue-400">Example Input:</span>
-                                      <pre className="mt-1 p-2 bg-white dark:bg-gray-800 rounded text-xs font-mono overflow-x-auto">
+                                      <span className="text-xs font-medium text-sky-400">Example Input:</span>
+                                      <pre className="mt-1 p-2 bg-[#0a0a12] rounded text-xs font-mono overflow-x-auto">
                                         {currentTask.exampleInput}
                                       </pre>
                                     </div>
                                   )}
                                   {currentTask.exampleOutput && (
                                     <div>
-                                      <span className="text-xs font-medium text-blue-700 dark:text-blue-400">Example Output:</span>
-                                      <pre className="mt-1 p-2 bg-white dark:bg-gray-800 rounded text-xs font-mono overflow-x-auto">
+                                      <span className="text-xs font-medium text-sky-400">Example Output:</span>
+                                      <pre className="mt-1 p-2 bg-[#0a0a12] rounded text-xs font-mono overflow-x-auto">
                                         {currentTask.exampleOutput}
                                       </pre>
                                     </div>
@@ -463,8 +463,8 @@ export default function ProfessorReviewPage() {
                               {/* Notes */}
                               {currentTask.notes && (
                                 <div className="mb-3">
-                                  <span className="text-xs font-medium text-blue-700 dark:text-blue-400">Notes:</span>
-                                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{currentTask.notes}</p>
+                                  <span className="text-xs font-medium text-sky-400">Notes:</span>
+                                  <p className="mt-1 text-sm text-gray-400">{currentTask.notes}</p>
                                 </div>
                               )}
 
@@ -474,7 +474,7 @@ export default function ProfessorReviewPage() {
                                   href={currentTask.pdfUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/50 rounded hover:bg-blue-200 dark:hover:bg-blue-900"
+                                  className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-sky-300 bg-sky-900/40 rounded hover:bg-sky-900/60 cursor-pointer"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -486,17 +486,17 @@ export default function ProfessorReviewPage() {
                           )}
 
                           {/* Student Code */}
-                          <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                          <h5 className="text-sm font-semibold text-gray-300 mb-2">
                             Student's Code
                           </h5>
                           {currentSubmission.sourceCode ? (
-                            <div className="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                            <div className="bg-[#0a0a12] rounded-lg border border-[#2a2a3e] overflow-hidden">
                               <div className="max-h-[400px] overflow-y-auto">
                                 {renderCode(currentSubmission.sourceCode)}
                               </div>
                             </div>
                           ) : (
-                            <p className="text-gray-500 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                            <p className="text-gray-500 p-4 bg-[#0a0a12] rounded-lg">
                               No code submitted for this task.
                             </p>
                           )}
@@ -504,8 +504,8 @@ export default function ProfessorReviewPage() {
                           {/* Output */}
                           {currentSubmission.output && (
                             <div className="mt-4">
-                              <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Output:</h5>
-                              <pre className="bg-gray-100 dark:bg-gray-900 p-3 rounded text-sm overflow-x-auto border border-gray-200 dark:border-gray-700">
+                              <h5 className="text-sm font-medium text-gray-300 mb-2">Output:</h5>
+                              <pre className="bg-[#0a0a12] p-3 rounded text-sm overflow-x-auto border border-[#2a2a3e]">
                                 {currentSubmission.output}
                               </pre>
                             </div>
@@ -519,8 +519,8 @@ export default function ProfessorReviewPage() {
                 )}
 
                 {/* Comments Section */}
-                <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-none border border-gray-200/60 dark:border-gray-700/60 p-6">
-                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                <div className="bg-[#13131f] border border-[#2a2a3e] rounded-2xl p-6">
+                  <h4 className="text-lg font-semibold text-white mb-4">
                     Add Feedback
                   </h4>
 
@@ -537,7 +537,7 @@ export default function ProfessorReviewPage() {
                         value={newCommentLine}
                         onChange={(e) => setNewCommentLine(e.target.value)}
                         placeholder="Line"
-                        className="w-20 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
+                        className="w-20 px-3 py-2 text-sm bg-[#1a1a2e] border border-[#2a2a3e] text-white rounded"
                       />
                     </div>
                     <div className="flex-1">
@@ -548,14 +548,14 @@ export default function ProfessorReviewPage() {
                         onChange={(e) => setNewCommentMessage(e.target.value)}
                         placeholder="Enter your feedback..."
                         onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
+                        className="w-full px-3 py-2 text-sm bg-[#1a1a2e] border border-[#2a2a3e] text-white rounded"
                       />
                     </div>
                     <div className="flex items-end">
                       <button
                         onClick={handleAddComment}
                         disabled={isSavingComment || !newCommentMessage.trim()}
-                        className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-sm shadow-indigo-500/25 disabled:opacity-50 transition-all"
+                        className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-xl hover:bg-emerald-500 shadow-sm shadow-emerald-500/25 disabled:opacity-50 transition-all cursor-pointer"
                       >
                         {isSavingComment ? 'Adding...' : 'Add Comment'}
                       </button>
@@ -564,7 +564,7 @@ export default function ProfessorReviewPage() {
 
                   {/* General comments (no line number) */}
                   <div className="space-y-2">
-                    <h5 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    <h5 className="text-sm font-medium text-gray-400">
                       General Comments ({comments.filter(c => c.line === null).length})
                     </h5>
                     {comments
@@ -572,30 +572,30 @@ export default function ProfessorReviewPage() {
                       .map(comment => (
                         <div
                           key={comment.commentId}
-                          className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                          className="p-3 bg-[#1a1a2e] rounded-lg"
                         >
                           <div className="flex justify-between items-start">
                             <div>
-                              <span className="font-medium text-gray-900 dark:text-white">
+                              <span className="font-medium text-white">
                                 {comment.authorName}
                               </span>
                               <span className="ml-2 text-xs text-gray-500">
                                 {new Date(comment.createdAt).toLocaleString()}
                               </span>
-                              <p className="mt-1 text-gray-700 dark:text-gray-300">
+                              <p className="mt-1 text-gray-300">
                                 {comment.message}
                               </p>
                             </div>
                             <div className="flex gap-2">
                               <button
                                 onClick={() => handleEditComment(comment)}
-                                className="text-xs text-blue-500 hover:text-blue-700"
+                                className="text-xs text-sky-400 hover:text-sky-300 cursor-pointer"
                               >
                                 Edit
                               </button>
                               <button
                                 onClick={() => handleDeleteComment(comment.commentId)}
-                                className="text-xs text-red-500 hover:text-red-700"
+                                className="text-xs text-red-400 hover:text-red-300 cursor-pointer"
                               >
                                 Delete
                               </button>
@@ -610,8 +610,8 @@ export default function ProfessorReviewPage() {
 
                   {/* Line comments summary */}
                   {comments.filter(c => c.line !== null).length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                      <h5 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
+                    <div className="mt-4 pt-4 border-t border-[#2a2a3e]">
+                      <h5 className="text-sm font-medium text-gray-400 mb-2">
                         Line Comments ({comments.filter(c => c.line !== null).length})
                       </h5>
                       <div className="space-y-1">
@@ -621,26 +621,26 @@ export default function ProfessorReviewPage() {
                           .map(comment => (
                             <div
                               key={comment.commentId}
-                              className="flex items-center justify-between text-sm p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded"
+                              className="flex items-center justify-between text-sm p-2 bg-amber-900/20 rounded"
                             >
                               <div>
-                                <span className="font-medium text-yellow-700 dark:text-yellow-400">
+                                <span className="font-medium text-amber-400">
                                   Line {comment.line}:
                                 </span>
-                                <span className="ml-2 text-gray-700 dark:text-gray-300">
+                                <span className="ml-2 text-gray-300">
                                   {comment.message}
                                 </span>
                               </div>
                               <div className="flex gap-2">
                                 <button
                                   onClick={() => handleEditComment(comment)}
-                                  className="text-xs text-blue-500 hover:text-blue-700"
+                                  className="text-xs text-sky-400 hover:text-sky-300 cursor-pointer"
                                 >
                                   Edit
                                 </button>
                                 <button
                                   onClick={() => handleDeleteComment(comment.commentId)}
-                                  className="text-xs text-red-500 hover:text-red-700"
+                                  className="text-xs text-red-400 hover:text-red-300 cursor-pointer"
                                 >
                                   Delete
                                 </button>

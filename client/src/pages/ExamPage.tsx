@@ -795,13 +795,13 @@ Code saved.` : 'Code saved.'));
   const isExamLocked = examStatus !== 'active' || isReviewMode;
 
   return (
-    <div className={`h-screen bg-gray-900 text-white flex flex-col overflow-hidden ${!isReviewMode ? 'pb-20 md:pb-0' : ''}`}
+    <div className={`h-screen bg-[#0a0a12] text-white flex flex-col overflow-hidden ${!isReviewMode ? 'pb-20 md:pb-0' : ''}`}
       ref={containerRef}
     >
-      <header className="bg-gray-800/95 backdrop-blur-sm border-b border-gray-700/80 px-4 py-3 shrink-0">
+      <header className="bg-[#13131f]/95 backdrop-blur-sm border-b border-[#2a2a3e] px-4 py-3 shrink-0">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center space-x-4">
-            <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-blue-400 bg-clip-text text-transparent">Assessly</h1>
+            <h1 className="text-xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">Assessly</h1>
             <span className="text-gray-600">|</span>
             <span className="text-gray-200 font-medium">{currentTask?.title || 'Exam'}</span>
             {examDetails && (
@@ -819,11 +819,11 @@ Code saved.` : 'Code saved.'));
             )}
             <div className="flex items-center space-x-3">
               <span className={`text-xs uppercase tracking-wider font-semibold px-2.5 py-1 rounded-md ${
-                examStatus === 'active' ? 'bg-green-900/40 text-green-400 border border-green-700/50' :
-                examStatus === 'paused' ? 'bg-yellow-900/40 text-yellow-400 border border-yellow-700/50' :
-                examStatus === 'completed' || examStatus === 'submitted' ? 'bg-blue-900/40 text-blue-400 border border-blue-700/50' :
-                examStatus === 'withdrawn' ? 'bg-red-900/40 text-red-400 border border-red-700/50' :
-                'bg-gray-700/50 text-gray-400 border border-gray-600/50'
+                examStatus === 'active' ? 'bg-emerald-900/40 text-emerald-400 border border-emerald-800/40' :
+                examStatus === 'paused' ? 'bg-amber-900/40 text-amber-400 border border-amber-800/40' :
+                examStatus === 'completed' || examStatus === 'submitted' ? 'bg-sky-900/40 text-sky-400 border border-sky-800/40' :
+                examStatus === 'withdrawn' ? 'bg-red-900/40 text-red-400 border border-red-800/40' :
+                'bg-[#1a1a2e] text-gray-400 border border-[#2a2a3e]'
               }`}>
                 {examStatus === 'active' && 'Active'}
                 {examStatus === 'paused' && 'Paused'}
@@ -834,7 +834,7 @@ Code saved.` : 'Code saved.'));
                 {examStatus === 'withdrawn' && 'Withdrawn'}
               </span>
               {!isReviewMode && (
-                <div className={`text-lg font-mono font-bold tabular-nums ${timeLeft < 300 ? 'text-red-400' : 'text-green-400'}`}>
+                <div className={`text-lg font-mono font-bold tabular-nums ${timeLeft < 300 ? 'text-red-400' : 'text-emerald-400'}`}>
                   {formatTime(timeLeft)}
                 </div>
               )}
@@ -846,7 +846,7 @@ Code saved.` : 'Code saved.'));
               <button
                 type="button"
                 onClick={requestFullscreen}
-                className="px-3 py-1.5 text-xs border border-gray-600/80 text-gray-300 rounded-lg hover:bg-gray-700/80 hover:border-gray-500 transition-all"
+                className="px-3 py-1.5 text-xs border border-[#2a2a3e] text-gray-300 rounded-lg hover:bg-[#252540] hover:border-[#3a3a5e] transition-all cursor-pointer"
               >
                 {isFullscreen ? 'Fullscreen on' : 'Fullscreen'}
               </button>
@@ -856,13 +856,13 @@ Code saved.` : 'Code saved.'));
                 <button
                   onClick={handleSubmit}
                   disabled={isExamLocked}
-                  className="px-4 py-1.5 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-semibold transition-all shadow-sm shadow-green-900/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-semibold transition-all shadow-sm shadow-emerald-900/30 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   Submit exam
                 </button>
                 <button
                   onClick={handleCancelExam}
-                  className="px-4 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition-all"
+                  className="px-4 py-1.5 bg-[#1a1a2e] border border-[#2a2a3e] hover:bg-[#252540] rounded-lg text-sm font-medium transition-all cursor-pointer"
                 >
                   Withdraw
                 </button>
@@ -873,17 +873,17 @@ Code saved.` : 'Code saved.'));
       </header>
 
       {!isReviewMode && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-gray-800/95 backdrop-blur-sm border-t border-gray-700/80 px-4 py-3 flex gap-2">
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#13131f]/95 backdrop-blur-sm border-t border-[#2a2a3e] px-4 py-3 flex gap-2">
           <button
             onClick={handleSubmit}
             disabled={isExamLocked}
-            className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-semibold transition-all shadow-sm shadow-green-900/30 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-semibold transition-all shadow-sm shadow-emerald-900/30 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             Submit exam
           </button>
           <button
             onClick={handleCancelExam}
-            className="flex-1 px-4 py-2.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition-all"
+            className="flex-1 px-4 py-2.5 bg-[#1a1a2e] border border-[#2a2a3e] hover:bg-[#252540] rounded-lg text-sm font-medium transition-all cursor-pointer"
           >
             Withdraw
           </button>
@@ -892,7 +892,7 @@ Code saved.` : 'Code saved.'));
 
       <div className="flex-1 flex overflow-hidden" ref={contentRef}>
         <div
-          className="bg-gray-800 border-r border-gray-700 p-4 overflow-y-auto"
+          className="bg-[#13131f] border-r border-[#2a2a3e] p-4 overflow-y-auto"
           style={{ width: `${leftWidth}%`, flexShrink: 0 }}
         >
           {isExamLocked && !isReviewMode && (
@@ -918,27 +918,27 @@ Code saved.` : 'Code saved.'));
               Review mode: read-only view of your work.
             </div>
           )}
-          <div className="mb-4 rounded-lg border border-gray-700/80 bg-gray-900/80 px-3 py-2.5 text-xs text-gray-300">
+          <div className="mb-4 rounded-lg border border-[#2a2a3e] bg-[#0a0a12]/80 px-3 py-2.5 text-xs text-gray-300">
             <div className="mb-2 text-gray-500 uppercase tracking-wider text-[10px] font-semibold">View</div>
             <div className="flex flex-wrap gap-x-4 gap-y-2">
               <label className="flex items-center gap-1.5 cursor-pointer select-none hover:text-gray-100 transition-colors">
-                <input type="checkbox" checked={showTaskList} onChange={() => setShowTaskList((prev) => !prev)} className="accent-indigo-500 rounded" />
+                <input type="checkbox" checked={showTaskList} onChange={() => setShowTaskList((prev) => !prev)} className="accent-emerald-500 rounded" />
                 Tasks
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer select-none hover:text-gray-100 transition-colors">
-                <input type="checkbox" checked={showTaskDetails} onChange={() => setShowTaskDetails((prev) => !prev)} className="accent-indigo-500 rounded" />
+                <input type="checkbox" checked={showTaskDetails} onChange={() => setShowTaskDetails((prev) => !prev)} className="accent-emerald-500 rounded" />
                 Details
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer select-none hover:text-gray-100 transition-colors">
-                <input type="checkbox" checked={showPdf} onChange={() => setShowPdf((prev) => !prev)} className="accent-indigo-500 rounded" />
+                <input type="checkbox" checked={showPdf} onChange={() => setShowPdf((prev) => !prev)} className="accent-emerald-500 rounded" />
                 PDF
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer select-none hover:text-gray-100 transition-colors">
-                <input type="checkbox" checked={showEditor} onChange={() => setShowEditor((prev) => !prev)} className="accent-indigo-500 rounded" />
+                <input type="checkbox" checked={showEditor} onChange={() => setShowEditor((prev) => !prev)} className="accent-emerald-500 rounded" />
                 Editor
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer select-none hover:text-gray-100 transition-colors">
-                <input type="checkbox" checked={showOutput} onChange={() => setShowOutput((prev) => !prev)} className="accent-indigo-500 rounded" />
+                <input type="checkbox" checked={showOutput} onChange={() => setShowOutput((prev) => !prev)} className="accent-emerald-500 rounded" />
                 Output
               </label>
             </div>
@@ -954,10 +954,10 @@ Code saved.` : 'Code saved.'));
                     key={task.id}
                     type="button"
                     onClick={() => handleSelectTask(task)}
-                    className={`w-full text-left px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
+                    className={`w-full text-left px-3 py-2 rounded-lg border text-sm font-medium transition-all cursor-pointer ${
                       currentTask?.id === task.id
-                        ? 'border-indigo-500/60 bg-indigo-500/15 text-indigo-200 shadow-sm shadow-indigo-500/10'
-                        : 'border-gray-700/60 bg-gray-900/60 text-gray-300 hover:border-gray-600 hover:bg-gray-800/80'
+                        ? 'border-emerald-500/60 bg-emerald-500/15 text-emerald-200 shadow-sm shadow-emerald-500/10'
+                        : 'border-[#2a2a3e] bg-[#0a0a12]/60 text-gray-300 hover:border-[#3a3a5e] hover:bg-[#1a1a2e]'
                     }`}
                   >
                     {task.title}
@@ -1032,7 +1032,7 @@ Code saved.` : 'Code saved.'));
         </div>
 
         <div
-          className="w-1.5 bg-gray-700/60 cursor-col-resize hover:bg-indigo-500/80 active:bg-indigo-400 transition-colors"
+          className="w-1.5 bg-[#2a2a3e]/60 cursor-col-resize hover:bg-emerald-500/80 active:bg-emerald-400 transition-colors"
           onMouseDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -1041,12 +1041,12 @@ Code saved.` : 'Code saved.'));
         />
         <div className="flex-1 flex flex-col overflow-hidden" ref={rightPanelRef}>
           {showEditor && (
-            <div className="flex-1 border-b border-gray-700 min-h-0 overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
+            <div className="flex-1 border-b border-[#2a2a3e] min-h-0 overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between px-4 py-2 bg-[#13131f] border-b border-[#2a2a3e]">
                 <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-gray-400">
                   <span>Language</span>
                   <select
-                    className="bg-gray-900 border border-gray-700 text-gray-200 text-xs rounded px-2 py-1"
+                    className="bg-[#0a0a12] border border-[#2a2a3e] text-gray-200 text-xs rounded px-2 py-1"
                     value={currentLanguageId ?? ''}
                     onChange={(event) => {
                       const nextId = Number(event.target.value);
@@ -1109,7 +1109,7 @@ Code saved.` : 'Code saved.'));
 
           {showEditor && showOutput && (
             <div
-              className="h-1.5 bg-gray-700/60 cursor-row-resize hover:bg-indigo-500/80 active:bg-indigo-400 transition-colors"
+              className="h-1.5 bg-[#2a2a3e]/60 cursor-row-resize hover:bg-emerald-500/80 active:bg-emerald-400 transition-colors"
               onMouseDown={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -1120,10 +1120,10 @@ Code saved.` : 'Code saved.'));
 
           {showOutput && (
             <div
-              className="bg-gray-900 border-t border-gray-700/80"
+              className="bg-[#0a0a12] border-t border-[#2a2a3e]"
               style={{ height: `${outputHeight}px`, flexShrink: 0 }}
             >
-              <div className="flex items-center justify-between px-4 py-2 bg-gray-800/90 border-b border-gray-700/80">
+              <div className="flex items-center justify-between px-4 py-2 bg-[#13131f]/90 border-b border-[#2a2a3e]">
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Output</span>
                 {!isReviewMode && (
                   <div className="flex items-center space-x-2">
@@ -1132,8 +1132,8 @@ Code saved.` : 'Code saved.'));
                       disabled={isSaving || !currentTask || isExamLocked}
                       className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
                         isSaving || !currentTask || isExamLocked
-                          ? 'bg-gray-600/80 cursor-not-allowed opacity-50'
-                          : 'bg-blue-600 hover:bg-blue-500 shadow-sm shadow-blue-900/30'
+                          ? 'bg-[#1a1a2e] cursor-not-allowed opacity-50'
+                          : 'bg-sky-600 hover:bg-sky-500 shadow-sm shadow-sky-900/30 cursor-pointer'
                       }`}
                     >
                       {isSaving ? 'Saving...' : 'Save'}
@@ -1143,8 +1143,8 @@ Code saved.` : 'Code saved.'));
                       disabled={isRunning || !currentTask || isExamLocked}
                       className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
                         isRunning || !currentTask || isExamLocked
-                          ? 'bg-gray-600/80 cursor-not-allowed opacity-50'
-                          : 'bg-green-600 hover:bg-green-500 shadow-sm shadow-green-900/30'
+                          ? 'bg-[#1a1a2e] cursor-not-allowed opacity-50'
+                          : 'bg-emerald-600 hover:bg-emerald-500 shadow-sm shadow-emerald-900/30 cursor-pointer'
                       }`}
                     >
                       {isRunning ? 'Running...' : 'Run code (F5)'}
