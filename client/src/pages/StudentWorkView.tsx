@@ -70,11 +70,11 @@ export default function StudentWorkView() {
           const lineComments = getLineComments(lineNum);
           return (
             <div key={idx}>
-              <div className="flex hover:bg-[#1a1a2e]">
-                <span className="w-12 text-right pr-3 text-gray-500 select-none border-r border-[#2a2a3e]">
+              <div className="flex hover:bg-zinc-800/50">
+                <span className="w-12 text-right pr-3 text-zinc-500 select-none border-r border-zinc-800/80">
                   {lineNum}
                 </span>
-                <pre className="flex-1 pl-3 whitespace-pre-wrap break-all text-gray-200">{line || ' '}</pre>
+                <pre className="flex-1 pl-3 whitespace-pre-wrap break-all text-zinc-200">{line || ' '}</pre>
               </div>
               {lineComments.map(comment => (
                 <div
@@ -84,8 +84,8 @@ export default function StudentWorkView() {
                   <span className="font-medium text-yellow-400">
                     {comment.authorName}:
                   </span>
-                  <span className="ml-2 text-gray-300">{comment.message}</span>
-                  <span className="ml-2 text-xs text-gray-500">
+                  <span className="ml-2 text-zinc-300">{comment.message}</span>
+                  <span className="ml-2 text-xs text-zinc-500">
                     {new Date(comment.createdAt).toLocaleString()}
                   </span>
                 </div>
@@ -99,8 +99,8 @@ export default function StudentWorkView() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0a0a12] flex items-center justify-center">
-        <div className="flex items-center gap-2 text-gray-400">
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="flex items-center gap-2 text-zinc-400">
           <svg className="animate-spin h-5 w-5 text-emerald-400" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
@@ -112,15 +112,15 @@ export default function StudentWorkView() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a12] text-white">
+    <div className="min-h-screen bg-zinc-950 text-white">
       {/* Header */}
-      <header className="bg-[#13131f]/95 backdrop-blur-sm shadow-sm border-b border-[#2a2a3e] sticky top-0 z-30">
+      <header className="bg-zinc-900/80/95 backdrop-blur-sm shadow-sm border-b border-zinc-800/80 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-400 via-violet-400 to-purple-400 bg-clip-text text-transparent">
               {exam?.name || 'Exam Review'}
             </h1>
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-zinc-400">
               {exam?.subjectName} - Your Submission
             </p>
           </div>
@@ -130,12 +130,12 @@ export default function StudentWorkView() {
                 <div className="text-2xl font-bold text-green-400">
                   {grade.value}
                 </div>
-                <div className="text-xs text-gray-400">Your Grade</div>
+                <div className="text-xs text-zinc-400">Your Grade</div>
               </div>
             )}
             <button
               onClick={() => navigate('/student')}
-              className="px-4 py-2 text-sm font-medium text-gray-300 border border-[#2a2a3e] rounded-xl hover:bg-[#252540] transition-all cursor-pointer"
+              className="px-4 py-2 text-sm font-medium text-zinc-300 border border-zinc-800/80 rounded-xl hover:bg-zinc-800 transition-all cursor-pointer"
             >
               Back to Dashboard
             </button>
@@ -145,7 +145,7 @@ export default function StudentWorkView() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
-          <div className="mb-6 bg-red-900/30 border border-red-800 text-red-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+          <div className="mb-6 bg-red-500/10 border border-red-800 text-red-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
             <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -155,9 +155,9 @@ export default function StudentWorkView() {
 
         {/* Grade Comment */}
         {grade?.comment && (
-          <div className="mb-6 bg-emerald-900/30 border border-emerald-700/60 rounded-xl p-4">
+          <div className="mb-6 bg-emerald-500/10 border border-emerald-700/60 rounded-xl p-4">
             <h3 className="text-sm font-semibold text-emerald-400 mb-2">Professor's Comment</h3>
-            <p className="text-gray-300">{grade.comment}</p>
+            <p className="text-zinc-300">{grade.comment}</p>
           </div>
         )}
 
@@ -167,10 +167,10 @@ export default function StudentWorkView() {
             <h3 className="text-sm font-semibold text-yellow-400 mb-3">General Feedback</h3>
             <div className="space-y-2">
               {generalComments.map(comment => (
-                <div key={comment.commentId} className="text-gray-300">
+                <div key={comment.commentId} className="text-zinc-300">
                   <span className="font-medium text-yellow-300">{comment.authorName}:</span>
                   <span className="ml-2">{comment.message}</span>
-                  <span className="ml-2 text-xs text-gray-500">
+                  <span className="ml-2 text-xs text-zinc-500">
                     {new Date(comment.createdAt).toLocaleString()}
                   </span>
                 </div>
@@ -181,8 +181,8 @@ export default function StudentWorkView() {
 
         {/* Task Tabs */}
         {submissions.length > 0 ? (
-          <div className="bg-[#13131f] rounded-2xl shadow-lg border border-[#2a2a3e]">
-            <div className="border-b border-[#2a2a3e]">
+          <div className="bg-zinc-900/80 rounded-2xl shadow-lg border border-zinc-800/80">
+            <div className="border-b border-zinc-800/80">
               <nav className="flex overflow-x-auto">
                 {submissions.map((sub, idx) => (
                   <button
@@ -190,8 +190,8 @@ export default function StudentWorkView() {
                     onClick={() => setSelectedTaskIndex(idx)}
                     className={`px-4 py-3 text-sm font-medium whitespace-nowrap cursor-pointer ${
                       selectedTaskIndex === idx
-                        ? 'border-b-2 border-emerald-500 text-emerald-400 bg-[#1a1a2e]'
-                        : 'text-gray-400 hover:text-gray-200'
+                        ? 'border-b-2 border-emerald-500 text-emerald-400 bg-zinc-800/50'
+                        : 'text-zinc-400 hover:text-zinc-200'
                     }`}
                   >
                     {sub.taskTitle || `Task ${idx + 1}`}
@@ -215,7 +215,7 @@ export default function StudentWorkView() {
                         Task Description
                       </h5>
                       {currentTask.description && (
-                        <p className="text-sm text-gray-300 whitespace-pre-wrap mb-3">
+                        <p className="text-sm text-zinc-300 whitespace-pre-wrap mb-3">
                           {currentTask.description}
                         </p>
                       )}
@@ -226,7 +226,7 @@ export default function StudentWorkView() {
                           {currentTask.exampleInput && (
                             <div>
                               <span className="text-xs font-medium text-sky-400">Example Input:</span>
-                              <pre className="mt-1 p-2 bg-[#0a0a12] rounded text-xs font-mono overflow-x-auto text-gray-300">
+                              <pre className="mt-1 p-2 bg-zinc-950 rounded text-xs font-mono overflow-x-auto text-zinc-300">
                                 {currentTask.exampleInput}
                               </pre>
                             </div>
@@ -234,7 +234,7 @@ export default function StudentWorkView() {
                           {currentTask.exampleOutput && (
                             <div>
                               <span className="text-xs font-medium text-sky-400">Example Output:</span>
-                              <pre className="mt-1 p-2 bg-[#0a0a12] rounded text-xs font-mono overflow-x-auto text-gray-300">
+                              <pre className="mt-1 p-2 bg-zinc-950 rounded text-xs font-mono overflow-x-auto text-zinc-300">
                                 {currentTask.exampleOutput}
                               </pre>
                             </div>
@@ -246,7 +246,7 @@ export default function StudentWorkView() {
                       {currentTask.notes && (
                         <div className="mb-3">
                           <span className="text-xs font-medium text-sky-400">Notes:</span>
-                          <p className="mt-1 text-sm text-gray-400">{currentTask.notes}</p>
+                          <p className="mt-1 text-sm text-zinc-400">{currentTask.notes}</p>
                         </div>
                       )}
 
@@ -268,15 +268,15 @@ export default function StudentWorkView() {
                   )}
 
                   {/* Student Code */}
-                  <h5 className="text-sm font-semibold text-gray-400 mb-2">Your Code</h5>
+                  <h5 className="text-sm font-semibold text-zinc-400 mb-2">Your Code</h5>
                   {currentSubmission.sourceCode ? (
-                    <div className="bg-[#0a0a12] rounded-lg border border-[#2a2a3e] overflow-hidden">
+                    <div className="bg-zinc-950 rounded-lg border border-zinc-800/80 overflow-hidden">
                       <div className="max-h-[500px] overflow-y-auto">
                         {renderCode(currentSubmission.sourceCode)}
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-[#1a1a2e] rounded-lg p-6 text-center text-gray-500">
+                    <div className="bg-zinc-800/50 rounded-lg p-6 text-center text-zinc-500">
                       No code submitted for this task.
                     </div>
                   )}
@@ -284,8 +284,8 @@ export default function StudentWorkView() {
                   {/* Output */}
                   {currentSubmission.output && (
                     <div className="mt-4">
-                      <h5 className="text-sm font-medium text-gray-400 mb-2">Output:</h5>
-                      <pre className="bg-[#0a0a12] border border-[#2a2a3e] p-3 rounded text-sm text-gray-300 overflow-x-auto">
+                      <h5 className="text-sm font-medium text-zinc-400 mb-2">Output:</h5>
+                      <pre className="bg-zinc-950 border border-zinc-800/80 p-3 rounded text-sm text-zinc-300 overflow-x-auto">
                         {currentSubmission.output}
                       </pre>
                     </div>
@@ -293,20 +293,20 @@ export default function StudentWorkView() {
 
                   {/* Last Updated */}
                   {currentSubmission.updatedAt && (
-                    <div className="mt-4 text-xs text-gray-500">
+                    <div className="mt-4 text-xs text-zinc-500">
                       Last updated: {new Date(currentSubmission.updatedAt).toLocaleString()}
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="text-center text-gray-500 py-8">
+                <div className="text-center text-zinc-500 py-8">
                   No submission data available.
                 </div>
               )}
             </div>
           </div>
         ) : (
-          <div className="bg-[#1a1a2e] rounded-lg p-8 text-center text-gray-500">
+          <div className="bg-zinc-800/50 rounded-lg p-8 text-center text-zinc-500">
             No submissions found for this exam.
           </div>
         )}
@@ -322,10 +322,10 @@ export default function StudentWorkView() {
                 .filter(c => c.line !== null)
                 .sort((a, b) => (a.line || 0) - (b.line || 0))
                 .map(comment => (
-                  <div key={comment.commentId} className="text-sm p-2 bg-[#1a1a2e] rounded">
+                  <div key={comment.commentId} className="text-sm p-2 bg-zinc-800/50 rounded">
                     <span className="font-medium text-yellow-400">Line {comment.line}:</span>
-                    <span className="ml-2 text-gray-300">{comment.message}</span>
-                    <span className="ml-2 text-xs text-gray-500">
+                    <span className="ml-2 text-zinc-300">{comment.message}</span>
+                    <span className="ml-2 text-xs text-zinc-500">
                       ({comment.authorName})
                     </span>
                   </div>

@@ -116,7 +116,7 @@ export default function ExamChatPanel({ examId, isProfessor = false }: ExamChatP
   if (isMinimized) {
     return (
       <div
-        className="fixed bottom-4 left-4 z-50 bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-lg shadow-emerald-500/25 cursor-pointer hover:bg-emerald-500 hover:shadow-emerald-500/40 transition-all flex items-center gap-2"
+        className="fixed bottom-4 left-4 z-50 bg-indigo-600 text-white px-4 py-3 rounded-xl shadow-lg shadow-indigo-500/20 cursor-pointer hover:bg-indigo-500 hover:shadow-indigo-500/40 transition-all flex items-center gap-2"
         onClick={() => setIsMinimized(false)}
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -133,9 +133,9 @@ export default function ExamChatPanel({ examId, isProfessor = false }: ExamChatP
   }
 
   return (
-    <div className="fixed bottom-4 left-4 z-50 w-80 bg-[#13131f]/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-[#2a2a3e] flex flex-col max-h-96">
+    <div className="fixed bottom-4 left-4 z-50 w-80 bg-zinc-900/80/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-zinc-800/80 flex flex-col max-h-96">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-[#0a0a12]/90 rounded-t-2xl border-b border-[#2a2a3e]">
+      <div className="flex items-center justify-between px-4 py-3 bg-zinc-950/90 rounded-t-2xl border-b border-zinc-800/80">
         <div className="flex items-center gap-2">
           <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -149,7 +149,7 @@ export default function ExamChatPanel({ examId, isProfessor = false }: ExamChatP
         </div>
         <button
           onClick={() => setIsMinimized(true)}
-          className="text-gray-400 hover:text-white"
+          className="text-zinc-400 hover:text-white"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -160,9 +160,9 @@ export default function ExamChatPanel({ examId, isProfessor = false }: ExamChatP
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-48 max-h-64">
         {isLoading ? (
-          <div className="text-gray-400 text-sm text-center py-4">Loading messages...</div>
+          <div className="text-zinc-400 text-sm text-center py-4">Loading messages...</div>
         ) : visibleMessages.length === 0 ? (
-          <div className="text-gray-400 text-sm text-center py-4">
+          <div className="text-zinc-400 text-sm text-center py-4">
             {isProfessor ? 'No messages yet' : 'Ask a question to get help from professor'}
           </div>
         ) : (
@@ -176,15 +176,15 @@ export default function ExamChatPanel({ examId, isProfessor = false }: ExamChatP
                       ? 'bg-yellow-900/30 border border-yellow-700/50'
                       : msg.senderId === user?.id
                         ? 'bg-yellow-900/30 border border-yellow-700/50'
-                        : 'bg-[#1a1a2e]/50 blur-sm'
-                    : 'bg-[#1a1a2e]'
+                        : 'bg-zinc-800/50/50 blur-sm'
+                    : 'bg-zinc-800/50'
                 }`}
               >
                 <div className="flex items-center justify-between text-xs mb-1">
                   <span className="text-emerald-400 font-medium">{msg.senderName}</span>
-                  <span className="text-gray-500">{formatTime(msg.createdAt)}</span>
+                  <span className="text-zinc-500">{formatTime(msg.createdAt)}</span>
                 </div>
-                <p className="text-gray-200 text-sm">{msg.message}</p>
+                <p className="text-zinc-200 text-sm">{msg.message}</p>
                 {msg.status === 'pending' && msg.senderId === user?.id && (
                   <span className="text-xs text-yellow-500 mt-1 block">Waiting for professor...</span>
                 )}
@@ -206,9 +206,9 @@ export default function ExamChatPanel({ examId, isProfessor = false }: ExamChatP
                 <div className="ml-4 bg-emerald-900/30 border border-emerald-700/50 rounded-xl p-2.5">
                   <div className="flex items-center justify-between text-xs mb-1">
                     <span className="text-green-400 font-medium">{msg.replyAuthorName}</span>
-                    <span className="text-gray-500">{msg.approvedAt ? formatTime(msg.approvedAt) : ''}</span>
+                    <span className="text-zinc-500">{msg.approvedAt ? formatTime(msg.approvedAt) : ''}</span>
                   </div>
-                  <p className="text-gray-200 text-sm">{msg.replyMessage}</p>
+                  <p className="text-zinc-200 text-sm">{msg.replyMessage}</p>
                 </div>
               )}
             </div>
@@ -219,11 +219,11 @@ export default function ExamChatPanel({ examId, isProfessor = false }: ExamChatP
 
       {/* Reply form (for professors) */}
       {isProfessor && replyingTo && (
-        <div className="px-3 py-2 bg-[#0a0a12] border-t border-[#2a2a3e]">
-          <div className="text-xs text-gray-400 mb-1">
+        <div className="px-3 py-2 bg-zinc-950 border-t border-zinc-800/80">
+          <div className="text-xs text-zinc-400 mb-1">
             Replying to: <span className="text-emerald-400">{replyingTo.senderName}</span>
           </div>
-          <div className="text-xs text-gray-500 mb-2 truncate">"{replyingTo.message}"</div>
+          <div className="text-xs text-zinc-500 mb-2 truncate">"{replyingTo.message}"</div>
           <div className="flex gap-2">
             <input
               type="text"
@@ -231,19 +231,19 @@ export default function ExamChatPanel({ examId, isProfessor = false }: ExamChatP
               onChange={(e) => setReplyText(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleReply()}
               placeholder="Type your reply..."
-              className="flex-1 bg-[#1a1a2e] border border-[#2a2a3e] rounded-lg px-2 py-1 text-sm text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500"
+              className="flex-1 bg-zinc-800/50 border border-zinc-800/80 rounded-lg px-2 py-1 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-indigo-500/50"
               autoFocus
             />
             <button
               onClick={handleReply}
               disabled={isSending || !replyText.trim()}
-              className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 text-white px-3 py-1 rounded-lg text-sm transition-colors cursor-pointer"
+              className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 text-white px-3 py-1 rounded-lg text-sm transition-colors cursor-pointer"
             >
               Send
             </button>
             <button
               onClick={() => setReplyingTo(null)}
-              className="text-gray-400 hover:text-white px-2"
+              className="text-zinc-400 hover:text-white px-2"
             >
               Cancel
             </button>
@@ -253,7 +253,7 @@ export default function ExamChatPanel({ examId, isProfessor = false }: ExamChatP
 
       {/* Input form (for students) */}
       {!isProfessor && (
-        <div className="px-3 py-2 bg-[#0a0a12] border-t border-[#2a2a3e]">
+        <div className="px-3 py-2 bg-zinc-950 border-t border-zinc-800/80">
           <div className="flex gap-2">
             <input
               type="text"
@@ -261,12 +261,12 @@ export default function ExamChatPanel({ examId, isProfessor = false }: ExamChatP
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
               placeholder="Ask a question..."
-              className="flex-1 bg-[#1a1a2e] border border-[#2a2a3e] rounded-lg px-3 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500"
+              className="flex-1 bg-zinc-800/50 border border-zinc-800/80 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-indigo-500/50"
             />
             <button
               onClick={handleSendMessage}
               disabled={isSending || !newMessage.trim()}
-              className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
+              className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
             >
               Send
             </button>

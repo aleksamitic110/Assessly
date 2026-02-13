@@ -209,8 +209,8 @@ export default function ProfessorReviewPage() {
           const lineComment = lineComments.find(c => c.line === lineNum);
           return (
             <div key={idx}>
-              <div className="flex hover:bg-[#1a1a2e]">
-                <span className="w-12 text-right pr-3 text-gray-400 select-none border-r border-[#2a2a3e]">
+              <div className="flex hover:bg-zinc-800/50">
+                <span className="w-12 text-right pr-3 text-zinc-400 select-none border-r border-zinc-800/80">
                   {lineNum}
                 </span>
                 <pre className="flex-1 pl-3 whitespace-pre-wrap break-all">{line || ' '}</pre>
@@ -222,7 +222,7 @@ export default function ProfessorReviewPage() {
                           <span className="font-medium text-amber-400">
                             {lineComment.authorName}:
                           </span>
-                          <span className="ml-2 text-gray-300">{lineComment.message}</span>
+                          <span className="ml-2 text-zinc-300">{lineComment.message}</span>
                         </div>
                         <div className="flex gap-2">
                           <button
@@ -250,8 +250,8 @@ export default function ProfessorReviewPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0a0a12] flex items-center justify-center">
-        <div className="flex items-center gap-2 text-gray-400">
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="flex items-center gap-2 text-zinc-400">
           <svg className="animate-spin h-5 w-5 text-emerald-400" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
@@ -263,21 +263,21 @@ export default function ProfessorReviewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a12]">
+    <div className="min-h-screen bg-zinc-950">
       {/* Header */}
-      <header className="bg-[#13131f]/95 backdrop-blur-sm shadow-sm border-b border-[#2a2a3e] sticky top-0 z-30">
+      <header className="bg-zinc-900/80 backdrop-blur-xl shadow-sm border-b border-zinc-800/80 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-400 via-violet-400 to-purple-400 bg-clip-text text-transparent">
               Review: {exam?.name || 'Exam'}
             </h1>
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-zinc-400">
               {exam?.subjectName}
             </p>
           </div>
           <button
             onClick={() => navigate('/professor')}
-            className="px-4 py-2 text-sm font-medium text-gray-300 border border-[#2a2a3e] rounded-xl hover:bg-[#252540] transition-colors cursor-pointer"
+            className="px-4 py-2 text-sm font-medium text-zinc-300 border border-zinc-800/80 rounded-xl hover:bg-zinc-800 transition-colors cursor-pointer"
           >
             Back to Dashboard
           </button>
@@ -298,13 +298,13 @@ export default function ProfessorReviewPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Student List */}
           <div className="lg:col-span-1">
-            <div className="bg-[#13131f] border border-[#2a2a3e] rounded-2xl p-4">
+            <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-4">
               <h2 className="text-lg font-semibold text-white mb-4">
                 Students ({students.length})
               </h2>
               <div className="space-y-2 max-h-[600px] overflow-y-auto">
                 {students.length === 0 ? (
-                  <p className="text-sm text-gray-500">No submissions yet.</p>
+                  <p className="text-sm text-zinc-500">No submissions yet.</p>
                 ) : (
                   students.map(student => (
                     <button
@@ -313,13 +313,13 @@ export default function ProfessorReviewPage() {
                       className={`w-full text-left p-3 rounded-xl transition-all cursor-pointer ${
                         selectedStudent?.studentId === student.studentId
                           ? 'bg-emerald-900/30 border border-emerald-500/60 shadow-sm'
-                          : 'bg-[#1a1a2e] hover:bg-[#252540] border border-transparent'
+                          : 'bg-zinc-800/50 hover:bg-zinc-800 border border-transparent'
                       }`}
                     >
                       <div className="font-medium text-white text-sm">
                         {student.firstName} {student.lastName}
                       </div>
-                      <div className="text-xs text-gray-400">
+                      <div className="text-xs text-zinc-400">
                         {student.email}
                       </div>
                       {student.grade && (
@@ -337,27 +337,27 @@ export default function ProfessorReviewPage() {
           {/* Main Content */}
           <div className="lg:col-span-3">
             {!selectedStudent ? (
-              <div className="bg-[#13131f] border border-[#2a2a3e] rounded-2xl p-8 text-center text-gray-400">
+              <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-8 text-center text-zinc-400">
                 Select a student to review their work
               </div>
             ) : isLoadingSubmissions ? (
-              <div className="bg-[#13131f] border border-[#2a2a3e] rounded-2xl p-8 text-center text-gray-400">
+              <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-8 text-center text-zinc-400">
                 Loading submissions...
               </div>
             ) : (
               <div className="space-y-6">
                 {/* Student Info & Grade */}
-                <div className="bg-[#13131f] border border-[#2a2a3e] rounded-2xl p-6">
+                <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-6">
                   <div className="flex flex-wrap justify-between items-start gap-4">
                     <div>
                       <h3 className="text-xl font-semibold text-white">
                         {selectedStudent.firstName} {selectedStudent.lastName}
                       </h3>
-                      <p className="text-sm text-gray-400">
+                      <p className="text-sm text-zinc-400">
                         {selectedStudent.email}
                       </p>
                       {selectedStudent.submittedAt && (
-                        <p className="text-xs text-gray-400 mt-1">
+                        <p className="text-xs text-zinc-400 mt-1">
                           Submitted: {new Date(selectedStudent.submittedAt).toLocaleString()}
                         </p>
                       )}
@@ -366,30 +366,30 @@ export default function ProfessorReviewPage() {
                     {/* Grade Form */}
                     <div className="flex flex-wrap items-end gap-3">
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">Grade</label>
+                        <label className="block text-xs text-zinc-500 mb-1">Grade</label>
                         <input
                           type="number"
                           min="5"
                           max="10"
                           value={gradeValue}
                           onChange={(e) => setGradeValue(Number(e.target.value))}
-                          className="w-20 px-2 py-1 text-sm bg-[#1a1a2e] border border-[#2a2a3e] text-white rounded"
+                          className="w-20 px-2 py-1 text-sm bg-zinc-800/50 border border-zinc-800/80 text-white rounded"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">Comment</label>
+                        <label className="block text-xs text-zinc-500 mb-1">Comment</label>
                         <input
                           type="text"
                           value={gradeComment}
                           onChange={(e) => setGradeComment(e.target.value)}
                           placeholder="General comment..."
-                          className="w-48 px-2 py-1 text-sm bg-[#1a1a2e] border border-[#2a2a3e] text-white rounded"
+                          className="w-48 px-2 py-1 text-sm bg-zinc-800/50 border border-zinc-800/80 text-white rounded"
                         />
                       </div>
                       <button
                         onClick={handleSaveGrade}
                         disabled={isSavingGrade}
-                        className="px-4 py-1.5 text-sm font-semibold text-white bg-emerald-600 rounded-xl hover:bg-emerald-500 shadow-sm shadow-emerald-500/25 disabled:opacity-50 transition-all cursor-pointer"
+                        className="px-4 py-1.5 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-500 shadow-sm shadow-emerald-500/25 disabled:opacity-50 transition-all cursor-pointer"
                       >
                         {isSavingGrade ? 'Saving...' : 'Save Grade'}
                       </button>
@@ -399,8 +399,8 @@ export default function ProfessorReviewPage() {
 
                 {/* Task Tabs */}
                 {submissions.length > 0 && (
-                  <div className="bg-[#13131f] border border-[#2a2a3e] rounded-2xl">
-                    <div className="border-b border-[#2a2a3e]">
+                  <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl">
+                    <div className="border-b border-zinc-800/80">
                       <nav className="flex overflow-x-auto">
                         {submissions.map((sub, idx) => (
                           <button
@@ -409,7 +409,7 @@ export default function ProfessorReviewPage() {
                             className={`px-4 py-3 text-sm font-medium whitespace-nowrap cursor-pointer ${
                               selectedTaskIndex === idx
                                 ? 'border-b-2 border-emerald-500 text-emerald-400'
-                                : 'text-gray-500 hover:text-gray-300'
+                                : 'text-zinc-500 hover:text-zinc-300'
                             }`}
                           >
                             {sub.taskTitle || `Task ${idx + 1}`}
@@ -433,7 +433,7 @@ export default function ProfessorReviewPage() {
                                 Task Description
                               </h5>
                               {currentTask.description && (
-                                <p className="text-sm text-gray-300 whitespace-pre-wrap mb-3">
+                                <p className="text-sm text-zinc-300 whitespace-pre-wrap mb-3">
                                   {currentTask.description}
                                 </p>
                               )}
@@ -444,7 +444,7 @@ export default function ProfessorReviewPage() {
                                   {currentTask.exampleInput && (
                                     <div>
                                       <span className="text-xs font-medium text-sky-400">Example Input:</span>
-                                      <pre className="mt-1 p-2 bg-[#0a0a12] rounded text-xs font-mono overflow-x-auto">
+                                      <pre className="mt-1 p-2 bg-zinc-950 rounded text-xs font-mono overflow-x-auto">
                                         {currentTask.exampleInput}
                                       </pre>
                                     </div>
@@ -452,7 +452,7 @@ export default function ProfessorReviewPage() {
                                   {currentTask.exampleOutput && (
                                     <div>
                                       <span className="text-xs font-medium text-sky-400">Example Output:</span>
-                                      <pre className="mt-1 p-2 bg-[#0a0a12] rounded text-xs font-mono overflow-x-auto">
+                                      <pre className="mt-1 p-2 bg-zinc-950 rounded text-xs font-mono overflow-x-auto">
                                         {currentTask.exampleOutput}
                                       </pre>
                                     </div>
@@ -464,7 +464,7 @@ export default function ProfessorReviewPage() {
                               {currentTask.notes && (
                                 <div className="mb-3">
                                   <span className="text-xs font-medium text-sky-400">Notes:</span>
-                                  <p className="mt-1 text-sm text-gray-400">{currentTask.notes}</p>
+                                  <p className="mt-1 text-sm text-zinc-400">{currentTask.notes}</p>
                                 </div>
                               )}
 
@@ -486,17 +486,17 @@ export default function ProfessorReviewPage() {
                           )}
 
                           {/* Student Code */}
-                          <h5 className="text-sm font-semibold text-gray-300 mb-2">
+                          <h5 className="text-sm font-semibold text-zinc-300 mb-2">
                             Student's Code
                           </h5>
                           {currentSubmission.sourceCode ? (
-                            <div className="bg-[#0a0a12] rounded-lg border border-[#2a2a3e] overflow-hidden">
+                            <div className="bg-zinc-950 rounded-lg border border-zinc-800/80 overflow-hidden">
                               <div className="max-h-[400px] overflow-y-auto">
                                 {renderCode(currentSubmission.sourceCode)}
                               </div>
                             </div>
                           ) : (
-                            <p className="text-gray-500 p-4 bg-[#0a0a12] rounded-lg">
+                            <p className="text-zinc-500 p-4 bg-zinc-950 rounded-lg">
                               No code submitted for this task.
                             </p>
                           )}
@@ -504,22 +504,22 @@ export default function ProfessorReviewPage() {
                           {/* Output */}
                           {currentSubmission.output && (
                             <div className="mt-4">
-                              <h5 className="text-sm font-medium text-gray-300 mb-2">Output:</h5>
-                              <pre className="bg-[#0a0a12] p-3 rounded text-sm overflow-x-auto border border-[#2a2a3e]">
+                              <h5 className="text-sm font-medium text-zinc-300 mb-2">Output:</h5>
+                              <pre className="bg-zinc-950 p-3 rounded text-sm overflow-x-auto border border-zinc-800/80">
                                 {currentSubmission.output}
                               </pre>
                             </div>
                           )}
                         </div>
                       ) : (
-                        <p className="text-gray-500">No submission data available.</p>
+                        <p className="text-zinc-500">No submission data available.</p>
                       )}
                     </div>
                   </div>
                 )}
 
                 {/* Comments Section */}
-                <div className="bg-[#13131f] border border-[#2a2a3e] rounded-2xl p-6">
+                <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-6">
                   <h4 className="text-lg font-semibold text-white mb-4">
                     Add Feedback
                   </h4>
@@ -527,7 +527,7 @@ export default function ProfessorReviewPage() {
                   {/* Add Comment Form */}
                   <div className="flex gap-3 mb-4">
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">
+                      <label className="block text-xs text-zinc-500 mb-1">
                         Line # (optional){maxLineCount ? ` / max ${maxLineCount}` : ''}
                       </label>
                       <input
@@ -537,25 +537,25 @@ export default function ProfessorReviewPage() {
                         value={newCommentLine}
                         onChange={(e) => setNewCommentLine(e.target.value)}
                         placeholder="Line"
-                        className="w-20 px-3 py-2 text-sm bg-[#1a1a2e] border border-[#2a2a3e] text-white rounded"
+                        className="w-20 px-3 py-2 text-sm bg-zinc-800/50 border border-zinc-800/80 text-white rounded"
                       />
                     </div>
                     <div className="flex-1">
-                      <label className="block text-xs text-gray-500 mb-1">Comment</label>
+                      <label className="block text-xs text-zinc-500 mb-1">Comment</label>
                       <input
                         type="text"
                         value={newCommentMessage}
                         onChange={(e) => setNewCommentMessage(e.target.value)}
                         placeholder="Enter your feedback..."
                         onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
-                        className="w-full px-3 py-2 text-sm bg-[#1a1a2e] border border-[#2a2a3e] text-white rounded"
+                        className="w-full px-3 py-2 text-sm bg-zinc-800/50 border border-zinc-800/80 text-white rounded"
                       />
                     </div>
                     <div className="flex items-end">
                       <button
                         onClick={handleAddComment}
                         disabled={isSavingComment || !newCommentMessage.trim()}
-                        className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-xl hover:bg-emerald-500 shadow-sm shadow-emerald-500/25 disabled:opacity-50 transition-all cursor-pointer"
+                        className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-500 shadow-sm shadow-emerald-500/25 disabled:opacity-50 transition-all cursor-pointer"
                       >
                         {isSavingComment ? 'Adding...' : 'Add Comment'}
                       </button>
@@ -564,7 +564,7 @@ export default function ProfessorReviewPage() {
 
                   {/* General comments (no line number) */}
                   <div className="space-y-2">
-                    <h5 className="text-sm font-medium text-gray-400">
+                    <h5 className="text-sm font-medium text-zinc-400">
                       General Comments ({comments.filter(c => c.line === null).length})
                     </h5>
                     {comments
@@ -572,17 +572,17 @@ export default function ProfessorReviewPage() {
                       .map(comment => (
                         <div
                           key={comment.commentId}
-                          className="p-3 bg-[#1a1a2e] rounded-lg"
+                          className="p-3 bg-zinc-800/50 rounded-lg"
                         >
                           <div className="flex justify-between items-start">
                             <div>
                               <span className="font-medium text-white">
                                 {comment.authorName}
                               </span>
-                              <span className="ml-2 text-xs text-gray-500">
+                              <span className="ml-2 text-xs text-zinc-500">
                                 {new Date(comment.createdAt).toLocaleString()}
                               </span>
-                              <p className="mt-1 text-gray-300">
+                              <p className="mt-1 text-zinc-300">
                                 {comment.message}
                               </p>
                             </div>
@@ -604,14 +604,14 @@ export default function ProfessorReviewPage() {
                         </div>
                       ))}
                     {comments.filter(c => c.line === null).length === 0 && (
-                      <p className="text-sm text-gray-500 italic">No general comments yet. Add one above.</p>
+                      <p className="text-sm text-zinc-500 italic">No general comments yet. Add one above.</p>
                     )}
                   </div>
 
                   {/* Line comments summary */}
                   {comments.filter(c => c.line !== null).length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-[#2a2a3e]">
-                      <h5 className="text-sm font-medium text-gray-400 mb-2">
+                    <div className="mt-4 pt-4 border-t border-zinc-800/80">
+                      <h5 className="text-sm font-medium text-zinc-400 mb-2">
                         Line Comments ({comments.filter(c => c.line !== null).length})
                       </h5>
                       <div className="space-y-1">
@@ -627,7 +627,7 @@ export default function ProfessorReviewPage() {
                                 <span className="font-medium text-amber-400">
                                   Line {comment.line}:
                                 </span>
-                                <span className="ml-2 text-gray-300">
+                                <span className="ml-2 text-zinc-300">
                                   {comment.message}
                                 </span>
                               </div>

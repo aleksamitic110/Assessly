@@ -795,22 +795,22 @@ Code saved.` : 'Code saved.'));
   const isExamLocked = examStatus !== 'active' || isReviewMode;
 
   return (
-    <div className={`h-screen bg-[#0a0a12] text-white flex flex-col overflow-hidden ${!isReviewMode ? 'pb-20 md:pb-0' : ''}`}
+    <div className={`h-screen bg-zinc-950 text-white flex flex-col overflow-hidden ${!isReviewMode ? 'pb-20 md:pb-0' : ''}`}
       ref={containerRef}
     >
-      <header className="bg-[#13131f]/95 backdrop-blur-sm border-b border-[#2a2a3e] px-4 py-3 shrink-0">
+      <header className="bg-zinc-900/90 backdrop-blur-xl border-b border-zinc-800/80 px-4 py-3 shrink-0">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center space-x-4">
-            <h1 className="text-xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">Assessly</h1>
-            <span className="text-gray-600">|</span>
-            <span className="text-gray-200 font-medium">{currentTask?.title || 'Exam'}</span>
+            <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-400 via-violet-400 to-purple-400 bg-clip-text text-transparent">Assessly</h1>
+            <span className="h-5 w-px bg-zinc-700" />
+            <span className="text-zinc-200 font-medium">{currentTask?.title || 'Exam'}</span>
             {examDetails && (
-              <span className="text-gray-500 text-sm font-medium">({examDetails.subjectName})</span>
+              <span className="text-zinc-500 text-sm font-medium">({examDetails.subjectName})</span>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3">
             {violations > 0 && !isReviewMode && (
-              <div className="flex items-center space-x-2 bg-red-900/40 border border-red-700/50 rounded-lg px-3 py-1.5 text-red-400">
+              <div className="flex items-center space-x-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-1.5 text-red-400">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
@@ -819,11 +819,11 @@ Code saved.` : 'Code saved.'));
             )}
             <div className="flex items-center space-x-3">
               <span className={`text-xs uppercase tracking-wider font-semibold px-2.5 py-1 rounded-md ${
-                examStatus === 'active' ? 'bg-emerald-900/40 text-emerald-400 border border-emerald-800/40' :
-                examStatus === 'paused' ? 'bg-amber-900/40 text-amber-400 border border-amber-800/40' :
-                examStatus === 'completed' || examStatus === 'submitted' ? 'bg-sky-900/40 text-sky-400 border border-sky-800/40' :
-                examStatus === 'withdrawn' ? 'bg-red-900/40 text-red-400 border border-red-800/40' :
-                'bg-[#1a1a2e] text-gray-400 border border-[#2a2a3e]'
+                examStatus === 'active' ? 'bg-emerald-500/10 text-indigo-400 border border-emerald-500/20' :
+                examStatus === 'paused' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                examStatus === 'completed' || examStatus === 'submitted' ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20' :
+                examStatus === 'withdrawn' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                'bg-zinc-800/50 text-zinc-400 border border-zinc-700/50'
               }`}>
                 {examStatus === 'active' && 'Active'}
                 {examStatus === 'paused' && 'Paused'}
@@ -834,19 +834,19 @@ Code saved.` : 'Code saved.'));
                 {examStatus === 'withdrawn' && 'Withdrawn'}
               </span>
               {!isReviewMode && (
-                <div className={`text-lg font-mono font-bold tabular-nums ${timeLeft < 300 ? 'text-red-400' : 'text-emerald-400'}`}>
+                <div className={`text-lg font-mono font-bold tabular-nums ${timeLeft < 300 ? 'text-red-400' : 'text-indigo-400'}`}>
                   {formatTime(timeLeft)}
                 </div>
               )}
             </div>
-            <span className="text-gray-400 text-sm">
+            <span className="text-zinc-400 text-sm">
               {user?.firstName} {user?.lastName}
             </span>
             {!isReviewMode && (
               <button
                 type="button"
                 onClick={requestFullscreen}
-                className="px-3 py-1.5 text-xs border border-[#2a2a3e] text-gray-300 rounded-lg hover:bg-[#252540] hover:border-[#3a3a5e] transition-all cursor-pointer"
+                className="px-3 py-1.5 text-xs border border-zinc-700/50 text-zinc-300 rounded-lg hover:bg-zinc-800 hover:border-zinc-600/50 transition-all cursor-pointer"
               >
                 {isFullscreen ? 'Fullscreen on' : 'Fullscreen'}
               </button>
@@ -856,13 +856,13 @@ Code saved.` : 'Code saved.'));
                 <button
                   onClick={handleSubmit}
                   disabled={isExamLocked}
-                  className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-semibold transition-all shadow-sm shadow-emerald-900/30 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  className="px-4 py-1.5 bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 rounded-lg text-sm font-semibold transition-all shadow-sm shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   Submit exam
                 </button>
                 <button
                   onClick={handleCancelExam}
-                  className="px-4 py-1.5 bg-[#1a1a2e] border border-[#2a2a3e] hover:bg-[#252540] rounded-lg text-sm font-medium transition-all cursor-pointer"
+                  className="px-4 py-1.5 bg-zinc-800/50 border border-zinc-700/50 hover:bg-zinc-800 rounded-lg text-sm font-medium transition-all cursor-pointer"
                 >
                   Withdraw
                 </button>
@@ -873,17 +873,17 @@ Code saved.` : 'Code saved.'));
       </header>
 
       {!isReviewMode && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#13131f]/95 backdrop-blur-sm border-t border-[#2a2a3e] px-4 py-3 flex gap-2">
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-zinc-900/95 backdrop-blur-xl border-t border-zinc-800/80 px-4 py-3 flex gap-2">
           <button
             onClick={handleSubmit}
             disabled={isExamLocked}
-            className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-semibold transition-all shadow-sm shadow-emerald-900/30 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 rounded-lg text-sm font-semibold transition-all shadow-sm shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             Submit exam
           </button>
           <button
             onClick={handleCancelExam}
-            className="flex-1 px-4 py-2.5 bg-[#1a1a2e] border border-[#2a2a3e] hover:bg-[#252540] rounded-lg text-sm font-medium transition-all cursor-pointer"
+            className="flex-1 px-4 py-2.5 bg-zinc-800/50 border border-zinc-700/50 hover:bg-zinc-800 rounded-lg text-sm font-medium transition-all cursor-pointer"
           >
             Withdraw
           </button>
@@ -892,12 +892,12 @@ Code saved.` : 'Code saved.'));
 
       <div className="flex-1 flex overflow-hidden" ref={contentRef}>
         <div
-          className="bg-[#13131f] border-r border-[#2a2a3e] p-4 overflow-y-auto"
+          className="bg-zinc-900/80 border-r border-zinc-800/80 p-4 overflow-y-auto"
           style={{ width: `${leftWidth}%`, flexShrink: 0 }}
         >
           {isExamLocked && !isReviewMode && (
-            <div className="mb-4 rounded-lg border border-yellow-600/40 bg-yellow-900/20 px-3 py-2.5 text-sm text-yellow-200 flex items-center gap-2">
-              <svg className="w-4 h-4 shrink-0 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-200 flex items-center gap-2">
+              <svg className="w-4 h-4 shrink-0 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
               <span>
@@ -910,42 +910,42 @@ Code saved.` : 'Code saved.'));
             </div>
           )}
           {isReviewMode && (
-            <div className="mb-4 rounded-lg border border-blue-600/40 bg-blue-900/20 px-3 py-2.5 text-sm text-blue-200 flex items-center gap-2">
-              <svg className="w-4 h-4 shrink-0 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="mb-4 rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-3 py-2.5 text-sm text-indigo-200 flex items-center gap-2">
+              <svg className="w-4 h-4 shrink-0 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
               Review mode: read-only view of your work.
             </div>
           )}
-          <div className="mb-4 rounded-lg border border-[#2a2a3e] bg-[#0a0a12]/80 px-3 py-2.5 text-xs text-gray-300">
-            <div className="mb-2 text-gray-500 uppercase tracking-wider text-[10px] font-semibold">View</div>
+          <div className="mb-4 rounded-lg border border-zinc-800/80 bg-zinc-950/80 px-3 py-2.5 text-xs text-zinc-300">
+            <div className="mb-2 text-zinc-500 uppercase tracking-wider text-[10px] font-semibold">View</div>
             <div className="flex flex-wrap gap-x-4 gap-y-2">
               <label className="flex items-center gap-1.5 cursor-pointer select-none hover:text-gray-100 transition-colors">
-                <input type="checkbox" checked={showTaskList} onChange={() => setShowTaskList((prev) => !prev)} className="accent-emerald-500 rounded" />
+                <input type="checkbox" checked={showTaskList} onChange={() => setShowTaskList((prev) => !prev)} className="accent-indigo-500 rounded" />
                 Tasks
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer select-none hover:text-gray-100 transition-colors">
-                <input type="checkbox" checked={showTaskDetails} onChange={() => setShowTaskDetails((prev) => !prev)} className="accent-emerald-500 rounded" />
+                <input type="checkbox" checked={showTaskDetails} onChange={() => setShowTaskDetails((prev) => !prev)} className="accent-indigo-500 rounded" />
                 Details
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer select-none hover:text-gray-100 transition-colors">
-                <input type="checkbox" checked={showPdf} onChange={() => setShowPdf((prev) => !prev)} className="accent-emerald-500 rounded" />
+                <input type="checkbox" checked={showPdf} onChange={() => setShowPdf((prev) => !prev)} className="accent-indigo-500 rounded" />
                 PDF
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer select-none hover:text-gray-100 transition-colors">
-                <input type="checkbox" checked={showEditor} onChange={() => setShowEditor((prev) => !prev)} className="accent-emerald-500 rounded" />
+                <input type="checkbox" checked={showEditor} onChange={() => setShowEditor((prev) => !prev)} className="accent-indigo-500 rounded" />
                 Editor
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer select-none hover:text-gray-100 transition-colors">
-                <input type="checkbox" checked={showOutput} onChange={() => setShowOutput((prev) => !prev)} className="accent-emerald-500 rounded" />
+                <input type="checkbox" checked={showOutput} onChange={() => setShowOutput((prev) => !prev)} className="accent-indigo-500 rounded" />
                 Output
               </label>
             </div>
           </div>
           {showTaskList && tasks.length > 1 && (
             <div className="mb-4" style={{ resize: 'vertical', overflow: 'auto', minHeight: '6rem', maxHeight: '40vh' }}>
-              <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              <h2 className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">
                 Tasks
               </h2>
               <div className="space-y-1.5">
@@ -956,8 +956,8 @@ Code saved.` : 'Code saved.'));
                     onClick={() => handleSelectTask(task)}
                     className={`w-full text-left px-3 py-2 rounded-lg border text-sm font-medium transition-all cursor-pointer ${
                       currentTask?.id === task.id
-                        ? 'border-emerald-500/60 bg-emerald-500/15 text-emerald-200 shadow-sm shadow-emerald-500/10'
-                        : 'border-[#2a2a3e] bg-[#0a0a12]/60 text-gray-300 hover:border-[#3a3a5e] hover:bg-[#1a1a2e]'
+                        ? 'border-indigo-500/50 bg-indigo-500/10 text-indigo-200 shadow-sm shadow-indigo-500/10'
+                        : 'border-zinc-800/80 bg-zinc-950/60 text-zinc-300 hover:border-zinc-700/50 hover:bg-zinc-800/50'
                     }`}
                   >
                     {task.title}
@@ -968,10 +968,10 @@ Code saved.` : 'Code saved.'));
           )}
           {showTaskDetails && (
             <>
-              <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-3">Task details</h2>
+              <h2 className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-3">Task details</h2>
               <div className="prose prose-invert" style={{ resize: 'vertical', overflow: 'auto', minHeight: '10rem', maxHeight: '60vh' }}>
                 {isLoadingTask && (
-                  <div className="flex items-center gap-2 text-gray-400">
+                  <div className="flex items-center gap-2 text-zinc-400">
                     <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
@@ -985,13 +985,13 @@ Code saved.` : 'Code saved.'));
                 {!isLoadingTask && !taskError && currentTask && (
                   <>
                     <h3 className="text-white text-xl font-semibold mb-2">{currentTask.title}</h3>
-                    <p className="text-gray-300 leading-relaxed text-sm">{currentTask.description}</p>
+                    <p className="text-zinc-300 leading-relaxed text-sm">{currentTask.description}</p>
                     {showPdf && currentTask.pdfUrl && (
                       <div
-                        className="mt-4 border border-gray-700/80 rounded-lg overflow-hidden bg-gray-900/80"
+                        className="mt-4 border border-zinc-700/80 rounded-lg overflow-hidden bg-zinc-900/80"
                         style={{ resize: 'vertical', overflow: 'auto', minHeight: '12rem', maxHeight: '60vh' }}
                       >
-                        <div className="px-3 py-2 text-xs text-gray-500 font-medium border-b border-gray-700/80">
+                        <div className="px-3 py-2 text-xs text-zinc-500 font-medium border-b border-zinc-700/80">
                           Task PDF
                         </div>
                         <iframe
@@ -1004,24 +1004,24 @@ Code saved.` : 'Code saved.'));
                   </>
                 )}
                 {!isLoadingTask && !taskError && !currentTask && (
-                  <div className="text-gray-500 text-sm">No tasks available.</div>
+                  <div className="text-zinc-500 text-sm">No tasks available.</div>
                 )}
 
                 {currentTask && (
                   <>
                     {(currentTask.exampleInput || currentTask.exampleOutput) && (
-                      <div className="mt-6 p-4 bg-gray-700/50 rounded-lg border border-gray-600/40">
-                        <h4 className="text-yellow-400 font-medium text-sm mb-2">Example input/output:</h4>
-                        <pre className="text-sm text-gray-300 bg-gray-900/80 p-3 rounded-lg whitespace-pre-wrap font-mono">
+                      <div className="mt-6 p-4 bg-zinc-800/50 rounded-lg border border-zinc-700/40">
+                        <h4 className="text-amber-400 font-medium text-sm mb-2">Example input/output:</h4>
+                        <pre className="text-sm text-zinc-300 bg-zinc-900/80 p-3 rounded-lg whitespace-pre-wrap font-mono">
 {`${currentTask.exampleInput ? `Input: ${currentTask.exampleInput}` : ''}${currentTask.exampleInput && currentTask.exampleOutput ? '\n' : ''}${currentTask.exampleOutput ? `Output: ${currentTask.exampleOutput}` : ''}`}
                         </pre>
                       </div>
                     )}
 
                     {currentTask.notes && (
-                      <div className="mt-6 p-4 bg-blue-900/20 border border-blue-700/50 rounded-lg">
-                        <h4 className="text-blue-400 font-medium text-sm mb-2">Notes:</h4>
-                        <p className="text-gray-300 text-sm whitespace-pre-wrap leading-relaxed">{currentTask.notes}</p>
+                      <div className="mt-6 p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
+                        <h4 className="text-indigo-400 font-medium text-sm mb-2">Notes:</h4>
+                        <p className="text-zinc-300 text-sm whitespace-pre-wrap leading-relaxed">{currentTask.notes}</p>
                       </div>
                     )}
                   </>
@@ -1032,7 +1032,7 @@ Code saved.` : 'Code saved.'));
         </div>
 
         <div
-          className="w-1.5 bg-[#2a2a3e]/60 cursor-col-resize hover:bg-emerald-500/80 active:bg-emerald-400 transition-colors"
+          className="w-1.5 bg-zinc-800/40 cursor-col-resize hover:bg-indigo-500/80 active:bg-indigo-400 transition-colors"
           onMouseDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -1041,12 +1041,12 @@ Code saved.` : 'Code saved.'));
         />
         <div className="flex-1 flex flex-col overflow-hidden" ref={rightPanelRef}>
           {showEditor && (
-            <div className="flex-1 border-b border-[#2a2a3e] min-h-0 overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between px-4 py-2 bg-[#13131f] border-b border-[#2a2a3e]">
-                <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-gray-400">
+            <div className="flex-1 border-b border-zinc-800/80 min-h-0 overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between px-4 py-2 bg-zinc-900/80 border-b border-zinc-800/80">
+                <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-zinc-400">
                   <span>Language</span>
                   <select
-                    className="bg-[#0a0a12] border border-[#2a2a3e] text-gray-200 text-xs rounded px-2 py-1"
+                    className="bg-zinc-950 border border-zinc-800/80 text-zinc-200 text-xs rounded px-2 py-1"
                     value={currentLanguageId ?? ''}
                     onChange={(event) => {
                       const nextId = Number(event.target.value);
@@ -1109,7 +1109,7 @@ Code saved.` : 'Code saved.'));
 
           {showEditor && showOutput && (
             <div
-              className="h-1.5 bg-[#2a2a3e]/60 cursor-row-resize hover:bg-emerald-500/80 active:bg-emerald-400 transition-colors"
+              className="h-1.5 bg-zinc-800/40 cursor-row-resize hover:bg-indigo-500/80 active:bg-indigo-400 transition-colors"
               onMouseDown={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -1120,11 +1120,11 @@ Code saved.` : 'Code saved.'));
 
           {showOutput && (
             <div
-              className="bg-[#0a0a12] border-t border-[#2a2a3e]"
+              className="bg-zinc-950 border-t border-zinc-800/80"
               style={{ height: `${outputHeight}px`, flexShrink: 0 }}
             >
-              <div className="flex items-center justify-between px-4 py-2 bg-[#13131f]/90 border-b border-[#2a2a3e]">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Output</span>
+              <div className="flex items-center justify-between px-4 py-2 bg-zinc-900/80/90 border-b border-zinc-800/80">
+                <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Output</span>
                 {!isReviewMode && (
                   <div className="flex items-center space-x-2">
                     <button
@@ -1132,8 +1132,8 @@ Code saved.` : 'Code saved.'));
                       disabled={isSaving || !currentTask || isExamLocked}
                       className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
                         isSaving || !currentTask || isExamLocked
-                          ? 'bg-[#1a1a2e] cursor-not-allowed opacity-50'
-                          : 'bg-sky-600 hover:bg-sky-500 shadow-sm shadow-sky-900/30 cursor-pointer'
+                          ? 'bg-zinc-800/50 cursor-not-allowed opacity-50'
+                          : 'bg-sky-600 hover:bg-sky-500 shadow-sm shadow-sky-500/20 cursor-pointer'
                       }`}
                     >
                       {isSaving ? 'Saving...' : 'Save'}
@@ -1143,8 +1143,8 @@ Code saved.` : 'Code saved.'));
                       disabled={isRunning || !currentTask || isExamLocked}
                       className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
                         isRunning || !currentTask || isExamLocked
-                          ? 'bg-[#1a1a2e] cursor-not-allowed opacity-50'
-                          : 'bg-emerald-600 hover:bg-emerald-500 shadow-sm shadow-emerald-900/30 cursor-pointer'
+                          ? 'bg-zinc-800/50 cursor-not-allowed opacity-50'
+                          : 'bg-indigo-600 hover:bg-indigo-500 shadow-sm shadow-indigo-500/20 cursor-pointer'
                       }`}
                     >
                       {isRunning ? 'Running...' : 'Run code (F5)'}
@@ -1152,13 +1152,13 @@ Code saved.` : 'Code saved.'));
                   </div>
                 )}
               </div>
-              <pre className="p-4 text-sm text-gray-300 font-mono overflow-auto h-full leading-relaxed">
+              <pre className="p-4 text-sm text-zinc-300 font-mono overflow-auto h-full leading-relaxed">
                 {output || 'Click "Run code" to see output...'}
               </pre>
             </div>
           )}
           {!showEditor && !showOutput && (
-            <div className="flex-1 flex items-center justify-center text-sm text-gray-500 select-none">
+            <div className="flex-1 flex items-center justify-center text-sm text-zinc-500 select-none">
               Editor and output are hidden in view settings.
             </div>
           )}

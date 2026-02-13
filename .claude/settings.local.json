@@ -17,7 +17,9 @@
       "Bash(powershell -Command:*)",
       "Bash(git -C \"/c/Users/omiti/OneDrive/Радна površina/IV godina/prvi semestar/Napredne baze podataka/Projekat/Assessly\" ls-files \"server/src/databases\")",
       "Bash(git -C \"/c/Users/omiti/OneDrive/Радна površina/IV godina/prvi semestar/Napredne baze podataka/Projekat/Assessly\" ls-files \"server/src/services\")",
-      "Bash(git -C \"/c/Users/omiti/OneDrive/Радна површina/IV godina/prvi semestar/Napredne baze podataka/Projekat/Assessly\" ls-files \"server/src/middleware\")"
+      "Bash(git -C \"/c/Users/omiti/OneDrive/Радна површina/IV godina/prvi semestar/Napredne baze podataka/Projekat/Assessly\" ls-files \"server/src/middleware\")",
+      "Bash(python:*)",
+      "Bash(py:*)"
     ]
   }
 }
