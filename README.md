@@ -1,26 +1,44 @@
-# Assessly
+﻿# Assessly
 
 Fakultetski projekat iz predmeta **Napredne baze podataka**.  
-Sistem za online ispite: kreiranje predmeta/ispita/zadataka, rešavanje zadataka u editoru, real-time nadzor, chat student-profesor, automatsko i ručno submitovanje, logovanje aktivnosti i ocenjivanje.
+Sistem za online ispite: kreiranje predmeta/ispita/zadataka, reÅ¡avanje zadataka u editoru, real-time nadzor, chat student-profesor, automatsko i ruÄno submitovanje, logovanje aktivnosti i ocenjivanje.
 
 ---
 
-## 1) Kako pokrenuti projekat (preko skripte)
+## 1) Kako pokrenuti program (GLAVNI FOKUS)
 
-Najbrži način je PowerShell skripta u root-u projekta: `assessly_start.ps1`.
+Najbrzi i preporuceni nacin je PowerShell skripta u root-u projekta: `assessly_start.ps1`.
+
+### Uputstvo za profesorku (obavezno)
+1. Sa platforme CS preuzeti zip `ENV_SCB` i raspakovati ga u root projekta.
+2. Proveriti da su spremni konfiguracioni fajlovi:
+   - `server/.env` (ako je `.env` zavrsio u root-u, prebaciti ga u `server/.env`)
+   - Cassandra secure bundle (`*.zip`) na lokaciji koja je upisana u `CASSANDRA_BUNDLE_PATH`
+3. Pokretanje raditi bez Judge0:
+```powershell
+.\assessly_start.ps1
+```
+4. Nakon starta otvoriti:
+   - Client: http://localhost:5173
+   - Server: http://localhost:3000
+
+### Zasto je za profesorku preporucen start bez Judge0
+- jednostavnije pokretanje
+- manje rizika od Docker problema
+- nema velikog Judge0 image pull-a
 
 ### Preduslovi
-- Docker Desktop (WSL2 backend uključen)
+- Docker Desktop (WSL2 backend ukljucen)
 - PowerShell 5+ ili PowerShell 7+
-- `server/.env` mora postojati (koristi `server/.env.example` kao šablon)
+- `server/.env` mora postojati (koristi `server/.env.example` kao sablon)
 - validan Cassandra secure bundle fajl na putanji iz `CASSANDRA_BUNDLE_PATH`
 
-### Pokretanje bez Judge0 (samo lokalni C++ runner)
+### Pokretanje bez Judge0 (podrazumevano)
 ```powershell
 .\assessly_start.ps1
 ```
 
-### Pokretanje sa Judge0
+### Pokretanje sa Judge0 (opciono)
 ```powershell
 .\assessly_start.ps1 -WithJudge0
 ```
@@ -30,19 +48,19 @@ Najbrži način je PowerShell skripta u root-u projekta: `assessly_start.ps1`.
 Set-ExecutionPolicy -Scope Process Bypass
 ```
 
-### Šta skripta radi (sažetak)
+### Sta skripta radi (sazetak)
 - proverava da postoje `server/.env` i `docker-compose.yml`
-- čita i validira `CASSANDRA_BUNDLE_PATH` iz `server/.env`
-- u `-WithJudge0` režimu povlači odgovarajuću Judge0 sliku
+- cita i validira `CASSANDRA_BUNDLE_PATH` iz `server/.env`
+- u `-WithJudge0` rezimu povlaci odgovarajucu Judge0 sliku
 - bira `docker compose` (v2) ili fallback na `docker-compose`
 - bez `-WithJudge0`:
-  - pokreće samo `server` i `client`
+  - pokrece samo `server` i `client`
   - privremeno override-uje Judge0 env varijable na prazno (da backend radi u local C++ modu)
-- sa `-WithJudge0` pokreće ceo stack iz compose fajla
+- sa `-WithJudge0` pokrece ceo stack iz compose fajla
 
 ---
 
-## 2) Pokretanje bez skripte
+## 2) Alternativno pokretanje bez skripte
 
 ### A) Sa Judge0
 Iz root foldera:
@@ -70,8 +88,6 @@ napravi privremeni override compose fajl koji prazni Judge0 env varijable za `se
 docker compose -f docker-compose.yml -f <override-file>.yml up -d --build server client
 ```
 
----
-
 ## 3) Tehnologije i uloga
 
 ### Frontend
@@ -79,7 +95,7 @@ docker compose -f docker-compose.yml -f <override-file>.yml up -d --build server
 - **Vite**: dev server i build
 - **Tailwind CSS 4**: UI stilovi
 - **Monaco editor**: kod editor na Exam stranici
-- **Socket.IO client**: real-time događaji (timer, status ispita, chat, upozorenja)
+- **Socket.IO client**: real-time dogaÄ‘aji (timer, status ispita, chat, upozorenja)
 
 ### Backend
 - **Node.js + Express 5 + TypeScript**
@@ -88,21 +104,21 @@ docker compose -f docker-compose.yml -f <override-file>.yml up -d --build server
 - **Zod**: validacija request-a
 - **Multer**: upload PDF zadataka
 
-### Izvršavanje koda
-- **Judge0** (opciono): više programskih jezika
+### IzvrÅ¡avanje koda
+- **Judge0** (opciono): viÅ¡e programskih jezika
 - **Local C++ runner** (fallback): `g++` kompilacija + pokretanje bez sandbox-a
 
 ---
 
 ## 4) Baze podataka: gde i kako se koriste
 
-Projekt koristi više baza, svaka za svoju specifičnu ulogu.
+Projekt koristi viÅ¡e baza, svaka za svoju specifiÄnu ulogu.
 
 ### 4.1 Neo4j (AuraDB) - glavna poslovna domen logika
 
-Koristi se za relacije između korisnika, predmeta, ispita, zadataka, predaja i ocena.
+Koristi se za relacije izmeÄ‘u korisnika, predmeta, ispita, zadataka, predaja i ocena.
 
-**Glavni entiteti (čvorovi):**
+**Glavni entiteti (Ävorovi):**
 - `User`
 - `Subject`
 - `Exam`
@@ -111,7 +127,7 @@ Koristi se za relacije između korisnika, predmeta, ispita, zadataka, predaja i 
 
 **Glavne relacije:**
 - `(:User)-[:PREDAJE]->(:Subject)` (profesor predaje predmet)
-- `(:Subject)-[:SADRZI]->(:Exam)` (predmet sadrži ispit)
+- `(:Subject)-[:SADRZI]->(:Exam)` (predmet sadrÅ¾i ispit)
 - `(:Exam)-[:IMA_ZADATAK]->(:Task)` (ispit ima zadatke)
 - `(:User)-[:ENROLLED_IN]->(:Subject)` (student upisan na predmet)
 - `(:User)-[:SUBMITTED]->(:Task)` (kod/output po zadatku)
@@ -121,31 +137,31 @@ Koristi se za relacije između korisnika, predmeta, ispita, zadataka, predaja i 
 **Napomena:** pri startu servera se osigurava fulltext indeks nad `User.email`.
 
 **Potencijalne dodatne upotrebe Neo4j:**
-- preporuke zadataka po uspešnosti i istoriji
-- detekcija sličnosti ponašanja/grupa tokom ispita
+- preporuke zadataka po uspeÅ¡nosti i istoriji
+- detekcija sliÄnosti ponaÅ¡anja/grupa tokom ispita
 - napredna analitika nad graf relacijama student-predmet-zadatak
 
 ### 4.2 Cassandra (Astra DB) - logovi, audit i komunikacija
 
-Koristi se za vremenski orijentisane događaje i veće količine zapisa.
+Koristi se za vremenski orijentisane dogaÄ‘aje i veÄ‡e koliÄine zapisa.
 
 **Tabele koje backend koristi:**
-- `execution_logs` (run/save izvršavanja koda)
+- `execution_logs` (run/save izvrÅ¡avanja koda)
 - `security_events` (tab switch, blur, copy/paste i sl.)
 - `user_activity` (aktivnosti korisnika/admin-a)
 - `exam_comments` (komentari profesora po studentu/liniji koda)
 - `exam_chat_messages` (chat poruke i odgovori profesora)
 
 **Potencijalne dodatne upotrebe Cassandre:**
-- dugoročna analitika po ispitu/studentu
-- anti-cheat heuristike zasnovane na vremenskim serijama događaja
+- dugoroÄna analitika po ispitu/studentu
+- anti-cheat heuristike zasnovane na vremenskim serijama dogaÄ‘aja
 - retention politike i eksport audit trail-a
 
 ### 4.3 Redis - real-time state i ephemeral podaci
 
 Koristi se za privremeno stanje ispita i brzu sinkronizaciju preko Socket.IO.
 
-**Primeri ključeva/podataka:**
+**Primeri kljuÄeva/podataka:**
 - status/timer ispita:  
   - `exam:{examId}:status`
   - `exam:{examId}:start_time`
@@ -157,16 +173,16 @@ Koristi se za privremeno stanje ispita i brzu sinkronizaciju preko Socket.IO.
   - `exam:{examId}:started_students`
   - `exam:{examId}:started:{studentId}`
   - `exam:{examId}:withdrawn:{studentId}`
-- online status i violation brojači:
+- online status i violation brojaÄi:
   - `user:status:{userId}`
   - `user:violations:{examId}:{userId}`
 
 **Potencijalne dodatne upotrebe Redis-a:**
 - globalni rate-limit i session blacklist
-- kratkorošni cache često čitanih dashboard agregata
-- distributed lock za kritične operacije (npr. start/restart ispita)
+- kratkoroÅ¡ni cache Äesto Äitanih dashboard agregata
+- distributed lock za kritiÄne operacije (npr. start/restart ispita)
 
-### 4.4 Judge0 interne baze (kada je Judge0 uključen)
+### 4.4 Judge0 interne baze (kada je Judge0 ukljuÄen)
 
 U `docker-compose.yml` Judge0 dolazi sa internim servisima:
 - `judge0-db` (PostgreSQL)
@@ -183,7 +199,7 @@ Pokretanje:
 docker compose up -d --build
 ```
 
-Gašenje:
+GaÅ¡enje:
 ```powershell
 docker compose down
 ```
@@ -210,7 +226,7 @@ docker compose up -d --build server
 
 - Skripta javlja da Cassandra bundle ne postoji:
   - proveri `CASSANDRA_BUNDLE_PATH` u `server/.env`
-  - putanja može biti apsolutna ili relativna u odnosu na `server/`
+  - putanja moÅ¾e biti apsolutna ili relativna u odnosu na `server/`
 
 ---
 
@@ -275,3 +291,6 @@ Najvazniji "business flow":
 ## 9) English documentation
 
 English version is available in `README.en.md`.
+
+
+
