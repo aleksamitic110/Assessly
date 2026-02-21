@@ -32,16 +32,33 @@ Set-ExecutionPolicy -Scope Process Bypass
 - Server: http://localhost:3000
 
 ### Napomena za cloud baze
-Moguce je da su baze zbog nekoriscenja otisle u hibernate mode. U tom slucaju prvi start moze trajati duze ili privremeno da vrati gresku dok se baze ne probude. Ako se to desi, sacekati kratko i ponovo pokrenuti:
+Moguce je da su baze zbog nekoriscenja otisle u hibernate mode. `assessly_start.ps1` sada automatski pokusava da ih probudi i proverava spremnost preko:
+- `http://localhost:3000/status/cassandra`
+- `http://localhost:3000/status/redis`
+- `http://localhost:3000/status/neo4j`
+
+Tokom pokretanja dobicete jasne poruke, npr:
+- `Cassandra Waked.`
+- `Redis Waked.`
+- `Neo4j Waked.`
+
+Ako neka baza ne uspe da se probudi u predvidjenom vremenu, skripta ispisuje upozorenje sa poslednjom greskom.
 
 ```powershell
 .\assessly_start.ps1
+```
+
+Po potrebi mozete podesiti cekanje:
+
+```powershell
+.\assessly_start.ps1 -WakeTimeoutSeconds 300 -WakePollSeconds 5
 ```
 
 ### Sta skripta radi
 - proverava da postoje `server/.env` i `docker-compose.yml`
 - cita i validira `CASSANDRA_BUNDLE_PATH` iz `server/.env`
 - pokrece samo `server` i `client` servise (bez Judge0)
+- ceka da Cassandra, Redis i Neo4j budu dostupni i ispisuje status "waked/ready"
 
 ### Gasenje
 

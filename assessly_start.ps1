@@ -1,5 +1,9 @@
 param(
-  [switch]$WithJudge0
+  [switch]$WithJudge0,
+  [ValidateRange(10, 1800)]
+  [int]$WakeTimeoutSeconds = 180,
+  [ValidateRange(1, 60)]
+  [int]$WakePollSeconds = 3
 )
 
 $ErrorActionPreference = 'Stop'
@@ -8,6 +12,125 @@ Set-StrictMode -Version Latest
 $rootDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $serverEnvPath = Join-Path $rootDir 'server/.env'
 $composeFilePath = Join-Path $rootDir 'docker-compose.yml'
+
+function Get-ErrorMessage {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Management.Automation.ErrorRecord]$ErrorRecord
+  )
+
+  if ($ErrorRecord.ErrorDetails -and $ErrorRecord.ErrorDetails.Message) {
+    return $ErrorRecord.ErrorDetails.Message.Trim()
+  }
+
+  if ($ErrorRecord.Exception -and $ErrorRecord.Exception.Message) {
+    return $ErrorRecord.Exception.Message.Trim()
+  }
+
+  return 'Unknown error.'
+}
+
+function Test-JsonStatusEndpoint {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Url,
+    [int]$TimeoutSec = 8
+  )
+
+  try {
+    $response = Invoke-RestMethod -Method Get -Uri $Url -TimeoutSec $TimeoutSec
+    if ($null -eq $response) {
+      return [pscustomobject]@{
+        Ok = $false
+        Message = 'Empty response.'
+      }
+    }
+
+    $statusValue = ''
+    if ($response.PSObject.Properties.Name -contains 'status') {
+      $statusValue = [string]$response.status
+    }
+
+    if ($statusValue -eq 'ok') {
+      $messageValue = ''
+      if ($response.PSObject.Properties.Name -contains 'message' -and $null -ne $response.message) {
+        $messageValue = [string]$response.message
+      }
+
+      return [pscustomobject]@{
+        Ok = $true
+        Message = $messageValue.Trim()
+      }
+    }
+
+    return [pscustomobject]@{
+      Ok = $false
+      Message = "Unexpected status: '$statusValue'"
+    }
+  } catch {
+    return [pscustomobject]@{
+      Ok = $false
+      Message = (Get-ErrorMessage -ErrorRecord $_)
+    }
+  }
+}
+
+function Wait-ForDependenciesWake {
+  param(
+    [int]$TimeoutSeconds,
+    [int]$PollSeconds
+  )
+
+  if ($PollSeconds -gt $TimeoutSeconds) {
+    throw 'WakePollSeconds cannot be greater than WakeTimeoutSeconds.'
+  }
+
+  $checks = @(
+    @{ Name = 'Cassandra'; Url = 'http://localhost:3000/status/cassandra'; IsAwake = $false; LastMessage = 'No response yet.' },
+    @{ Name = 'Redis'; Url = 'http://localhost:3000/status/redis'; IsAwake = $false; LastMessage = 'No response yet.' },
+    @{ Name = 'Neo4j'; Url = 'http://localhost:3000/status/neo4j'; IsAwake = $false; LastMessage = 'No response yet.' }
+  )
+
+  Write-Host "==> Waking Cassandra, Redis and Neo4j (timeout: ${TimeoutSeconds}s)..."
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+
+  while ((Get-Date) -lt $deadline) {
+    $pendingCount = 0
+
+    foreach ($check in $checks) {
+      if ($check.IsAwake) {
+        continue
+      }
+
+      $result = Test-JsonStatusEndpoint -Url $check.Url -TimeoutSec ([Math]::Min(10, $PollSeconds + 2))
+      if ($result.Ok) {
+        $check.IsAwake = $true
+        if ([string]::IsNullOrWhiteSpace($result.Message)) {
+          Write-Host "$($check.Name) Waked."
+        } else {
+          Write-Host "$($check.Name) Waked. ($($result.Message))"
+        }
+      } else {
+        $check.LastMessage = $result.Message
+        $pendingCount++
+      }
+    }
+
+    if ($pendingCount -eq 0) {
+      return $true
+    }
+
+    Start-Sleep -Seconds $PollSeconds
+  }
+
+  foreach ($check in $checks) {
+    if (-not $check.IsAwake) {
+      Write-Warning "$($check.Name) did not wake in time (${TimeoutSeconds}s). Last response: $($check.LastMessage)"
+    }
+  }
+
+  return $false
+}
 
 Write-Host '==> Checking required files...'
 
@@ -136,9 +259,18 @@ services:
   Pop-Location
 }
 
+$dependenciesAwake = Wait-ForDependenciesWake -TimeoutSeconds $WakeTimeoutSeconds -PollSeconds $WakePollSeconds
+
 if ($WithJudge0) {
   Write-Host 'Done. Started with Judge0.'
 } else {
   Write-Host 'Done. Started without Judge0 (C++ local runner mode).'
   Write-Host 'Tip: To start with Judge0, run: .\up-first-run.ps1 -WithJudge0'
+}
+
+if ($dependenciesAwake) {
+  Write-Host 'All dependencies are awake and ready.'
+} else {
+  Write-Warning 'Some dependencies are still sleeping. Login can fail until they wake up.'
+  Write-Host 'Tip: Check backend logs with: docker logs --tail 120 assessly-server'
 }
