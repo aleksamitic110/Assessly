@@ -30,6 +30,11 @@ import { apiLimiter } from './middleware/rateLimit.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { env, getCorsOrigins } from './config/env.js';
 
+// --- DODATO ZA MONGODB STATISTIKU ---
+import { connectMongo, disconnectMongo } from './databases/mongodb/client.js';
+import statsRoutes from './databases/mongodb/routes/statsRoutes.js';
+// -------------------------
+
 const PORT = process.env.PORT || 3000;
 
 const app = express();
@@ -95,6 +100,10 @@ app.use('/api/exams', examRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/judge0', judge0Routes);
 
+// --- DODATO ZA MONGODB STATISTIKU ---
+app.use('/api/stats', statsRoutes);
+// -------------------------
+
 app.use(errorHandler);
 
 async function initializeDatabases() {
@@ -112,6 +121,9 @@ async function initializeDatabases() {
   await cassandraClient.connect();
   console.log('Connected to Cassandra (Astra DB)');
 
+  // --- DODATO ZA MONGODB ---
+  await connectMongo();
+  // -------------------------
 }
 
 const startServer = async () => {
@@ -134,6 +146,11 @@ const gracefulShutdown = async () => {
     await neo4jDriver.close();
     if (redisClient.isOpen) await redisClient.quit();
     await cassandraClient.shutdown();
+    
+    // --- DODATO ZA MONGODB ---
+    await disconnectMongo();
+    // -------------------------
+
     server.close(() => process.exit(0));
   } catch (error) {
     console.error(error);

@@ -24,6 +24,11 @@ const envSchema = z.object({
   CASSANDRA_CLIENT_SECRET: z.string().optional(),
   CASSANDRA_KEYSPACE: z.string().optional(),
   CASSANDRA_BUNDLE_PATH: z.string().optional(),
+  
+  // --- DODATO ZA MONGODB ---
+  MONGO_URI: z.string().optional(),
+  // -------------------------
+
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.string().optional(),
   SMTP_USER: z.string().optional(),

@@ -11,6 +11,10 @@ import { getDefaultLanguageId, isJudge0Configured, runJudge0Code } from '../../.
 import fs from 'fs/promises';
 import path from 'path';
 
+// --- DODATO ZA MONGODB ---
+import { GradeStat } from '../../mongodb/models/GradeStat.js';
+// -------------------------
+
 const STATE_TTL_SECONDS = 60 * 60 * 24;
 
 const resolveExamState = async (examId: string, scheduledStartTime?: string) => {
@@ -339,7 +343,6 @@ export const getStudentSubjects = async (req: any, res: Response) => {
       const examData = (record.get('examData') || [])
         .filter((item: any) => item.exam != null);
 
-      // Neo4j collect() moze da dupira redove kad ima vise OPTIONAL MATCH-eva
       const seenIds = new Set<string>();
       const uniqueExamData: any[] = [];
       for (const item of examData) {
@@ -1303,6 +1306,28 @@ export const setGrade = async (req: any, res: Response) => {
     }
 
     const grade = result.records[0].get('g').properties;
+    
+    // --- DODATO ZA MONGODB STATISTIKU ---
+    // Kada se ocena sačuva u Neo4j, beležimo i statistiku u MongoDB
+    try {
+      await GradeStat.findOneAndUpdate(
+        { examId, studentId }, // Trazimo da li vec postoji ocena
+        {
+          examId,
+          studentId,
+          professorId,
+          gradeValue: numericValue,
+          passed: numericValue > 5, // Položio ako je ocena veća od 5
+          gradedAt: new Date()
+        },
+        { upsert: true, new: true } // Kreiraj ako ne postoji, updateuj ako postoji
+      );
+    } catch (mongoError) {
+      console.error('Failed to save grade stat to MongoDB:', mongoError);
+      // Ne prekidamo request, jer je ocena uspesno sacuvana u glavnoj (Neo4j) bazi
+    }
+    // ------------------------------------
+
     res.json({
       examId: grade.examId,
       studentId: grade.studentId,
