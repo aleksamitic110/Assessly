@@ -340,7 +340,7 @@ export default function ExamPage() {
       }, 800);
       return () => window.clearTimeout(timeoutId);
     }
-    if (examStatus !== 'withdrawn' && examId) {
+    if (examId) {
       localStorage.removeItem(`exam_withdrawn:${examId}`);
     }
   }, [examStatus, examId, isReviewMode, navigate]);

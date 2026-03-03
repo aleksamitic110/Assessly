@@ -1,6 +1,7 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IGradeStat extends Document {
+  subjectId?: string;
   examId: string;
   studentId: string;
   professorId: string;
@@ -10,7 +11,8 @@ export interface IGradeStat extends Document {
 }
 
 const GradeStatSchema: Schema = new Schema({
-  examId: { type: String, required: true, index: true }, // Indexirano za bržu pretragu statistike
+  subjectId: { type: String, required: false, index: true },
+  examId: { type: String, required: true, index: true },
   studentId: { type: String, required: true },
   professorId: { type: String, required: true },
   gradeValue: { type: Number, required: true, min: 5, max: 10 },
@@ -18,8 +20,7 @@ const GradeStatSchema: Schema = new Schema({
   gradedAt: { type: Date, default: Date.now }
 });
 
-// Sprečavamo da isti profesor upiše više statistika za istog studenta na istom ispitu.
-// Ako se ocena menja, prepisaćemo je.
 GradeStatSchema.index({ examId: 1, studentId: 1 }, { unique: true });
+GradeStatSchema.index({ subjectId: 1, examId: 1 });
 
 export const GradeStat = mongoose.model<IGradeStat>('GradeStat', GradeStatSchema);

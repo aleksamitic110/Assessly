@@ -33,6 +33,7 @@ import { env, getCorsOrigins } from './config/env.js';
 // --- DODATO ZA MONGODB STATISTIKU ---
 import { connectMongo, disconnectMongo } from './databases/mongodb/client.js';
 import statsRoutes from './databases/mongodb/routes/statsRoutes.js';
+import questionBankRoutes from './databases/mongodb/routes/questionBankRoutes.js';
 // -------------------------
 
 const PORT = process.env.PORT || 3000;
@@ -102,6 +103,7 @@ app.use('/api/judge0', judge0Routes);
 
 // --- DODATO ZA MONGODB STATISTIKU ---
 app.use('/api/stats', statsRoutes);
+app.use('/api/question-bank', questionBankRoutes);
 // -------------------------
 
 app.use(errorHandler);

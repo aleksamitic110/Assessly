@@ -11,9 +11,18 @@ import { getDefaultLanguageId, isJudge0Configured, runJudge0Code } from '../../.
 import fs from 'fs/promises';
 import path from 'path';
 
-// --- DODATO ZA MONGODB ---
 import { GradeStat } from '../../mongodb/models/GradeStat.js';
-// -------------------------
+import {
+  logTaskRunEvent,
+  markExamSubmitted,
+  markExamWithdrawn,
+  markExamWorked
+} from '../../mongodb/services/analyticsTrackingService.js';
+import {
+  normalizeQuestionDifficulty,
+  shouldSaveToQuestionBank,
+  upsertQuestionBankItemFromTask
+} from '../../mongodb/services/questionBankService.js';
 
 const STATE_TTL_SECONDS = 60 * 60 * 24;
 
@@ -76,6 +85,26 @@ const hasSubmittedExam = async (session: any, examId: string, studentId: string)
   const countRaw = result.records[0]?.get('submitCount');
   const count = typeof countRaw?.toNumber === 'function' ? countRaw.toNumber() : Number(countRaw || 0);
   return count > 0;
+};
+
+const fetchSubjectIdForExam = async (examId: string) => {
+  const session = neo4jDriver.session();
+  try {
+    const result = await session.run(
+      `
+      MATCH (s:Subject)-[:SADRZI]->(e:Exam {id: $examId})
+      RETURN s.id AS subjectId
+      LIMIT 1
+      `,
+      { examId }
+    );
+    if (!result.records.length) {
+      return null;
+    }
+    return String(result.records[0].get('subjectId'));
+  } finally {
+    await session.close();
+  }
 };
 
 const shouldTreatAsWithdrawn = async (examId: string, studentId: string) => {
@@ -498,7 +527,19 @@ export const deleteExam = async (req: any, res: Response) => {
 };
 
 export const createTask = async (req: any, res: Response) => {
-  const { examId, title, description, starterCode, testCases, exampleInput, exampleOutput, notes } = req.body;
+  const {
+    examId,
+    title,
+    description,
+    starterCode,
+    testCases,
+    exampleInput,
+    exampleOutput,
+    notes,
+    saveToQuestionBank,
+    bankDifficulty,
+    bankTags
+  } = req.body;
   const professorId = req.user.id;
   const pdfFile = req.file as Express.Multer.File | undefined;
   const pdfPath = pdfFile ? `/uploads/tasks/${pdfFile.filename}` : null;
@@ -506,9 +547,10 @@ export const createTask = async (req: any, res: Response) => {
 
   try {
     const id = uuidv4();
+    const normalizedTestCases = typeof testCases === 'string' ? testCases : JSON.stringify(testCases || []);
     const result = await session.run(
       `
-      MATCH (p:User {id: $professorId})-[:PREDAJE]->(:Subject)-[:SADRZI]->(e:Exam {id: $examId})
+      MATCH (p:User {id: $professorId})-[:PREDAJE]->(s:Subject)-[:SADRZI]->(e:Exam {id: $examId})
       CREATE (t:Task {
         id: $id,
         title: $title,
@@ -521,7 +563,7 @@ export const createTask = async (req: any, res: Response) => {
         notes: $notes
       })
       CREATE (e)-[:IMA_ZADATAK]->(t)
-      RETURN t
+      RETURN t, s.id AS subjectId
       `,
       {
         professorId,
@@ -530,7 +572,7 @@ export const createTask = async (req: any, res: Response) => {
         title,
         description,
         starterCode,
-        testCases: typeof testCases === 'string' ? testCases : JSON.stringify(testCases || []),
+        testCases: normalizedTestCases,
         pdfPath,
         exampleInput: exampleInput || null,
         exampleOutput: exampleOutput || null,
@@ -543,10 +585,36 @@ export const createTask = async (req: any, res: Response) => {
     }
 
     const task = result.records[0].get('t').properties;
+    const subjectId = String(result.records[0].get('subjectId'));
+
+    if (shouldSaveToQuestionBank(saveToQuestionBank)) {
+      try {
+        await upsertQuestionBankItemFromTask({
+          subjectId,
+          createdByProfessorId: professorId,
+          sourceExamId: examId,
+          sourceTaskId: id,
+          title: String(task.title || title),
+          description: (task.description as string | null) || null,
+          starterCode: (task.starterCode as string | null) || null,
+          testCases: String(task.testCases || normalizedTestCases || '[]'),
+          pdfPath: (task.pdfPath as string | null) || null,
+          exampleInput: (task.exampleInput as string | null) || null,
+          exampleOutput: (task.exampleOutput as string | null) || null,
+          notes: (task.notes as string | null) || null,
+          difficulty: normalizeQuestionDifficulty(bankDifficulty),
+          tags: bankTags
+        });
+      } catch (mongoError) {
+        console.error('Failed to store task in question bank:', mongoError);
+      }
+    }
+
     const serverBaseUrl = process.env.SERVER_BASE_URL || 'http://localhost:3000';
     res.status(201).json({
       ...task,
-      pdfUrl: task.pdfPath ? `${serverBaseUrl}${task.pdfPath}` : null
+      pdfUrl: task.pdfPath ? `${serverBaseUrl}${task.pdfPath}` : null,
+      savedToQuestionBank: shouldSaveToQuestionBank(saveToQuestionBank)
     });
   } catch (error) {
     res.status(500).json({ error: 'Error while creating task' });
@@ -557,7 +625,18 @@ export const createTask = async (req: any, res: Response) => {
 
 export const updateTask = async (req: any, res: Response) => {
   const { taskId } = req.params;
-  const { title, description, starterCode, testCases, exampleInput, exampleOutput, notes } = req.body;
+  const {
+    title,
+    description,
+    starterCode,
+    testCases,
+    exampleInput,
+    exampleOutput,
+    notes,
+    saveToQuestionBank,
+    bankDifficulty,
+    bankTags
+  } = req.body;
   const professorId = req.user.id;
   const pdfFile = req.file as Express.Multer.File | undefined;
   const session = neo4jDriver.session();
@@ -565,8 +644,8 @@ export const updateTask = async (req: any, res: Response) => {
   try {
     const existing = await session.run(
       `
-      MATCH (p:User {id: $professorId})-[:PREDAJE]->(:Subject)-[:SADRZI]->(:Exam)-[:IMA_ZADATAK]->(t:Task {id: $taskId})
-      RETURN t
+      MATCH (p:User {id: $professorId})-[:PREDAJE]->(s:Subject)-[:SADRZI]->(e:Exam)-[:IMA_ZADATAK]->(t:Task {id: $taskId})
+      RETURN t, s.id AS subjectId, e.id AS examId
       `,
       { professorId, taskId }
     );
@@ -576,6 +655,8 @@ export const updateTask = async (req: any, res: Response) => {
     }
 
     const current = existing.records[0].get('t').properties;
+    const subjectId = String(existing.records[0].get('subjectId'));
+    const examId = String(existing.records[0].get('examId'));
     let pdfPath = current.pdfPath || null;
 
     if (pdfFile) {
@@ -614,10 +695,35 @@ export const updateTask = async (req: any, res: Response) => {
     );
 
     const task = result.records[0].get('t').properties;
+
+    if (shouldSaveToQuestionBank(saveToQuestionBank)) {
+      try {
+        await upsertQuestionBankItemFromTask({
+          subjectId,
+          createdByProfessorId: professorId,
+          sourceExamId: examId,
+          sourceTaskId: taskId,
+          title: String(task.title || title),
+          description: (task.description as string | null) || null,
+          starterCode: (task.starterCode as string | null) || null,
+          testCases: String(task.testCases || '[]'),
+          pdfPath: (task.pdfPath as string | null) || null,
+          exampleInput: (task.exampleInput as string | null) || null,
+          exampleOutput: (task.exampleOutput as string | null) || null,
+          notes: (task.notes as string | null) || null,
+          difficulty: normalizeQuestionDifficulty(bankDifficulty),
+          tags: bankTags
+        });
+      } catch (mongoError) {
+        console.error('Failed to update question bank item from task:', mongoError);
+      }
+    }
+
     const serverBaseUrl = process.env.SERVER_BASE_URL || 'http://localhost:3000';
     res.json({
       ...task,
-      pdfUrl: task.pdfPath ? `${serverBaseUrl}${task.pdfPath}` : null
+      pdfUrl: task.pdfPath ? `${serverBaseUrl}${task.pdfPath}` : null,
+      savedToQuestionBank: shouldSaveToQuestionBank(saveToQuestionBank)
     });
   } catch (error) {
     res.status(500).json({ error: 'Error while updating task' });
@@ -970,6 +1076,7 @@ export const runCode = async (req: any, res: Response) => {
   const { examId } = req.params;
   const { taskId, sourceCode, input, languageId } = req.body;
   const studentId = req.user?.id;
+  let subjectId: string | null = null;
 
   if (!studentId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -985,8 +1092,8 @@ export const runCode = async (req: any, res: Response) => {
   try {
     const access = await session.run(
       `
-      MATCH (u:User {id: $studentId})-[:ENROLLED_IN]->(:Subject)-[:SADRZI]->(e:Exam {id: $examId})
-      RETURN count(e) AS examCount
+      MATCH (u:User {id: $studentId})-[:ENROLLED_IN]->(s:Subject)-[:SADRZI]->(e:Exam {id: $examId})
+      RETURN count(e) AS examCount, head(collect(s.id)) AS subjectId
       `,
       { studentId, examId }
     );
@@ -995,6 +1102,8 @@ export const runCode = async (req: any, res: Response) => {
     if (!count) {
       return res.status(403).json({ error: 'You are not enrolled in this subject' });
     }
+    const subjectIdRaw = access.records[0]?.get('subjectId');
+    subjectId = subjectIdRaw ? String(subjectIdRaw) : null;
 
     const taskCheck = await session.run(
       `
@@ -1023,12 +1132,50 @@ export const runCode = async (req: any, res: Response) => {
         input: String(input || ''),
         languageId: Number(resolvedLanguageId)
       });
+
+      if (subjectId) {
+        await Promise.allSettled([
+          markExamWorked({ examId, subjectId, studentId }),
+          logTaskRunEvent({
+            examId,
+            subjectId,
+            studentId,
+            taskId: String(taskId),
+            status: result?.ok ? 'SUCCESS' : 'ERROR'
+          })
+        ]);
+      }
+
       return res.json(result);
     }
 
     const result = await runCppCode(String(sourceCode), String(input || ''));
+    if (subjectId) {
+      await Promise.allSettled([
+        markExamWorked({ examId, subjectId, studentId }),
+        logTaskRunEvent({
+          examId,
+          subjectId,
+          studentId,
+          taskId: String(taskId),
+          status: result?.ok ? 'SUCCESS' : 'ERROR'
+        })
+      ]);
+    }
     res.json(result);
   } catch (error) {
+    if (subjectId) {
+      await Promise.allSettled([
+        markExamWorked({ examId, subjectId, studentId }),
+        logTaskRunEvent({
+          examId,
+          subjectId,
+          studentId,
+          taskId: String(taskId),
+          status: 'ERROR'
+        })
+      ]);
+    }
     res.status(500).json({ error: 'Error while running code' });
   }
 };
@@ -1037,6 +1184,7 @@ export const saveSubmission = async (req: any, res: Response) => {
   const { examId } = req.params;
   const { taskId, sourceCode, output } = req.body;
   const studentId = req.user?.id;
+  let subjectId: string | null = null;
 
   if (!studentId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -1052,8 +1200,8 @@ export const saveSubmission = async (req: any, res: Response) => {
   try {
     const access = await session.run(
       `
-      MATCH (u:User {id: $studentId})-[:ENROLLED_IN]->(:Subject)-[:SADRZI]->(e:Exam {id: $examId})
-      RETURN count(e) AS examCount
+      MATCH (u:User {id: $studentId})-[:ENROLLED_IN]->(s:Subject)-[:SADRZI]->(e:Exam {id: $examId})
+      RETURN count(e) AS examCount, head(collect(s.id)) AS subjectId
       `,
       { studentId, examId }
     );
@@ -1062,6 +1210,8 @@ export const saveSubmission = async (req: any, res: Response) => {
     if (!count) {
       return res.status(403).json({ error: 'You are not enrolled in this subject' });
     }
+    const subjectIdRaw = access.records[0]?.get('subjectId');
+    subjectId = subjectIdRaw ? String(subjectIdRaw) : null;
 
     const result = await session.run(
       `
@@ -1081,6 +1231,11 @@ export const saveSubmission = async (req: any, res: Response) => {
     }
 
     const record = result.records[0];
+    if (subjectId) {
+      await markExamWorked({ examId, subjectId, studentId }).catch((mongoError) => {
+        console.error('Failed to update participation after saveSubmission:', mongoError);
+      });
+    }
     res.json({
       taskId: record.get('taskId'),
       sourceCode: record.get('sourceCode'),
@@ -1192,6 +1347,7 @@ export const getStudentSubmissions = async (req: any, res: Response) => {
 export const submitExam = async (req: any, res: Response) => {
   const { examId } = req.params;
   const studentId = req.user?.id;
+  let subjectId: string | null = null;
 
   if (!studentId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -1204,8 +1360,8 @@ export const submitExam = async (req: any, res: Response) => {
   try {
     const access = await session.run(
       `
-      MATCH (u:User {id: $studentId})-[:ENROLLED_IN]->(:Subject)-[:SADRZI]->(e:Exam {id: $examId})
-      RETURN count(e) AS examCount
+      MATCH (u:User {id: $studentId})-[:ENROLLED_IN]->(s:Subject)-[:SADRZI]->(e:Exam {id: $examId})
+      RETURN count(e) AS examCount, head(collect(s.id)) AS subjectId
       `,
       { studentId, examId }
     );
@@ -1214,6 +1370,8 @@ export const submitExam = async (req: any, res: Response) => {
     if (!count) {
       return res.status(403).json({ error: 'You are not enrolled in this subject' });
     }
+    const subjectIdRaw = access.records[0]?.get('subjectId');
+    subjectId = subjectIdRaw ? String(subjectIdRaw) : null;
 
     await session.run(
       `
@@ -1223,6 +1381,12 @@ export const submitExam = async (req: any, res: Response) => {
       `,
       { studentId, examId }
     );
+
+    if (subjectId) {
+      await markExamSubmitted({ examId, subjectId, studentId }).catch((mongoError) => {
+        console.error('Failed to update participation after submitExam:', mongoError);
+      });
+    }
 
     res.json({ message: 'Submitted' });
   } catch (error) {
@@ -1245,6 +1409,12 @@ export const withdrawExam = async (req: any, res: Response) => {
   try {
     const sessionId = await redisClient.get(getSessionKey(examId));
     await redisClient.set(getWithdrawnKey(examId, studentId), sessionId || 'true', { EX: STATE_TTL_SECONDS });
+    const subjectId = await fetchSubjectIdForExam(examId);
+    if (subjectId) {
+      await markExamWithdrawn({ examId, subjectId, studentId }).catch((mongoError) => {
+        console.error('Failed to update participation after withdrawExam:', mongoError);
+      });
+    }
     await logUserActivity(studentId, 'EXAM_WITHDRAW', {
       examId
     });
@@ -1258,6 +1428,7 @@ export const setGrade = async (req: any, res: Response) => {
   const { examId, studentId } = req.params;
   const { value, comment } = req.body;
   const professorId = req.user?.id;
+  let subjectId: string | null = null;
 
   if (!professorId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -1276,8 +1447,8 @@ export const setGrade = async (req: any, res: Response) => {
     // Verify professor owns the exam
     const accessCheck = await session.run(
       `
-      MATCH (p:User {id: $professorId})-[:PREDAJE]->(:Subject)-[:SADRZI]->(e:Exam {id: $examId})
-      RETURN count(e) AS examCount
+      MATCH (p:User {id: $professorId})-[:PREDAJE]->(s:Subject)-[:SADRZI]->(e:Exam {id: $examId})
+      RETURN count(e) AS examCount, head(collect(s.id)) AS subjectId
       `,
       { professorId, examId }
     );
@@ -1286,6 +1457,8 @@ export const setGrade = async (req: any, res: Response) => {
     if (!count) {
       return res.status(403).json({ error: 'You do not have access to this exam' });
     }
+    const subjectIdRaw = accessCheck.records[0]?.get('subjectId');
+    subjectId = subjectIdRaw ? String(subjectIdRaw) : null;
 
     const result = await session.run(
       `
@@ -1313,6 +1486,7 @@ export const setGrade = async (req: any, res: Response) => {
       await GradeStat.findOneAndUpdate(
         { examId, studentId }, // Trazimo da li vec postoji ocena
         {
+          subjectId,
           examId,
           studentId,
           professorId,

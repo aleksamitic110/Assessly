@@ -84,6 +84,9 @@ export default function ProfessorDashboard() {
     exampleInput: '',
     exampleOutput: '',
     notes: '',
+    saveToQuestionBank: false,
+    bankDifficulty: 'MEDIUM',
+    bankTags: '',
     pdfFile: null as File | null,
   });
   const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
@@ -293,6 +296,9 @@ export default function ProfessorDashboard() {
       exampleInput: '',
       exampleOutput: '',
       notes: '',
+      saveToQuestionBank: false,
+      bankDifficulty: 'MEDIUM',
+      bankTags: '',
       pdfFile: null,
     });
     setEditingTask(null);
@@ -330,9 +336,14 @@ export default function ProfessorDashboard() {
   };
 
   const handleTaskInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
+    if (e.target instanceof HTMLInputElement && e.target.type === 'checkbox') {
+      const target = e.target as HTMLInputElement;
+      setTaskForm((prev) => ({ ...prev, [name]: target.checked }));
+      return;
+    }
     setTaskForm((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -351,6 +362,9 @@ export default function ProfessorDashboard() {
       exampleInput: task.exampleInput || '',
       exampleOutput: task.exampleOutput || '',
       notes: task.notes || '',
+      saveToQuestionBank: false,
+      bankDifficulty: 'MEDIUM',
+      bankTags: '',
       pdfFile: null,
     });
   };
@@ -373,6 +387,9 @@ export default function ProfessorDashboard() {
     formData.append('exampleInput', taskForm.exampleInput);
     formData.append('exampleOutput', taskForm.exampleOutput);
     formData.append('notes', taskForm.notes);
+    formData.append('saveToQuestionBank', String(taskForm.saveToQuestionBank));
+    formData.append('bankDifficulty', taskForm.bankDifficulty);
+    formData.append('bankTags', taskForm.bankTags);
     if (taskForm.pdfFile) {
       formData.append('pdf', taskForm.pdfFile);
     }
@@ -1113,6 +1130,22 @@ export default function ProfessorDashboard() {
                             <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                               Subject ID: <span className="text-gray-800 dark:text-gray-200">{subject.id}</span>
                             </div>
+                            <div className="mb-4 flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => navigate(`/professor/subject/${subject.id}/question-bank`)}
+                                className="px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700"
+                              >
+                                Question Bank
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => navigate(`/professor/subject/${subject.id}/analytics`)}
+                                className="px-3 py-1.5 text-xs font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700"
+                              >
+                                Subject Analytics
+                              </button>
+                            </div>
                             {subject.isCreator && (
                               <div className="mb-4">
                                 <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
@@ -1312,6 +1345,20 @@ export default function ProfessorDashboard() {
                                         </button>
 
                                         <button
+                                          onClick={() => navigate(`/professor/subject/${subject.id}/question-bank?examId=${exam.id}`)}
+                                          className="px-3 py-1 text-xs border border-emerald-300 text-emerald-700 rounded hover:bg-emerald-50"
+                                        >
+                                          Bank
+                                        </button>
+
+                                        <button
+                                          onClick={() => navigate(`/professor/subject/${subject.id}/analytics?examId=${exam.id}`)}
+                                          className="px-3 py-1 text-xs border border-sky-300 text-sky-700 rounded hover:bg-sky-50"
+                                        >
+                                          Analytics
+                                        </button>
+
+                                        <button
                                           onClick={() => navigate(`/professor/exam/${exam.id}/review`)}
                                           className="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg hover:bg-purple-700"
                                         >
@@ -1440,6 +1487,34 @@ export default function ProfessorDashboard() {
                                             rows={3}
                                             className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white font-mono"
                                           />
+                                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 rounded-lg border border-emerald-200 bg-emerald-50/60 dark:bg-emerald-900/15 dark:border-emerald-800/60">
+                                            <label className="flex items-center gap-2 text-xs font-medium text-emerald-800 dark:text-emerald-300">
+                                              <input
+                                                type="checkbox"
+                                                name="saveToQuestionBank"
+                                                checked={taskForm.saveToQuestionBank}
+                                                onChange={handleTaskInputChange}
+                                              />
+                                              Save this task to question bank
+                                            </label>
+                                            <select
+                                              name="bankDifficulty"
+                                              value={taskForm.bankDifficulty}
+                                              onChange={handleTaskInputChange}
+                                              className="px-3 py-2 text-sm border border-emerald-300 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                            >
+                                              <option value="EASY">Easy</option>
+                                              <option value="MEDIUM">Medium</option>
+                                              <option value="HARD">Hard</option>
+                                            </select>
+                                            <input
+                                              name="bankTags"
+                                              value={taskForm.bankTags}
+                                              onChange={handleTaskInputChange}
+                                              placeholder="Tags: loops, arrays, recursion"
+                                              className="px-3 py-2 text-sm border border-emerald-300 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                            />
+                                          </div>
                                           <input
                                             type="file"
                                             accept="application/pdf"
