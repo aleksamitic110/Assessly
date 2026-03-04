@@ -19,7 +19,7 @@ import {
   markExamWorked
 } from '../../mongodb/services/analyticsTrackingService.js';
 import {
-  normalizeQuestionDifficulty,
+  normalizeQuestionMaxPoints,
   shouldSaveToQuestionBank,
   upsertQuestionBankItemFromTask
 } from '../../mongodb/services/questionBankService.js';
@@ -743,6 +743,7 @@ export const createTask = async (req: any, res: Response) => {
           sourceExamId: examId,
           sourceTaskId: id,
           title: String(task.title || title),
+          maxPoints: normalizeQuestionMaxPoints(task.maxPoints, normalizedTaskMaxPoints),
           description: (task.description as string | null) || null,
           starterCode: (task.starterCode as string | null) || null,
           testCases: String(task.testCases || normalizedTestCases || '[]'),
@@ -750,7 +751,7 @@ export const createTask = async (req: any, res: Response) => {
           exampleInput: (task.exampleInput as string | null) || null,
           exampleOutput: (task.exampleOutput as string | null) || null,
           notes: (task.notes as string | null) || null,
-          difficulty: normalizeQuestionDifficulty(bankDifficulty),
+          difficulty: bankDifficulty,
           tags: bankTags
         });
       } catch (mongoError) {
@@ -857,6 +858,7 @@ export const updateTask = async (req: any, res: Response) => {
           sourceExamId: examId,
           sourceTaskId: taskId,
           title: String(task.title || title),
+          maxPoints: normalizeQuestionMaxPoints(task.maxPoints, 10),
           description: (task.description as string | null) || null,
           starterCode: (task.starterCode as string | null) || null,
           testCases: String(task.testCases || '[]'),
@@ -864,7 +866,7 @@ export const updateTask = async (req: any, res: Response) => {
           exampleInput: (task.exampleInput as string | null) || null,
           exampleOutput: (task.exampleOutput as string | null) || null,
           notes: (task.notes as string | null) || null,
-          difficulty: normalizeQuestionDifficulty(bankDifficulty),
+          difficulty: bankDifficulty,
           tags: bankTags
         });
       } catch (mongoError) {

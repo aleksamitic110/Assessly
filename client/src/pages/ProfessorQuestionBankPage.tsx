@@ -324,6 +324,7 @@ export default function ProfessorQuestionBankPage() {
                     <div>
                       <h3 className="text-base font-bold text-gray-900 dark:text-white">{item.title}</h3>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Max points: {item.maxPoints ?? 10} •{' '}
                         Used {item.useCount} times
                         {item.lastUsedAt ? ` - Last used ${new Date(item.lastUsedAt).toLocaleString()}` : ''}
                       </p>

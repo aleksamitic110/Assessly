@@ -4,6 +4,7 @@ import { neo4jDriver } from '../../neo4j/driver.js';
 import { QuestionBankItem } from '../models/QuestionBankItem.js';
 import {
   bumpQuestionBankUsage,
+  normalizeQuestionMaxPoints,
   normalizeQuestionDifficulty,
   parseQuestionTags
 } from '../services/questionBankService.js';
@@ -205,6 +206,7 @@ export const createQuestionBankItem = async (req: any, res: Response) => {
   const {
     subjectId: subjectIdFromBody,
     title,
+    maxPoints,
     description,
     starterCode,
     testCases,
@@ -233,6 +235,7 @@ export const createQuestionBankItem = async (req: any, res: Response) => {
     subjectId,
     createdByProfessorId: professorId,
     title,
+    maxPoints: normalizeQuestionMaxPoints(maxPoints, 10),
     description: description || null,
     starterCode: starterCode || null,
     testCases: typeof testCases === 'string' ? testCases : JSON.stringify(testCases || []),
@@ -252,6 +255,7 @@ export const updateQuestionBankItem = async (req: any, res: Response) => {
   const { itemId } = req.params;
   const {
     title,
+    maxPoints,
     description,
     starterCode,
     testCases,
@@ -279,6 +283,7 @@ export const updateQuestionBankItem = async (req: any, res: Response) => {
   }
 
   if (title !== undefined) existing.title = String(title).trim();
+  if (maxPoints !== undefined) existing.maxPoints = normalizeQuestionMaxPoints(maxPoints, 10);
   if (description !== undefined) existing.description = description || null;
   if (starterCode !== undefined) existing.starterCode = starterCode || null;
   if (testCases !== undefined) {
@@ -354,7 +359,7 @@ export const importQuestionBankItemToExam = async (req: any, res: Response) => {
     {
       id: newTaskId,
       title: item.title,
-      maxPoints: 10,
+      maxPoints: normalizeQuestionMaxPoints(item.maxPoints, 10),
       description: item.description || null,
       starterCode: item.starterCode || null,
       testCases: item.testCases || '[]',
@@ -430,7 +435,7 @@ export const autoGenerateTasksFromQuestionBank = async (req: any, res: Response)
       {
         id: uuidv4(),
         title: item.title,
-        maxPoints: 10,
+        maxPoints: normalizeQuestionMaxPoints(item.maxPoints, 10),
         description: item.description || null,
         starterCode: item.starterCode || null,
         testCases: item.testCases || '[]',

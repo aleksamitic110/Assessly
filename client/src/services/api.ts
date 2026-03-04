@@ -101,6 +101,7 @@ type QuestionBankListParams = {
 
 type QuestionBankPayload = {
   title: string;
+  maxPoints?: number;
   description?: string | null;
   starterCode?: string | null;
   testCases?: string;

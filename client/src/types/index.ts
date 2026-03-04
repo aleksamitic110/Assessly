@@ -159,6 +159,7 @@ export interface QuestionBankItem {
   sourceExamId?: string | null;
   sourceTaskId?: string | null;
   title: string;
+  maxPoints?: number;
   description?: string | null;
   starterCode?: string | null;
   testCases: string;

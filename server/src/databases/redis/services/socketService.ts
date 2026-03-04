@@ -426,10 +426,24 @@ export const initSocket = (io: Server) => {
         if (!examId || !messageId || !replyMessage) return;
 
         const replyAuthorName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+        const messagesBeforeReply = await getChatMessages(examId);
+        const originalMessage = messagesBeforeReply.find((m) => m.messageId === messageId);
         await replyChatMessage(examId, messageId, replyMessage, user.id, replyAuthorName);
 
         const messages = await getChatMessages(examId);
-        const updatedMessage = messages.find(m => m.messageId === messageId);
+        const updatedMessage =
+          messages.find((m) => m.messageId === messageId) ||
+          (originalMessage
+            ? {
+                ...originalMessage,
+                status: 'approved' as const,
+                replyTo: messageId,
+                replyMessage,
+                replyAuthorId: user.id,
+                replyAuthorName,
+                approvedAt: new Date().toISOString()
+              }
+            : null);
 
         if (updatedMessage) {
           io.to(examId).emit('chat_update', updatedMessage);

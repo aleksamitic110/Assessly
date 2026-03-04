@@ -8,6 +8,7 @@ export interface IQuestionBankItem extends Document {
   sourceExamId?: string | null;
   sourceTaskId?: string | null;
   title: string;
+  maxPoints: number;
   description?: string | null;
   starterCode?: string | null;
   testCases: string;
@@ -31,6 +32,7 @@ const QuestionBankItemSchema = new Schema<IQuestionBankItem>(
     sourceExamId: { type: String, default: null },
     sourceTaskId: { type: String, default: null },
     title: { type: String, required: true, trim: true, maxlength: 120 },
+    maxPoints: { type: Number, required: true, min: 0.5, max: 10000, default: 10 },
     description: { type: String, default: null, maxlength: 2000 },
     starterCode: { type: String, default: null, maxlength: 20000 },
     testCases: { type: String, required: true, default: '[]' },

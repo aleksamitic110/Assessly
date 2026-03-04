@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import api, { chatApi } from '../services/api';
 import { socket, connectSocket, disconnectSocket } from '../services/socket';
-import type { Exam as ExamType, Task as TaskType, ChatMessage } from '../types';
+import type { Exam as ExamType, Task as TaskType, ChatMessage, QuestionDifficulty } from '../types';
 import ExamChatPanel from '../components/ExamChatPanel';
 
 interface Subject {
@@ -87,6 +87,8 @@ export default function ProfessorDashboard() {
     exampleOutput: '',
     notes: '',
     saveToQuestionBank: false,
+    bankDifficulty: '' as '' | QuestionDifficulty,
+    bankTags: '',
     pdfFile: null as File | null,
   });
   const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
@@ -299,6 +301,8 @@ export default function ProfessorDashboard() {
       exampleOutput: '',
       notes: '',
       saveToQuestionBank: false,
+      bankDifficulty: '' as '' | QuestionDifficulty,
+      bankTags: '',
       pdfFile: null,
     });
     setEditingTask(null);
@@ -372,6 +376,8 @@ export default function ProfessorDashboard() {
       exampleOutput: task.exampleOutput || '',
       notes: task.notes || '',
       saveToQuestionBank: false,
+      bankDifficulty: '' as '' | QuestionDifficulty,
+      bankTags: '',
       pdfFile: null,
     });
   };
@@ -400,6 +406,14 @@ export default function ProfessorDashboard() {
     formData.append('exampleOutput', taskForm.exampleOutput);
     formData.append('notes', taskForm.notes);
     formData.append('saveToQuestionBank', String(taskForm.saveToQuestionBank));
+    if (taskForm.saveToQuestionBank) {
+      if (taskForm.bankDifficulty) {
+        formData.append('bankDifficulty', taskForm.bankDifficulty);
+      }
+      if (taskForm.bankTags.trim()) {
+        formData.append('bankTags', taskForm.bankTags.trim());
+      }
+    }
     if (taskForm.pdfFile) {
       formData.append('pdf', taskForm.pdfFile);
     }
@@ -1548,6 +1562,28 @@ export default function ProfessorDashboard() {
                                             />
                                             Save task to question bank
                                           </label>
+                                          {taskForm.saveToQuestionBank && (
+                                            <>
+                                              <select
+                                                name="bankDifficulty"
+                                                value={taskForm.bankDifficulty}
+                                                onChange={handleTaskInputChange}
+                                                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                              >
+                                                <option value="">Difficulty (default: medium)</option>
+                                                <option value="EASY">Easy</option>
+                                                <option value="MEDIUM">Medium</option>
+                                                <option value="HARD">Hard</option>
+                                              </select>
+                                              <input
+                                                name="bankTags"
+                                                value={taskForm.bankTags}
+                                                onChange={handleTaskInputChange}
+                                                placeholder="Question bank tags (comma-separated)"
+                                                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                              />
+                                            </>
+                                          )}
                                           <textarea
                                             name="starterCode"
                                             value={taskForm.starterCode}
