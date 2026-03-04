@@ -91,19 +91,24 @@ export const upsertQuestionBankItemFromTask = async (snapshot: QuestionBankSnaps
     if (normalizedTags) {
       updatePayload.tags = normalizedTags;
     }
+    const setOnInsertPayload: Record<string, unknown> = {
+      useCount: 0,
+      archived: false
+    };
+    if (!Object.prototype.hasOwnProperty.call(updatePayload, 'difficulty')) {
+      setOnInsertPayload.difficulty = 'MEDIUM';
+    }
+    if (!Object.prototype.hasOwnProperty.call(updatePayload, 'tags')) {
+      setOnInsertPayload.tags = [];
+    }
 
     await QuestionBankItem.findOneAndUpdate(
       { subjectId: payload.subjectId, sourceTaskId: payload.sourceTaskId },
       {
         $set: updatePayload,
-        $setOnInsert: {
-          useCount: 0,
-          archived: false,
-          difficulty: normalizedDifficulty || 'MEDIUM',
-          tags: normalizedTags || []
-        }
+        $setOnInsert: setOnInsertPayload
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
     return;
   }
