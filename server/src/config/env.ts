@@ -47,11 +47,36 @@ const envSchema = z.object({
 
 export const env = envSchema.parse(process.env);
 
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+
+const addLoopbackAliases = (origin: string, originsSet: Set<string>) => {
+  try {
+    const parsed = new URL(origin);
+    if (!LOOPBACK_HOSTS.has(parsed.hostname)) return;
+
+    const port = parsed.port ? `:${parsed.port}` : '';
+    originsSet.add(`${parsed.protocol}//localhost${port}`);
+    originsSet.add(`${parsed.protocol}//127.0.0.1${port}`);
+    originsSet.add(`${parsed.protocol}//[::1]${port}`);
+  } catch {
+    // Ignore malformed origins from env; they simply won't be added.
+  }
+};
+
 export const getCorsOrigins = () => {
   const raw = env.CORS_ORIGINS;
   if (!raw) return [];
-  return raw
+
+  const configuredOrigins = raw
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
+
+  const expandedOrigins = new Set<string>();
+  for (const origin of configuredOrigins) {
+    expandedOrigins.add(origin);
+    addLoopbackAliases(origin, expandedOrigins);
+  }
+
+  return Array.from(expandedOrigins);
 };

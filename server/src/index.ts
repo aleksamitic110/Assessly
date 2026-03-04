@@ -46,6 +46,7 @@ if (env.TRUST_PROXY) {
 }
 
 const corsOrigins = getCorsOrigins();
+const localDevOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://[::1]:5173'];
 const corsOptions: cors.CorsOptions = {
   origin: corsOrigins.length
     ? (origin, callback) => {
@@ -65,11 +66,11 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       baseUri: ["'self'"],
-      frameAncestors: ["'self'", 'http://localhost:5173', 'http://127.0.0.1:5173', ...corsOrigins],
+      frameAncestors: ["'self'", ...localDevOrigins, ...corsOrigins],
       imgSrc: ["'self'", 'data:', 'https:'],
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
-      connectSrc: ["'self'", ...corsOrigins]
+      connectSrc: ["'self'", ...localDevOrigins, ...corsOrigins]
     }
   }
 }));

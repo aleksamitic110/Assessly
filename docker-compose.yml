@@ -20,6 +20,8 @@ services:
       context: ./client
       dockerfile: Dockerfile.dev
     container_name: assessly-client
+    environment:
+      - VITE_PROXY_TARGET=http://server:3000
     ports:
       - "5173:5173"
     volumes:
