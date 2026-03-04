@@ -23,6 +23,8 @@ export default function ProfessorReviewPage() {
   const [gradeValue, setGradeValue] = useState<number>(0);
   const [gradeComment, setGradeComment] = useState('');
   const [isSavingGrade, setIsSavingGrade] = useState(false);
+  const [taskPointsByTaskId, setTaskPointsByTaskId] = useState<Record<string, number>>({});
+  const [savingTaskForId, setSavingTaskForId] = useState<string | null>(null);
 
   // Comment form
   const [newCommentLine, setNewCommentLine] = useState<string>('');
@@ -66,6 +68,11 @@ export default function ProfessorReviewPage() {
         commentsApi.getComments(examId, student.studentId)
       ]);
       setSubmissions(submissionsRes.data);
+      const initialPoints: Record<string, number> = {};
+      submissionsRes.data.forEach((submission) => {
+        initialPoints[submission.taskId] = Number(submission.awardedPoints ?? 0);
+      });
+      setTaskPointsByTaskId(initialPoints);
       setComments(commentsRes.data);
 
       // Set grade form values
@@ -86,6 +93,10 @@ export default function ProfessorReviewPage() {
   // Save grade
   const handleSaveGrade = async () => {
     if (!examId || !selectedStudent) return;
+    if (!selectedStudent.submittedAt) {
+      setError('Student must submit exam before grading.');
+      return;
+    }
     if (gradeValue < 5 || gradeValue > 10) {
       setError('Ocena mora biti izmedju 5 i 10.');
       return;
@@ -93,15 +104,24 @@ export default function ProfessorReviewPage() {
     setIsSavingGrade(true);
     setError('');
     try {
-      await gradeApi.setGrade(examId, selectedStudent.studentId, gradeValue, gradeComment);
+      const response = await gradeApi.setGrade(examId, selectedStudent.studentId, gradeValue, gradeComment);
+      const totalAwardedPoints = response.data.totalAwardedPoints ?? selectedStudent.totalAwardedPoints;
+      const totalMaxPoints = response.data.totalMaxPoints ?? selectedStudent.totalMaxPoints;
       // Update local state
       setStudents(prev => prev.map(s =>
         s.studentId === selectedStudent.studentId
-          ? { ...s, grade: { value: gradeValue, comment: gradeComment, updatedAt: new Date().toISOString() } }
+          ? {
+              ...s,
+              totalAwardedPoints,
+              totalMaxPoints,
+              grade: { value: gradeValue, comment: gradeComment, updatedAt: new Date().toISOString() }
+            }
           : s
       ));
       setSelectedStudent(prev => prev ? {
         ...prev,
+        totalAwardedPoints,
+        totalMaxPoints,
         grade: { value: gradeValue, comment: gradeComment, updatedAt: new Date().toISOString() }
       } : null);
     } catch (err: any) {
@@ -185,11 +205,71 @@ export default function ProfessorReviewPage() {
     }
   };
 
+  const handleSaveTaskPoints = async (taskId: string) => {
+    if (!examId || !selectedStudent) return;
+    if (!selectedStudent.submittedAt) {
+      setError('Student must submit exam before grading.');
+      return;
+    }
+
+    const submission = submissions.find((item) => item.taskId === taskId);
+    const taskMaxPoints = Number(submission?.taskMaxPoints ?? 0);
+    const points = Number(taskPointsByTaskId[taskId] ?? 0);
+
+    if (!Number.isFinite(points) || points < 0) {
+      setError('Task points must be a non-negative number.');
+      return;
+    }
+    if (taskMaxPoints > 0 && points > taskMaxPoints) {
+      setError(`Task points cannot exceed max points (${taskMaxPoints}).`);
+      return;
+    }
+
+    setSavingTaskForId(taskId);
+    setError('');
+    try {
+      const response = await gradeApi.setTaskPoints(examId, selectedStudent.studentId, taskId, points);
+      const savedPoints = Number(response.data.points);
+      const totalAwardedPoints = Number(response.data.totalAwardedPoints);
+      const totalMaxPoints = Number(response.data.totalMaxPoints);
+
+      setSubmissions((prev) =>
+        prev.map((item) =>
+          item.taskId === taskId
+            ? { ...item, awardedPoints: savedPoints }
+            : item
+        )
+      );
+      setTaskPointsByTaskId((prev) => ({ ...prev, [taskId]: savedPoints }));
+
+      setStudents((prev) =>
+        prev.map((student) =>
+          student.studentId === selectedStudent.studentId
+            ? { ...student, totalAwardedPoints, totalMaxPoints }
+            : student
+        )
+      );
+      setSelectedStudent((prev) =>
+        prev
+          ? { ...prev, totalAwardedPoints, totalMaxPoints }
+          : prev
+      );
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to save task points');
+    } finally {
+      setSavingTaskForId(null);
+    }
+  };
+
   const currentSubmission = submissions[selectedTaskIndex];
   const maxLineCount = currentSubmission?.sourceCode ? currentSubmission.sourceCode.split('\n').length : 0;
 
   // Get the task details for the current submission
   const currentTask = tasks.find(t => t.id === currentSubmission?.taskId);
+  const totalTaskMaxPoints = submissions.reduce((sum, submission) => sum + Number(submission.taskMaxPoints ?? 0), 0);
+  const totalAwardedPoints = submissions.reduce((sum, submission) => sum + Number(submission.awardedPoints ?? 0), 0);
+  const examMaxPoints = Number(exam?.maxPoints ?? 0);
+  const hasTaskMaxMismatchWarning = examMaxPoints > 0 && totalTaskMaxPoints > 0 && Math.abs(totalTaskMaxPoints - examMaxPoints) > 0.01;
 
   // Render code with line numbers
   const renderCode = (code: string) => {
@@ -316,6 +396,10 @@ export default function ProfessorReviewPage() {
                       <div className="text-xs text-gray-500 dark:text-gray-400">
                         {student.email}
                       </div>
+                      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {student.submittedAt ? 'Submitted' : 'Not submitted'}
+                        {student.totalMaxPoints ? ` | Points ${student.totalAwardedPoints ?? 0}/${student.totalMaxPoints}` : ''}
+                      </div>
                       {student.grade && (
                         <div className="mt-1 text-sm font-semibold text-green-600 dark:text-green-400">
                           Grade: {student.grade.value}
@@ -355,6 +439,14 @@ export default function ProfessorReviewPage() {
                           Submitted: {new Date(selectedStudent.submittedAt).toLocaleString()}
                         </p>
                       )}
+                      {!selectedStudent.submittedAt && (
+                        <p className="text-xs text-amber-600 dark:text-amber-300 mt-1">
+                          Student has not submitted the exam yet.
+                        </p>
+                      )}
+                      <p className="text-xs text-indigo-600 dark:text-indigo-300 mt-1">
+                        Task points: {selectedStudent.totalAwardedPoints ?? totalAwardedPoints} / {selectedStudent.totalMaxPoints ?? totalTaskMaxPoints}
+                      </p>
                     </div>
 
                     {/* Grade Form */}
@@ -367,6 +459,7 @@ export default function ProfessorReviewPage() {
                           max="10"
                           value={gradeValue}
                           onChange={(e) => setGradeValue(Number(e.target.value))}
+                          disabled={!selectedStudent.submittedAt}
                           className="w-20 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
                         />
                       </div>
@@ -377,18 +470,24 @@ export default function ProfessorReviewPage() {
                           value={gradeComment}
                           onChange={(e) => setGradeComment(e.target.value)}
                           placeholder="General comment..."
+                          disabled={!selectedStudent.submittedAt}
                           className="w-48 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
                         />
                       </div>
                       <button
                         onClick={handleSaveGrade}
-                        disabled={isSavingGrade}
+                        disabled={isSavingGrade || !selectedStudent.submittedAt}
                         className="px-4 py-1.5 text-sm font-semibold text-white bg-green-600 rounded-xl hover:bg-green-700 shadow-sm shadow-green-500/25 disabled:opacity-50 transition-all"
                       >
                         {isSavingGrade ? 'Saving...' : 'Save Grade'}
                       </button>
                     </div>
                   </div>
+                  {hasTaskMaxMismatchWarning && (
+                    <div className="mt-3 text-xs rounded border border-amber-300 bg-amber-50 px-3 py-2 text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                      Warning: exam max points is {examMaxPoints}, while sum of task max points is {totalTaskMaxPoints}. Values do not match.
+                    </div>
+                  )}
                 </div>
 
                 {/* Task Tabs */}
@@ -407,6 +506,9 @@ export default function ProfessorReviewPage() {
                             }`}
                           >
                             {sub.taskTitle || `Task ${idx + 1}`}
+                            <span className="ml-2 text-xs text-gray-400">
+                              ({sub.awardedPoints ?? 0}/{sub.taskMaxPoints ?? 10})
+                            </span>
                           </button>
                         ))}
                       </nav>
@@ -419,6 +521,37 @@ export default function ProfessorReviewPage() {
                           <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
                             {currentSubmission.taskTitle}
                           </h4>
+                          <div className="mb-4 flex flex-wrap items-end gap-3">
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Task points</label>
+                              <input
+                                type="number"
+                                min="0"
+                                max={currentSubmission.taskMaxPoints ?? currentTask?.maxPoints ?? 10}
+                                step="0.5"
+                                value={taskPointsByTaskId[currentSubmission.taskId] ?? currentSubmission.awardedPoints ?? 0}
+                                onChange={(e) =>
+                                  setTaskPointsByTaskId((prev) => ({
+                                    ...prev,
+                                    [currentSubmission.taskId]: Number(e.target.value)
+                                  }))
+                                }
+                                disabled={!selectedStudent.submittedAt}
+                                className="w-28 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
+                              />
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              Max: {currentSubmission.taskMaxPoints ?? currentTask?.maxPoints ?? 10}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleSaveTaskPoints(currentSubmission.taskId)}
+                              disabled={savingTaskForId === currentSubmission.taskId || !selectedStudent.submittedAt}
+                              className="px-4 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                            >
+                              {savingTaskForId === currentSubmission.taskId ? 'Saving...' : 'Save Task Points'}
+                            </button>
+                          </div>
 
                           {/* Task Description */}
                           {currentTask && (

@@ -1,21 +1,22 @@
 import { Response } from 'express';
 import { neo4jDriver } from '../../neo4j/driver.js';
 import { GradeStat } from '../models/GradeStat.js';
-import { ExamParticipation } from '../models/ExamParticipation.js';
-import { TaskRunEvent } from '../models/TaskRunEvent.js';
 
-const toNumber = (value: unknown) => {
+const toNumber = (value: unknown, fallback = 0) => {
   if (typeof (value as { toNumber?: () => number })?.toNumber === 'function') {
     return (value as { toNumber: () => number }).toNumber();
   }
-  return Number(value || 0);
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
 };
+
+const round2 = (value: number) => Math.round(value * 100) / 100;
 
 const safePercent = (numerator: number, denominator: number) => {
   if (!denominator) {
     return 0;
   }
-  return Math.round((numerator / denominator) * 10000) / 100;
+  return round2((numerator / denominator) * 100);
 };
 
 const computeMedian = (values: number[]) => {
@@ -25,7 +26,7 @@ const computeMedian = (values: number[]) => {
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   if (sorted.length % 2 === 0) {
-    return Math.round(((sorted[mid - 1] + sorted[mid]) / 2) * 100) / 100;
+    return round2((sorted[mid - 1] + sorted[mid]) / 2);
   }
   return sorted[mid];
 };
@@ -37,14 +38,11 @@ const fetchExamContext = async (professorId: string, examId: string) => {
       `
       MATCH (p:User {id: $professorId})-[:PREDAJE]->(s:Subject)-[:SADRZI]->(e:Exam {id: $examId})
       OPTIONAL MATCH (st:User)-[:ENROLLED_IN]->(s)
-      WITH s, e, count(DISTINCT st) AS enrolledCount
-      OPTIONAL MATCH (:User)-[sub:SUBMITTED_EXAM]->(e)
       RETURN s.id AS subjectId,
              s.name AS subjectName,
              e.id AS examId,
              e.name AS examName,
-             enrolledCount,
-             count(DISTINCT sub) AS submittedCount
+             count(DISTINCT st) AS enrolledCount
       `,
       { professorId, examId }
     );
@@ -59,30 +57,150 @@ const fetchExamContext = async (professorId: string, examId: string) => {
       subjectName: String(record.get('subjectName')),
       examId: String(record.get('examId')),
       examName: String(record.get('examName')),
-      enrolledCount: toNumber(record.get('enrolledCount')),
-      submittedCount: toNumber(record.get('submittedCount'))
+      enrolledCount: toNumber(record.get('enrolledCount'))
     };
   } finally {
     await session.close();
   }
 };
 
-const fetchTaskMetadataForExam = async (examId: string) => {
+const fetchExamParticipationCounts = async (examId: string) => {
+  const session = neo4jDriver.session();
+  try {
+    const result = await session.run(
+      `
+      MATCH (s:Subject)-[:SADRZI]->(e:Exam {id: $examId})
+      OPTIONAL MATCH (enrolled:User)-[:ENROLLED_IN]->(s)
+      WITH e, count(DISTINCT enrolled) AS enrolledCount
+
+      OPTIONAL MATCH (submitted:User)-[:SUBMITTED_EXAM]->(e)
+      WITH e, enrolledCount, collect(DISTINCT submitted.id) AS submittedIds
+
+      OPTIONAL MATCH (worker:User)-[:SUBMITTED]->(:Task)<-[:IMA_ZADATAK]-(e)
+      WITH e, enrolledCount, submittedIds, collect(DISTINCT worker.id) AS workedIdsRaw
+
+      OPTIONAL MATCH (withdrawn:User)-[:WITHDREW_EXAM]->(e)
+      WITH enrolledCount,
+           submittedIds,
+           [id IN workedIdsRaw + submittedIds WHERE id IS NOT NULL] AS workedCandidateIds,
+           collect(DISTINCT withdrawn.id) AS withdrawnIds
+      RETURN enrolledCount,
+             size(submittedIds) AS submittedCount,
+             size(reduce(acc = [], id IN workedCandidateIds |
+               CASE WHEN id IN acc THEN acc ELSE acc + id END
+             )) AS workedCount,
+             size([id IN withdrawnIds WHERE id IS NOT NULL AND NOT id IN submittedIds]) AS withdrawnCount
+      `,
+      { examId }
+    );
+
+    if (!result.records.length) {
+      return {
+        enrolledCount: 0,
+        submittedCount: 0,
+        workedCount: 0,
+        withdrawnCount: 0
+      };
+    }
+
+    const row = result.records[0];
+    return {
+      enrolledCount: toNumber(row.get('enrolledCount')),
+      submittedCount: toNumber(row.get('submittedCount')),
+      workedCount: toNumber(row.get('workedCount')),
+      withdrawnCount: toNumber(row.get('withdrawnCount'))
+    };
+  } finally {
+    await session.close();
+  }
+};
+
+type RawTaskPointsRow = {
+  taskId: string;
+  taskTitle: string;
+  taskMaxPoints: number;
+  submittedStudents: number;
+  gradedStudents: number;
+  successfulStudents: number;
+  totalAwardedPoints: number;
+  totalPossiblePointsForGraded: number;
+  examId?: string | null;
+  examName?: string | null;
+};
+
+const mapTaskPointsRow = (row: RawTaskPointsRow) => {
+  const taskMaxPoints = round2(toNumber(row.taskMaxPoints, 10));
+  const submittedStudents = toNumber(row.submittedStudents);
+  const gradedStudents = toNumber(row.gradedStudents);
+  const successfulStudents = toNumber(row.successfulStudents);
+  const totalAwardedPoints = round2(toNumber(row.totalAwardedPoints));
+  const totalPossiblePointsForGraded = round2(toNumber(row.totalPossiblePointsForGraded));
+
+  const scoreRate = safePercent(totalAwardedPoints, totalPossiblePointsForGraded);
+  const averageAwardedPoints = gradedStudents ? round2(totalAwardedPoints / gradedStudents) : 0;
+  const completionRate = safePercent(gradedStudents, submittedStudents || gradedStudents || 1);
+  const hardnessScore = round2(100 - scoreRate);
+
+  return {
+    taskId: String(row.taskId),
+    taskTitle: String(row.taskTitle),
+    attempts: submittedStudents,
+    studentsCount: submittedStudents,
+    successfulStudents,
+    successRate: scoreRate,
+    errorRate: round2(100 - scoreRate),
+    hardnessScore,
+    taskMaxPoints,
+    averageAwardedPoints,
+    completionRate,
+    gradedStudents,
+    totalAwardedPoints,
+    examId: row.examId ? String(row.examId) : undefined,
+    examName: row.examName ? String(row.examName) : undefined
+  };
+};
+
+const fetchExamTaskPointsStats = async (examId: string) => {
   const session = neo4jDriver.session();
   try {
     const result = await session.run(
       `
       MATCH (e:Exam {id: $examId})-[:IMA_ZADATAK]->(t:Task)
-      RETURN t.id AS taskId, t.title AS taskTitle
+      OPTIONAL MATCH (u:User)-[r:SUBMITTED]->(t)
+      WITH t,
+           count(DISTINCT CASE WHEN r IS NOT NULL THEN u END) AS submittedStudents,
+           count(DISTINCT CASE WHEN r.awardedPoints IS NOT NULL THEN u END) AS gradedStudents,
+           count(DISTINCT CASE
+             WHEN r.awardedPoints IS NOT NULL AND toFloat(r.awardedPoints) >= coalesce(toFloat(t.maxPoints), 10.0) * 0.6
+             THEN u
+           END) AS successfulStudents,
+           sum(coalesce(toFloat(r.awardedPoints), 0.0)) AS totalAwardedPoints,
+           sum(CASE WHEN r.awardedPoints IS NULL THEN 0.0 ELSE coalesce(toFloat(t.maxPoints), 10.0) END) AS totalPossiblePointsForGraded
+      RETURN t.id AS taskId,
+             t.title AS taskTitle,
+             coalesce(toFloat(t.maxPoints), 10.0) AS taskMaxPoints,
+             submittedStudents,
+             gradedStudents,
+             successfulStudents,
+             totalAwardedPoints,
+             totalPossiblePointsForGraded
       ORDER BY t.title
       `,
       { examId }
     );
 
-    return result.records.map((record) => ({
-      taskId: String(record.get('taskId')),
-      taskTitle: String(record.get('taskTitle'))
-    }));
+    return result.records.map((record) =>
+      mapTaskPointsRow({
+        taskId: String(record.get('taskId')),
+        taskTitle: String(record.get('taskTitle')),
+        taskMaxPoints: toNumber(record.get('taskMaxPoints'), 10),
+        submittedStudents: toNumber(record.get('submittedStudents')),
+        gradedStudents: toNumber(record.get('gradedStudents')),
+        successfulStudents: toNumber(record.get('successfulStudents')),
+        totalAwardedPoints: toNumber(record.get('totalAwardedPoints')),
+        totalPossiblePointsForGraded: toNumber(record.get('totalPossiblePointsForGraded'))
+      })
+    );
   } finally {
     await session.close();
   }
@@ -103,23 +221,37 @@ const fetchSubjectContext = async (professorId: string, subjectId: string) => {
       return null;
     }
 
-    const enrolledResult = await session.run(
+    const examCountsResult = await session.run(
       `
-      MATCH (s:Subject {id: $subjectId})<-[r:ENROLLED_IN]-(:User)
-      RETURN count(DISTINCT r) AS enrolledCount
+      MATCH (s:Subject {id: $subjectId})-[:SADRZI]->(e:Exam)
+      OPTIONAL MATCH (submitted:User)-[:SUBMITTED_EXAM]->(e)
+      WITH e, collect(DISTINCT submitted.id) AS submittedIds
+
+      OPTIONAL MATCH (worker:User)-[:SUBMITTED]->(:Task)<-[:IMA_ZADATAK]-(e)
+      WITH e, submittedIds, collect(DISTINCT worker.id) AS workedIdsRaw
+
+      OPTIONAL MATCH (withdrawn:User)-[:WITHDREW_EXAM]->(e)
+      WITH e,
+           submittedIds,
+           [id IN workedIdsRaw + submittedIds WHERE id IS NOT NULL] AS workedCandidateIds,
+           collect(DISTINCT withdrawn.id) AS withdrawnIds
+      RETURN e.id AS examId,
+             e.name AS examName,
+             e.startTime AS startTime,
+             size(submittedIds) AS submittedCount,
+             size(reduce(acc = [], id IN workedCandidateIds |
+               CASE WHEN id IN acc THEN acc ELSE acc + id END
+             )) AS workedCount,
+             size([id IN withdrawnIds WHERE id IS NOT NULL AND NOT id IN submittedIds]) AS withdrawnCount
+      ORDER BY e.startTime
       `,
       { subjectId }
     );
 
-    const examsResult = await session.run(
+    const enrolledResult = await session.run(
       `
-      MATCH (s:Subject {id: $subjectId})-[:SADRZI]->(e:Exam)
-      OPTIONAL MATCH (:User)-[sub:SUBMITTED_EXAM]->(e)
-      RETURN e.id AS examId,
-             e.name AS examName,
-             e.startTime AS startTime,
-             count(DISTINCT sub) AS submittedCount
-      ORDER BY e.startTime
+      MATCH (s:Subject {id: $subjectId})<-[r:ENROLLED_IN]-(:User)
+      RETURN count(DISTINCT r) AS enrolledCount
       `,
       { subjectId }
     );
@@ -129,11 +261,13 @@ const fetchSubjectContext = async (professorId: string, subjectId: string) => {
       subjectId: String(subjectRecord.get('subjectId')),
       subjectName: String(subjectRecord.get('subjectName')),
       enrolledCount: toNumber(enrolledResult.records[0]?.get('enrolledCount')),
-      exams: examsResult.records.map((record) => ({
+      exams: examCountsResult.records.map((record) => ({
         examId: String(record.get('examId')),
         examName: String(record.get('examName')),
         startTime: record.get('startTime') ? String(record.get('startTime')) : null,
-        submittedCount: toNumber(record.get('submittedCount'))
+        submittedCount: toNumber(record.get('submittedCount')),
+        workedCount: toNumber(record.get('workedCount')),
+        withdrawnCount: toNumber(record.get('withdrawnCount'))
       }))
     };
   } finally {
@@ -141,24 +275,87 @@ const fetchSubjectContext = async (professorId: string, subjectId: string) => {
   }
 };
 
-const fetchTaskMetadataForSubject = async (subjectId: string) => {
+const fetchSubjectParticipationTotals = async (subjectId: string) => {
+  const session = neo4jDriver.session();
+  try {
+    const result = await session.run(
+      `
+      MATCH (s:Subject {id: $subjectId})
+      OPTIONAL MATCH (enrolled:User)-[:ENROLLED_IN]->(s)
+      WITH s, count(DISTINCT enrolled) AS enrolledCount
+
+      OPTIONAL MATCH (s)-[:SADRZI]->(e:Exam)<-[:SUBMITTED_EXAM]-(submitted:User)
+      WITH s, enrolledCount, collect(DISTINCT submitted.id) AS submittedStudentIds
+
+      OPTIONAL MATCH (s)-[:SADRZI]->(:Exam)-[:IMA_ZADATAK]->(:Task)<-[:SUBMITTED]-(worker:User)
+      WITH enrolledCount,
+           submittedStudentIds,
+           [id IN collect(DISTINCT worker.id) + submittedStudentIds WHERE id IS NOT NULL] AS workedCandidateIds
+      RETURN enrolledCount,
+             size(submittedStudentIds) AS submittedStudents,
+             size(reduce(acc = [], id IN workedCandidateIds |
+               CASE WHEN id IN acc THEN acc ELSE acc + id END
+             )) AS workedStudents
+      `,
+      { subjectId }
+    );
+
+    const row = result.records[0];
+    return {
+      enrolledCount: toNumber(row?.get('enrolledCount')),
+      submittedStudents: toNumber(row?.get('submittedStudents')),
+      workedStudents: toNumber(row?.get('workedStudents'))
+    };
+  } finally {
+    await session.close();
+  }
+};
+
+const fetchSubjectTaskPointsStats = async (subjectId: string) => {
   const session = neo4jDriver.session();
   try {
     const result = await session.run(
       `
       MATCH (s:Subject {id: $subjectId})-[:SADRZI]->(e:Exam)-[:IMA_ZADATAK]->(t:Task)
-      RETURN t.id AS taskId, t.title AS taskTitle, e.id AS examId, e.name AS examName
+      OPTIONAL MATCH (u:User)-[r:SUBMITTED]->(t)
+      WITH e, t,
+           count(DISTINCT CASE WHEN r IS NOT NULL THEN u END) AS submittedStudents,
+           count(DISTINCT CASE WHEN r.awardedPoints IS NOT NULL THEN u END) AS gradedStudents,
+           count(DISTINCT CASE
+             WHEN r.awardedPoints IS NOT NULL AND toFloat(r.awardedPoints) >= coalesce(toFloat(t.maxPoints), 10.0) * 0.6
+             THEN u
+           END) AS successfulStudents,
+           sum(coalesce(toFloat(r.awardedPoints), 0.0)) AS totalAwardedPoints,
+           sum(CASE WHEN r.awardedPoints IS NULL THEN 0.0 ELSE coalesce(toFloat(t.maxPoints), 10.0) END) AS totalPossiblePointsForGraded
+      RETURN t.id AS taskId,
+             t.title AS taskTitle,
+             coalesce(toFloat(t.maxPoints), 10.0) AS taskMaxPoints,
+             e.id AS examId,
+             e.name AS examName,
+             submittedStudents,
+             gradedStudents,
+             successfulStudents,
+             totalAwardedPoints,
+             totalPossiblePointsForGraded
       ORDER BY e.startTime, t.title
       `,
       { subjectId }
     );
 
-    return result.records.map((record) => ({
-      taskId: String(record.get('taskId')),
-      taskTitle: String(record.get('taskTitle')),
-      examId: String(record.get('examId')),
-      examName: String(record.get('examName'))
-    }));
+    return result.records.map((record) =>
+      mapTaskPointsRow({
+        taskId: String(record.get('taskId')),
+        taskTitle: String(record.get('taskTitle')),
+        taskMaxPoints: toNumber(record.get('taskMaxPoints'), 10),
+        examId: record.get('examId') ? String(record.get('examId')) : null,
+        examName: record.get('examName') ? String(record.get('examName')) : null,
+        submittedStudents: toNumber(record.get('submittedStudents')),
+        gradedStudents: toNumber(record.get('gradedStudents')),
+        successfulStudents: toNumber(record.get('successfulStudents')),
+        totalAwardedPoints: toNumber(record.get('totalAwardedPoints')),
+        totalPossiblePointsForGraded: toNumber(record.get('totalPossiblePointsForGraded'))
+      })
+    );
   } finally {
     await session.close();
   }
@@ -248,72 +445,8 @@ export const getExamOverviewStats = async (req: any, res: Response) => {
       { $sort: { _id: 1 } }
     ]);
 
-    const participationSummary = await ExamParticipation.aggregate([
-      { $match: { examId } },
-      {
-        $group: {
-          _id: null,
-          workedCount: { $sum: { $cond: ['$hasWorked', 1, 0] } },
-          withdrawnCount: { $sum: { $cond: ['$hasWithdrawn', 1, 0] } }
-        }
-      }
-    ]);
-
-    const taskRunRows = await TaskRunEvent.aggregate([
-      { $match: { examId } },
-      {
-        $group: {
-          _id: '$taskId',
-          attempts: { $sum: 1 },
-          successRuns: { $sum: { $cond: [{ $eq: ['$status', 'SUCCESS'] }, 1, 0] } },
-          errorRuns: { $sum: { $cond: [{ $eq: ['$status', 'ERROR'] }, 1, 0] } },
-          students: { $addToSet: '$studentId' },
-          successfulStudentsRaw: {
-            $addToSet: {
-              $cond: [{ $eq: ['$status', 'SUCCESS'] }, '$studentId', null]
-            }
-          }
-        }
-      },
-      {
-        $project: {
-          _id: 0,
-          taskId: '$_id',
-          attempts: 1,
-          successRuns: 1,
-          errorRuns: 1,
-          studentsCount: { $size: '$students' },
-          successfulStudents: {
-            $size: { $setDifference: ['$successfulStudentsRaw', [null]] }
-          }
-        }
-      }
-    ]);
-
-    const taskMeta = await fetchTaskMetadataForExam(examId);
-    const taskTitleById = new Map(taskMeta.map((task) => [task.taskId, task.taskTitle]));
-
-    const taskDifficulty = taskRunRows
-      .map((row: any) => {
-        const studentsCount = toNumber(row.studentsCount);
-        const successfulStudents = toNumber(row.successfulStudents);
-        const attempts = toNumber(row.attempts);
-        const errorRuns = toNumber(row.errorRuns);
-        const successRate = safePercent(successfulStudents, studentsCount || 1);
-        const errorRate = safePercent(errorRuns, attempts || 1);
-        const hardnessScore = Math.round((100 - successRate) * 0.7 + errorRate * 0.3);
-        return {
-          taskId: String(row.taskId),
-          taskTitle: taskTitleById.get(String(row.taskId)) || 'Unknown task',
-          attempts,
-          studentsCount,
-          successfulStudents,
-          successRate,
-          errorRate,
-          hardnessScore
-        };
-      })
-      .sort((a: any, b: any) => b.hardnessScore - a.hardnessScore);
+    const participation = await fetchExamParticipationCounts(examId);
+    const taskDifficulty = (await fetchExamTaskPointsStats(examId)).sort((a, b) => b.hardnessScore - a.hardnessScore);
 
     const gradeDistribution: Record<string, number> = {
       '5': 0,
@@ -333,11 +466,8 @@ export const getExamOverviewStats = async (req: any, res: Response) => {
     const gradedCount = toNumber(gradeSummary?.gradedCount);
     const passedCount = toNumber(gradeSummary?.passedCount);
     const averageGradeRaw = Number(gradeSummary?.averageGrade || 0);
-    const averageGrade = Math.round(averageGradeRaw * 100) / 100;
+    const averageGrade = round2(averageGradeRaw);
     const medianGrade = computeMedian(Array.isArray(gradeSummary?.grades) ? gradeSummary.grades : []);
-
-    const workedCount = toNumber(participationSummary[0]?.workedCount);
-    const withdrawnCount = toNumber(participationSummary[0]?.withdrawnCount);
 
     return res.json({
       exam: {
@@ -347,19 +477,19 @@ export const getExamOverviewStats = async (req: any, res: Response) => {
         subjectName: context.subjectName
       },
       counts: {
-        enrolled: context.enrolledCount,
-        worked: workedCount,
-        submitted: context.submittedCount,
+        enrolled: participation.enrolledCount || context.enrolledCount,
+        worked: participation.workedCount,
+        submitted: participation.submittedCount,
         graded: gradedCount,
         passed: passedCount,
-        withdrawn: withdrawnCount
+        withdrawn: participation.withdrawnCount
       },
       rates: {
-        workRate: safePercent(workedCount, context.enrolledCount),
-        submissionRate: safePercent(context.submittedCount, context.enrolledCount),
+        workRate: safePercent(participation.workedCount, participation.enrolledCount || context.enrolledCount),
+        submissionRate: safePercent(participation.submittedCount, participation.enrolledCount || context.enrolledCount),
         passRateAmongGraded: safePercent(passedCount, gradedCount),
-        passRateAmongEnrolled: safePercent(passedCount, context.enrolledCount),
-        withdrawalRate: safePercent(withdrawnCount, context.enrolledCount)
+        passRateAmongEnrolled: safePercent(passedCount, participation.enrolledCount || context.enrolledCount),
+        withdrawalRate: safePercent(participation.withdrawnCount, participation.enrolledCount || context.enrolledCount)
       },
       grades: {
         average: averageGrade,
@@ -433,80 +563,8 @@ export const getSubjectOverviewStats = async (req: any, res: Response) => {
         ])
       : [];
 
-    const participationByExam = examIds.length
-      ? await ExamParticipation.aggregate([
-          { $match: { examId: { $in: examIds } } },
-          {
-            $group: {
-              _id: '$examId',
-              workedCount: { $sum: { $cond: ['$hasWorked', 1, 0] } },
-              withdrawnCount: { $sum: { $cond: ['$hasWithdrawn', 1, 0] } }
-            }
-          }
-        ])
-      : [];
-
-    const participationOverall = await ExamParticipation.aggregate([
-      { $match: { subjectId } },
-      {
-        $group: {
-          _id: null,
-          workedStudentsRaw: {
-            $addToSet: {
-              $cond: ['$hasWorked', '$studentId', null]
-            }
-          },
-          submittedStudentsRaw: {
-            $addToSet: {
-              $cond: ['$hasSubmitted', '$studentId', null]
-            }
-          }
-        }
-      },
-      {
-        $project: {
-          _id: 0,
-          workedStudents: { $size: { $setDifference: ['$workedStudentsRaw', [null]] } },
-          submittedStudents: { $size: { $setDifference: ['$submittedStudentsRaw', [null]] } }
-        }
-      }
-    ]);
-
-    const taskRunRows = await TaskRunEvent.aggregate([
-      { $match: { subjectId } },
-      {
-        $group: {
-          _id: '$taskId',
-          attempts: { $sum: 1 },
-          successRuns: { $sum: { $cond: [{ $eq: ['$status', 'SUCCESS'] }, 1, 0] } },
-          errorRuns: { $sum: { $cond: [{ $eq: ['$status', 'ERROR'] }, 1, 0] } },
-          students: { $addToSet: '$studentId' },
-          successfulStudentsRaw: {
-            $addToSet: {
-              $cond: [{ $eq: ['$status', 'SUCCESS'] }, '$studentId', null]
-            }
-          }
-        }
-      },
-      {
-        $project: {
-          _id: 0,
-          taskId: '$_id',
-          attempts: 1,
-          successRuns: 1,
-          errorRuns: 1,
-          studentsCount: { $size: '$students' },
-          successfulStudents: {
-            $size: { $setDifference: ['$successfulStudentsRaw', [null]] }
-          }
-        }
-      }
-    ]);
-
-    const taskMeta = await fetchTaskMetadataForSubject(subjectId);
-    const taskMetaById = new Map(
-      taskMeta.map((task) => [task.taskId, { taskTitle: task.taskTitle, examId: task.examId, examName: task.examName }])
-    );
+    const participationTotals = await fetchSubjectParticipationTotals(subjectId);
+    const taskComparisons = (await fetchSubjectTaskPointsStats(subjectId)).sort((a, b) => b.hardnessScore - a.hardnessScore);
 
     const gradeMapByExam = new Map<string, { gradedCount: number; passedCount: number; averageGrade: number }>(
       gradeSummaryByExam.map((row: any) => [
@@ -514,16 +572,7 @@ export const getSubjectOverviewStats = async (req: any, res: Response) => {
         {
           gradedCount: toNumber(row.gradedCount),
           passedCount: toNumber(row.passedCount),
-          averageGrade: Math.round(Number(row.averageGrade || 0) * 100) / 100
-        }
-      ])
-    );
-    const participationMapByExam = new Map<string, { workedCount: number; withdrawnCount: number }>(
-      participationByExam.map((row: any) => [
-        String(row._id),
-        {
-          workedCount: toNumber(row.workedCount),
-          withdrawnCount: toNumber(row.withdrawnCount)
+          averageGrade: round2(Number(row.averageGrade || 0))
         }
       ])
     );
@@ -534,20 +583,17 @@ export const getSubjectOverviewStats = async (req: any, res: Response) => {
         passedCount: 0,
         averageGrade: 0
       }) as { gradedCount: number; passedCount: number; averageGrade: number };
-      const participation = (participationMapByExam.get(exam.examId) || {
-        workedCount: 0,
-        withdrawnCount: 0
-      }) as { workedCount: number; withdrawnCount: number };
+
       const passRate = safePercent(grade.passedCount, grade.gradedCount);
       const normalizedAverage = grade.averageGrade > 0 ? (grade.averageGrade - 5) / 5 : 0;
-      const hardnessScore = Math.round((100 - passRate) * 0.7 + (100 - normalizedAverage * 100) * 0.3);
+      const hardnessScore = round2((100 - passRate) * 0.7 + (100 - normalizedAverage * 100) * 0.3);
       return {
         examId: exam.examId,
         examName: exam.examName,
         startTime: exam.startTime,
         submittedCount: exam.submittedCount,
-        workedCount: participation.workedCount,
-        withdrawnCount: participation.withdrawnCount,
+        workedCount: exam.workedCount,
+        withdrawnCount: exam.withdrawnCount,
         gradedCount: grade.gradedCount,
         passedCount: grade.passedCount,
         passRate,
@@ -555,31 +601,6 @@ export const getSubjectOverviewStats = async (req: any, res: Response) => {
         hardnessScore
       };
     });
-
-    const taskComparisons = taskRunRows
-      .map((row: any) => {
-        const meta = taskMetaById.get(String(row.taskId));
-        const studentsCount = toNumber(row.studentsCount);
-        const successfulStudents = toNumber(row.successfulStudents);
-        const attempts = toNumber(row.attempts);
-        const errorRuns = toNumber(row.errorRuns);
-        const successRate = safePercent(successfulStudents, studentsCount || 1);
-        const errorRate = safePercent(errorRuns, attempts || 1);
-        const hardnessScore = Math.round((100 - successRate) * 0.7 + errorRate * 0.3);
-        return {
-          taskId: String(row.taskId),
-          taskTitle: meta?.taskTitle || 'Unknown task',
-          examId: meta?.examId || null,
-          examName: meta?.examName || null,
-          attempts,
-          studentsCount,
-          successfulStudents,
-          successRate,
-          errorRate,
-          hardnessScore
-        };
-      })
-      .sort((a: any, b: any) => b.hardnessScore - a.hardnessScore);
 
     const overallGrades = gradeSummaryOverall[0] || {
       gradedCount: 0,
@@ -603,11 +624,11 @@ export const getSubjectOverviewStats = async (req: any, res: Response) => {
       }
     }
 
-    const workedStudents = toNumber(participationOverall[0]?.workedStudents);
-    const submittedStudents = toNumber(participationOverall[0]?.submittedStudents);
+    const workedStudents = toNumber(participationTotals.workedStudents);
+    const submittedStudents = toNumber(participationTotals.submittedStudents);
     const gradedCount = toNumber(overallGrades.gradedCount);
     const passedCount = toNumber(overallGrades.passedCount);
-    const averageGrade = Math.round(Number(overallGrades.averageGrade || 0) * 100) / 100;
+    const averageGrade = round2(Number(overallGrades.averageGrade || 0));
     const medianGrade = computeMedian(Array.isArray(overallGrades.grades) ? overallGrades.grades : []);
 
     return res.json({

@@ -24,13 +24,14 @@ import {
   updateTask,
   deleteTask,
   setGrade,
+  setTaskPoints,
   getGrade,
   getExamStudents
 } from '../controllers/examController.js';
 import { authenticateJWT, requireRole } from '../middleware/authMiddleware.js';
 import { taskUpload } from '../../../middleware/upload.js';
 import { validate } from '../../../middleware/validate.js';
-import { uuidParam, subjectSchemas, examSchemas, taskSchemas, submissionSchemas, runSchemas } from '../../../validation/schemas.js';
+import { uuidParam, subjectSchemas, examSchemas, taskSchemas, submissionSchemas, runSchemas, gradeSchemas } from '../../../validation/schemas.js';
 
 const router = Router();
 
@@ -60,7 +61,8 @@ router.post('/:examId/withdraw', authenticateJWT, requireRole('STUDENT'), valida
 
 // Grade routes
 router.get('/:examId/students', authenticateJWT, requireRole('PROFESSOR'), validate({ params: uuidParam }), getExamStudents);
-router.post('/:examId/grade/:studentId', authenticateJWT, requireRole('PROFESSOR'), validate({ params: uuidParam }), setGrade);
+router.post('/:examId/grade/:studentId', authenticateJWT, requireRole('PROFESSOR'), validate({ params: uuidParam, body: gradeSchemas.setGrade }), setGrade);
+router.post('/:examId/grade/:studentId/task-points', authenticateJWT, requireRole('PROFESSOR'), validate({ params: uuidParam, body: gradeSchemas.setTaskPoints }), setTaskPoints);
 router.get('/:examId/grade/:studentId', authenticateJWT, validate({ params: uuidParam }), getGrade);
 
 export default router;

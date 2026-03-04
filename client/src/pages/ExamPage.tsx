@@ -895,7 +895,9 @@ Code saved.` : 'Code saved.'));
             <span className="text-gray-600">|</span>
             <span className="text-gray-200 font-medium">{currentTask?.title || 'Exam'}</span>
             {examDetails && (
-              <span className="text-gray-500 text-sm font-medium">({examDetails.subjectName})</span>
+              <span className="text-gray-500 text-sm font-medium">
+                ({examDetails.subjectName}) - Max {examDetails.maxPoints ?? 100} pts
+              </span>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -1056,7 +1058,8 @@ Code saved.` : 'Code saved.'));
                         : 'border-gray-700/60 bg-gray-900/60 text-gray-300 hover:border-gray-600 hover:bg-gray-800/80'
                     }`}
                   >
-                    {task.title}
+                    <div>{task.title}</div>
+                    <div className="text-[11px] text-gray-400">Max: {task.maxPoints ?? 10} pts</div>
                   </button>
                 ))}
               </div>
@@ -1081,6 +1084,9 @@ Code saved.` : 'Code saved.'));
                 {!isLoadingTask && !taskError && currentTask && (
                   <>
                     <h3 className="text-white text-xl font-semibold mb-2">{currentTask.title}</h3>
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-indigo-300">
+                      Task max points: {currentTask.maxPoints ?? 10}
+                    </div>
                     <p className="text-gray-300 leading-relaxed text-sm">{currentTask.description}</p>
                     {showPdf && currentTask.pdfUrl && (
                       <div

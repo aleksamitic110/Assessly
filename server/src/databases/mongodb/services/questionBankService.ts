@@ -6,6 +6,7 @@ export type QuestionBankSnapshot = {
   sourceExamId?: string | null;
   sourceTaskId?: string | null;
   title: string;
+  maxPoints?: number | null;
   description?: string | null;
   starterCode?: string | null;
   testCases?: string | null;
@@ -23,6 +24,14 @@ export const normalizeQuestionDifficulty = (value: unknown): QuestionDifficulty 
     return raw;
   }
   return 'MEDIUM';
+};
+
+export const normalizeQuestionMaxPoints = (value: unknown, fallback = 10): number => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return fallback;
+  }
+  return Math.round(numeric * 100) / 100;
 };
 
 export const parseQuestionTags = (value: unknown): string[] => {
@@ -53,33 +62,62 @@ export const shouldSaveToQuestionBank = (value: unknown): boolean => {
 };
 
 export const upsertQuestionBankItemFromTask = async (snapshot: QuestionBankSnapshot) => {
+  const hasDifficulty = snapshot.difficulty !== undefined && snapshot.difficulty !== null;
+  const hasTags = snapshot.tags !== undefined && snapshot.tags !== null;
+  const normalizedDifficulty = hasDifficulty ? normalizeQuestionDifficulty(snapshot.difficulty) : undefined;
+  const normalizedTags = hasTags ? parseQuestionTags(snapshot.tags) : undefined;
+
   const payload = {
     subjectId: snapshot.subjectId,
     createdByProfessorId: snapshot.createdByProfessorId,
     sourceExamId: snapshot.sourceExamId || null,
     sourceTaskId: snapshot.sourceTaskId || null,
     title: snapshot.title,
+    maxPoints: normalizeQuestionMaxPoints(snapshot.maxPoints, 10),
     description: snapshot.description || null,
     starterCode: snapshot.starterCode || null,
     testCases: snapshot.testCases || '[]',
     pdfPath: snapshot.pdfPath || null,
     exampleInput: snapshot.exampleInput || null,
     exampleOutput: snapshot.exampleOutput || null,
-    notes: snapshot.notes || null,
-    difficulty: normalizeQuestionDifficulty(snapshot.difficulty),
-    tags: parseQuestionTags(snapshot.tags)
+    notes: snapshot.notes || null
   };
 
   if (payload.sourceTaskId) {
+    const updatePayload: Record<string, unknown> = { ...payload };
+    if (normalizedDifficulty) {
+      updatePayload.difficulty = normalizedDifficulty;
+    }
+    if (normalizedTags) {
+      updatePayload.tags = normalizedTags;
+    }
+    const setOnInsertPayload: Record<string, unknown> = {
+      useCount: 0,
+      archived: false
+    };
+    if (!Object.prototype.hasOwnProperty.call(updatePayload, 'difficulty')) {
+      setOnInsertPayload.difficulty = 'MEDIUM';
+    }
+    if (!Object.prototype.hasOwnProperty.call(updatePayload, 'tags')) {
+      setOnInsertPayload.tags = [];
+    }
+
     await QuestionBankItem.findOneAndUpdate(
       { subjectId: payload.subjectId, sourceTaskId: payload.sourceTaskId },
-      { $set: payload, $setOnInsert: { useCount: 0, archived: false } },
-      { upsert: true, new: true }
+      {
+        $set: updatePayload,
+        $setOnInsert: setOnInsertPayload
+      },
+      { upsert: true, returnDocument: 'after' }
     );
     return;
   }
 
-  await QuestionBankItem.create(payload);
+  await QuestionBankItem.create({
+    ...payload,
+    difficulty: normalizedDifficulty || 'MEDIUM',
+    tags: normalizedTags || []
+  });
 };
 
 export const bumpQuestionBankUsage = async (itemIds: string[]) => {

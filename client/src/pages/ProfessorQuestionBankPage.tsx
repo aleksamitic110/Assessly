@@ -48,18 +48,6 @@ export default function ProfessorQuestionBankPage() {
     tags: ''
   });
 
-  const [newItemForm, setNewItemForm] = useState({
-    title: '',
-    description: '',
-    starterCode: '',
-    testCases: '[]',
-    exampleInput: '',
-    exampleOutput: '',
-    notes: '',
-    difficulty: 'MEDIUM' as QuestionDifficulty,
-    tags: ''
-  });
-
   const hasExams = (subject?.exams || []).length > 0;
 
   const loadSubject = async () => {
@@ -158,50 +146,6 @@ export default function ProfessorQuestionBankPage() {
       await loadItems();
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to auto-generate tasks');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleCreateItem = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!subjectId) return;
-    setError('');
-    setMessage('');
-    try {
-      JSON.parse(newItemForm.testCases || '[]');
-    } catch {
-      setError('Test cases must be valid JSON.');
-      return;
-    }
-    setIsSaving(true);
-    try {
-      await questionBankApi.createItem(subjectId, {
-        title: newItemForm.title.trim(),
-        description: newItemForm.description || null,
-        starterCode: newItemForm.starterCode || null,
-        testCases: newItemForm.testCases || '[]',
-        exampleInput: newItemForm.exampleInput || null,
-        exampleOutput: newItemForm.exampleOutput || null,
-        notes: newItemForm.notes || null,
-        difficulty: newItemForm.difficulty,
-        tags: newItemForm.tags
-      });
-      setMessage('Question bank item created.');
-      setNewItemForm({
-        title: '',
-        description: '',
-        starterCode: '',
-        testCases: '[]',
-        exampleInput: '',
-        exampleOutput: '',
-        notes: '',
-        difficulty: 'MEDIUM',
-        tags: ''
-      });
-      await loadItems();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to create question');
     } finally {
       setIsSaving(false);
     }
@@ -358,67 +302,8 @@ export default function ProfessorQuestionBankPage() {
           </div>
         </section>
 
-        <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <form
-            onSubmit={handleCreateItem}
-            className="xl:col-span-1 p-4 rounded-2xl border border-gray-200/70 dark:border-gray-700/70 bg-white/80 dark:bg-gray-800/80 shadow-sm space-y-3 h-fit"
-          >
-            <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">Add bank item manually</div>
-            <input
-              required
-              value={newItemForm.title}
-              onChange={(e) => setNewItemForm((prev) => ({ ...prev, title: e.target.value }))}
-              placeholder="Question title"
-              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            />
-            <textarea
-              rows={2}
-              value={newItemForm.description}
-              onChange={(e) => setNewItemForm((prev) => ({ ...prev, description: e.target.value }))}
-              placeholder="Description"
-              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            />
-            <textarea
-              rows={2}
-              value={newItemForm.starterCode}
-              onChange={(e) => setNewItemForm((prev) => ({ ...prev, starterCode: e.target.value }))}
-              placeholder="Starter code"
-              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono"
-            />
-            <textarea
-              rows={2}
-              value={newItemForm.testCases}
-              onChange={(e) => setNewItemForm((prev) => ({ ...prev, testCases: e.target.value }))}
-              placeholder='Test cases JSON: [{"input":"","output":""}]'
-              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono"
-            />
-            <div className="grid grid-cols-2 gap-2">
-              <select
-                value={newItemForm.difficulty}
-                onChange={(e) => setNewItemForm((prev) => ({ ...prev, difficulty: e.target.value as QuestionDifficulty }))}
-                className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              >
-                <option value="EASY">Easy</option>
-                <option value="MEDIUM">Medium</option>
-                <option value="HARD">Hard</option>
-              </select>
-              <input
-                value={newItemForm.tags}
-                onChange={(e) => setNewItemForm((prev) => ({ ...prev, tags: e.target.value }))}
-                placeholder="tag1, tag2"
-                className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="w-full px-3 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-60"
-            >
-              Add to Question Bank
-            </button>
-          </form>
-
-          <div className="xl:col-span-2 space-y-3">
+        <section className="space-y-3">
+          <div className="space-y-3">
             {isLoading ? (
               <div className="p-6 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80 text-sm text-gray-500 dark:text-gray-400">
                 Loading question bank...
@@ -439,6 +324,7 @@ export default function ProfessorQuestionBankPage() {
                     <div>
                       <h3 className="text-base font-bold text-gray-900 dark:text-white">{item.title}</h3>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Max points: {item.maxPoints ?? 10} •{' '}
                         Used {item.useCount} times
                         {item.lastUsedAt ? ` - Last used ${new Date(item.lastUsedAt).toLocaleString()}` : ''}
                       </p>

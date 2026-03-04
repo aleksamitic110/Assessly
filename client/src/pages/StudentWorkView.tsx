@@ -50,6 +50,10 @@ export default function StudentWorkView() {
 
   const currentSubmission = submissions[selectedTaskIndex];
   const currentTask = tasks.find(t => t.id === currentSubmission?.taskId);
+  const awardedTotalFallback = submissions.reduce((sum, submission) => sum + Number(submission.awardedPoints ?? 0), 0);
+  const maxTotalFallback = submissions.reduce((sum, submission) => sum + Number(submission.taskMaxPoints ?? 0), 0);
+  const totalAwardedPoints = grade?.totalAwardedPoints ?? awardedTotalFallback;
+  const totalMaxPoints = grade?.totalMaxPoints ?? (maxTotalFallback || exam?.maxPoints || 0);
 
   // Get comments for the current line
   const getLineComments = (lineNum: number) => {
@@ -125,6 +129,14 @@ export default function StudentWorkView() {
             </p>
           </div>
           <div className="flex items-center gap-4">
+            {totalMaxPoints > 0 && (
+              <div className="bg-blue-900/40 border border-blue-700/60 rounded-xl px-4 py-2">
+                <div className="text-xl font-bold text-blue-300">
+                  {totalAwardedPoints} / {totalMaxPoints}
+                </div>
+                <div className="text-xs text-gray-400">Task Points</div>
+              </div>
+            )}
             {grade && (
               <div className="bg-green-900/40 border border-green-700/60 rounded-xl px-4 py-2">
                 <div className="text-2xl font-bold text-green-400">
@@ -195,6 +207,7 @@ export default function StudentWorkView() {
                     }`}
                   >
                     {sub.taskTitle || `Task ${idx + 1}`}
+                    <span className="ml-2 text-xs text-gray-400">({sub.awardedPoints ?? 0}/{sub.taskMaxPoints ?? 10})</span>
                   </button>
                 ))}
               </nav>
@@ -207,6 +220,9 @@ export default function StudentWorkView() {
                   <h4 className="text-lg font-semibold text-white mb-3">
                     {currentSubmission.taskTitle}
                   </h4>
+                  <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-indigo-300">
+                    Points: {currentSubmission.awardedPoints ?? 0} / {currentSubmission.taskMaxPoints ?? currentTask?.maxPoints ?? 10}
+                  </div>
 
                   {/* Task Description */}
                   {currentTask && (

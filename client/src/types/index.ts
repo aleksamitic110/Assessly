@@ -39,6 +39,7 @@ export interface Exam {
   name: string;
   startTime: string;
   durationMinutes: number;
+  maxPoints?: number;
   subjectId?: string;
   subjectName?: string;
   status?: 'wait_room' | 'waiting_start' | 'active' | 'paused' | 'completed' | 'withdrawn' | 'submitted';
@@ -51,6 +52,7 @@ export interface Exam {
 export interface Task {
   id: string;
   title: string;
+  maxPoints?: number;
   description: string;
   starterCode: string;
   testCases: string; // JSON string
@@ -76,6 +78,8 @@ export interface ExecutionLog {
 export interface Submission {
   taskId: string;
   taskTitle?: string;
+  taskMaxPoints?: number;
+  awardedPoints?: number | null;
   sourceCode: string;
   output: string;
   updatedAt?: string | null;
@@ -97,6 +101,8 @@ export interface Grade {
   comment: string;
   professorId: string;
   updatedAt: string | null;
+  totalAwardedPoints?: number;
+  totalMaxPoints?: number;
 }
 
 // Exam Comment types (professor's feedback on student code)
@@ -118,6 +124,8 @@ export interface ExamStudent {
   firstName: string;
   lastName: string;
   submittedAt: string | null;
+  totalMaxPoints?: number;
+  totalAwardedPoints?: number;
   grade: {
     value: number;
     comment: string;
@@ -151,6 +159,7 @@ export interface QuestionBankItem {
   sourceExamId?: string | null;
   sourceTaskId?: string | null;
   title: string;
+  maxPoints?: number;
   description?: string | null;
   starterCode?: string | null;
   testCases: string;
@@ -176,6 +185,11 @@ export interface TaskDifficultyStat {
   successRate: number;
   errorRate: number;
   hardnessScore: number;
+  taskMaxPoints?: number;
+  averageAwardedPoints?: number;
+  completionRate?: number;
+  gradedStudents?: number;
+  totalAwardedPoints?: number;
   examId?: string | null;
   examName?: string | null;
 }

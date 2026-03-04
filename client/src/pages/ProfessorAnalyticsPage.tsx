@@ -141,20 +141,20 @@ export default function ProfessorAnalyticsPage() {
   }, [subjectStats]);
 
   const subjectHardestTaskData = useMemo(() => {
-    if (!subjectStats) return [] as Array<{ taskTitle: string; hardnessScore: number; successRate: number }>;
+    if (!subjectStats) return [] as Array<{ taskTitle: string; hardnessScore: number; pointsRate: number }>;
     return subjectStats.tasks.hardest.map((task) => ({
       taskTitle: sliceName(task.taskTitle, 22),
       hardnessScore: task.hardnessScore,
-      successRate: task.successRate
+      pointsRate: task.successRate
     }));
   }, [subjectStats]);
 
   const subjectEasiestTaskData = useMemo(() => {
-    if (!subjectStats) return [] as Array<{ taskTitle: string; successRate: number; errorRate: number }>;
+    if (!subjectStats) return [] as Array<{ taskTitle: string; pointsRate: number; completionRate: number }>;
     return subjectStats.tasks.easiest.map((task) => ({
       taskTitle: sliceName(task.taskTitle, 22),
-      successRate: task.successRate,
-      errorRate: task.errorRate
+      pointsRate: task.successRate,
+      completionRate: task.completionRate || 0
     }));
   }, [subjectStats]);
 
@@ -187,20 +187,20 @@ export default function ProfessorAnalyticsPage() {
   );
 
   const examHardestTaskData = useMemo(() => {
-    if (!examStats) return [] as Array<{ taskTitle: string; hardnessScore: number; successRate: number }>;
+    if (!examStats) return [] as Array<{ taskTitle: string; hardnessScore: number; pointsRate: number }>;
     return examStats.tasks.hardest.map((task) => ({
       taskTitle: sliceName(task.taskTitle, 22),
       hardnessScore: task.hardnessScore,
-      successRate: task.successRate
+      pointsRate: task.successRate
     }));
   }, [examStats]);
 
   const examEasiestTaskData = useMemo(() => {
-    if (!examStats) return [] as Array<{ taskTitle: string; successRate: number; errorRate: number }>;
+    if (!examStats) return [] as Array<{ taskTitle: string; pointsRate: number; completionRate: number }>;
     return examStats.tasks.easiest.map((task) => ({
       taskTitle: sliceName(task.taskTitle, 22),
-      successRate: task.successRate,
-      errorRate: task.errorRate
+      pointsRate: task.successRate,
+      completionRate: task.completionRate || 0
     }));
   }, [examStats]);
 
@@ -248,11 +248,11 @@ export default function ProfessorAnalyticsPage() {
                 <p className="text-2xl font-black text-gray-900 dark:text-white">{subjectStats.totals.exams}</p>
               </div>
               <div className="p-4 rounded-2xl bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700">
-                <p className="text-xs text-gray-500 dark:text-gray-400">Active Rate</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Work Rate (Worked/Enrolled)</p>
                 <p className="text-2xl font-black text-sky-700 dark:text-sky-300">{subjectStats.rates.activeRate}%</p>
               </div>
               <div className="p-4 rounded-2xl bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700">
-                <p className="text-xs text-gray-500 dark:text-gray-400">Submission Rate</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Submission Rate (Submitted/Enrolled)</p>
                 <p className="text-2xl font-black text-sky-700 dark:text-sky-300">{subjectStats.rates.submissionRate}%</p>
               </div>
               <div className="p-4 rounded-2xl bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700">
@@ -284,13 +284,17 @@ export default function ProfessorAnalyticsPage() {
               </article>
 
               <article className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80">
-                <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">Participation Pipeline</h2>
+                <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">Participation Pipeline (Unique Students)</h2>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={subjectParticipationData}>
                       <CartesianGrid stroke={gridColor} strokeDasharray="3 3" opacity={0.25} />
                       <XAxis dataKey="name" tick={{ fill: axisTickColor, fontSize: 12 }} />
-                      <YAxis tick={{ fill: axisTickColor, fontSize: 12 }} allowDecimals={false} />
+                      <YAxis
+                        tick={{ fill: axisTickColor, fontSize: 12 }}
+                        allowDecimals={false}
+                        label={{ value: 'Student count', angle: -90, position: 'insideLeft', fill: axisTickColor }}
+                      />
                       <Tooltip contentStyle={tooltipStyle} />
                       <Bar dataKey="value" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
                     </BarChart>
@@ -305,7 +309,11 @@ export default function ProfessorAnalyticsPage() {
                     <BarChart data={subjectGradeData}>
                       <CartesianGrid stroke={gridColor} strokeDasharray="3 3" opacity={0.25} />
                       <XAxis dataKey="grade" tick={{ fill: axisTickColor, fontSize: 12 }} />
-                      <YAxis tick={{ fill: axisTickColor, fontSize: 12 }} allowDecimals={false} />
+                      <YAxis
+                        tick={{ fill: axisTickColor, fontSize: 12 }}
+                        allowDecimals={false}
+                        label={{ value: 'Students', angle: -90, position: 'insideLeft', fill: axisTickColor }}
+                      />
                       <Tooltip contentStyle={tooltipStyle} />
                       <Bar dataKey="count" fill="#f59e0b" radius={[6, 6, 0, 0]} />
                     </BarChart>
@@ -355,7 +363,7 @@ export default function ProfessorAnalyticsPage() {
 
             <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <article className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">Hardest Tasks (Subject)</h2>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">Hardest Tasks (Subject, Points-Based)</h2>
                 <div className="h-72">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={subjectHardestTaskData} layout="vertical" margin={{ left: 12, right: 12 }}>
@@ -363,14 +371,14 @@ export default function ProfessorAnalyticsPage() {
                       <XAxis type="number" tick={{ fill: axisTickColor, fontSize: 12 }} domain={[0, 100]} />
                       <YAxis type="category" dataKey="taskTitle" tick={{ fill: axisTickColor, fontSize: 11 }} width={150} />
                       <Tooltip contentStyle={tooltipStyle} />
-                      <Bar dataKey="hardnessScore" name="Hardness score" fill="#ef4444" radius={[0, 6, 6, 0]} />
+                      <Bar dataKey="hardnessScore" name="Difficulty (100 - points rate)" fill="#ef4444" radius={[0, 6, 6, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </article>
 
               <article className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">Easiest Tasks (Subject)</h2>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">Easiest Tasks (Subject, Points-Based)</h2>
                 <div className="h-72">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={subjectEasiestTaskData} layout="vertical" margin={{ left: 12, right: 12 }}>
@@ -378,7 +386,7 @@ export default function ProfessorAnalyticsPage() {
                       <XAxis type="number" tick={{ fill: axisTickColor, fontSize: 12 }} domain={[0, 100]} />
                       <YAxis type="category" dataKey="taskTitle" tick={{ fill: axisTickColor, fontSize: 11 }} width={150} />
                       <Tooltip contentStyle={tooltipStyle} />
-                      <Bar dataKey="successRate" name="Success rate (%)" fill="#22c55e" radius={[0, 6, 6, 0]} />
+                      <Bar dataKey="pointsRate" name="Average points rate (%)" fill="#22c55e" radius={[0, 6, 6, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -409,7 +417,7 @@ export default function ProfessorAnalyticsPage() {
                 <div className="space-y-5">
                   <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-700/40 border border-gray-200 dark:border-gray-600">
                     <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">{selectedExamName}</div>
-                    <div className="mt-2 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 text-sm">
+                    <div className="mt-2 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 text-sm">
                       <div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">Enrolled</div>
                         <div className="font-bold text-gray-900 dark:text-white">{examStats.counts.enrolled}</div>
@@ -425,6 +433,10 @@ export default function ProfessorAnalyticsPage() {
                       <div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">Graded</div>
                         <div className="font-bold text-gray-900 dark:text-white">{examStats.counts.graded}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Withdrawn</div>
+                        <div className="font-bold text-gray-900 dark:text-white">{examStats.counts.withdrawn}</div>
                       </div>
                       <div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">Pass Rate</div>
@@ -456,13 +468,17 @@ export default function ProfessorAnalyticsPage() {
                     </article>
 
                     <article className="p-4 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-700/40">
-                      <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2">Participation (Exam)</h3>
+                      <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2">Participation (Exam - Student Counts)</h3>
                       <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={examParticipationData}>
                             <CartesianGrid stroke={gridColor} strokeDasharray="3 3" opacity={0.25} />
                             <XAxis dataKey="name" tick={{ fill: axisTickColor, fontSize: 11 }} />
-                            <YAxis tick={{ fill: axisTickColor, fontSize: 12 }} allowDecimals={false} />
+                            <YAxis
+                              tick={{ fill: axisTickColor, fontSize: 12 }}
+                              allowDecimals={false}
+                              label={{ value: 'Student count', angle: -90, position: 'insideLeft', fill: axisTickColor }}
+                            />
                             <Tooltip contentStyle={tooltipStyle} />
                             <Bar dataKey="value" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
                           </BarChart>
@@ -477,7 +493,11 @@ export default function ProfessorAnalyticsPage() {
                           <BarChart data={examGradeData}>
                             <CartesianGrid stroke={gridColor} strokeDasharray="3 3" opacity={0.25} />
                             <XAxis dataKey="grade" tick={{ fill: axisTickColor, fontSize: 12 }} />
-                            <YAxis tick={{ fill: axisTickColor, fontSize: 12 }} allowDecimals={false} />
+                            <YAxis
+                              tick={{ fill: axisTickColor, fontSize: 12 }}
+                              allowDecimals={false}
+                              label={{ value: 'Students', angle: -90, position: 'insideLeft', fill: axisTickColor }}
+                            />
                             <Tooltip contentStyle={tooltipStyle} />
                             <Bar dataKey="count" fill="#f59e0b" radius={[6, 6, 0, 0]} />
                           </BarChart>
@@ -488,7 +508,7 @@ export default function ProfessorAnalyticsPage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <article className="p-4 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-700/40">
-                      <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2">Hardest Tasks (Exam)</h3>
+                      <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2">Hardest Tasks (Exam, Points-Based)</h3>
                       <div className="h-72">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={examHardestTaskData} layout="vertical" margin={{ left: 12, right: 12 }}>
@@ -496,14 +516,14 @@ export default function ProfessorAnalyticsPage() {
                             <XAxis type="number" tick={{ fill: axisTickColor, fontSize: 12 }} domain={[0, 100]} />
                             <YAxis type="category" dataKey="taskTitle" tick={{ fill: axisTickColor, fontSize: 11 }} width={150} />
                             <Tooltip contentStyle={tooltipStyle} />
-                            <Bar dataKey="hardnessScore" name="Hardness score" fill="#ef4444" radius={[0, 6, 6, 0]} />
+                            <Bar dataKey="hardnessScore" name="Difficulty (100 - points rate)" fill="#ef4444" radius={[0, 6, 6, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
                     </article>
 
                     <article className="p-4 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-700/40">
-                      <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2">Easiest Tasks (Exam)</h3>
+                      <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2">Easiest Tasks (Exam, Points-Based)</h3>
                       <div className="h-72">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={examEasiestTaskData} layout="vertical" margin={{ left: 12, right: 12 }}>
@@ -511,7 +531,7 @@ export default function ProfessorAnalyticsPage() {
                             <XAxis type="number" tick={{ fill: axisTickColor, fontSize: 12 }} domain={[0, 100]} />
                             <YAxis type="category" dataKey="taskTitle" tick={{ fill: axisTickColor, fontSize: 11 }} width={150} />
                             <Tooltip contentStyle={tooltipStyle} />
-                            <Bar dataKey="successRate" name="Success rate (%)" fill="#22c55e" radius={[0, 6, 6, 0]} />
+                            <Bar dataKey="pointsRate" name="Average points rate (%)" fill="#22c55e" radius={[0, 6, 6, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
