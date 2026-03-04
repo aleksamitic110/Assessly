@@ -1,7 +1,18 @@
 import axios from 'axios';
-import type { Grade, ExamComment, ExamStudent, Submission, ChatMessage } from '../types';
+import type {
+  Grade,
+  ExamComment,
+  ExamStudent,
+  Submission,
+  ChatMessage,
+  ExamOverviewStats,
+  QuestionBankItem,
+  QuestionDifficulty,
+  SubjectOverviewStats,
+  Task
+} from '../types';
 
-const API_URL = 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL?.trim() || '/api';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -68,6 +79,57 @@ export const chatApi = {
 
   replyToMessage: (examId: string, messageId: string, replyMessage: string) =>
     api.post<ChatMessage>(`/logs/chat/${examId}/${messageId}/reply`, { replyMessage }),
+};
+
+type QuestionBankListParams = {
+  search?: string;
+  difficulty?: QuestionDifficulty | '';
+  tags?: string;
+  includeArchived?: boolean;
+};
+
+type QuestionBankPayload = {
+  title: string;
+  description?: string | null;
+  starterCode?: string | null;
+  testCases?: string;
+  pdfPath?: string | null;
+  exampleInput?: string | null;
+  exampleOutput?: string | null;
+  notes?: string | null;
+  difficulty?: QuestionDifficulty;
+  tags?: string | string[];
+  archived?: boolean;
+};
+
+export const questionBankApi = {
+  listItems: (subjectId: string, params: QuestionBankListParams = {}) =>
+    api.get<QuestionBankItem[]>(`/question-bank/subjects/${subjectId}/items`, { params }),
+
+  createItem: (subjectId: string, payload: QuestionBankPayload) =>
+    api.post<QuestionBankItem>(`/question-bank/subjects/${subjectId}/items`, payload),
+
+  updateItem: (itemId: string, payload: Partial<QuestionBankPayload>) =>
+    api.patch<QuestionBankItem>(`/question-bank/items/${itemId}`, payload),
+
+  deleteItem: (itemId: string) =>
+    api.delete(`/question-bank/items/${itemId}`),
+
+  importItemToExam: (examId: string, itemId: string) =>
+    api.post<Task>(`/question-bank/exams/${examId}/import`, { itemId }),
+
+  autoGenerateForExam: (
+    examId: string,
+    payload: { count: number; difficulty?: QuestionDifficulty | ''; tags?: string | string[] }
+  ) => api.post<{ createdCount: number; tasks: Task[] }>(`/question-bank/exams/${examId}/auto-generate`, payload)
+};
+
+export const statsApi = {
+  getExamOverview: (examId: string) =>
+    api.get<ExamOverviewStats>(`/stats/exam/${examId}/overview`),
+
+  getSubjectOverview: (subjectId: string) =>
+    api.get<SubjectOverviewStats>(`/stats/subject/${subjectId}/overview`)
 };
 
 export default api;

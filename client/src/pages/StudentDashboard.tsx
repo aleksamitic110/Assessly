@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import api, { gradeApi } from '../services/api';
 import { socket, connectSocket, disconnectSocket } from '../services/socket';
-import type { Exam, Grade } from '../types';
+import type { Grade } from '../types';
 
 interface AvailableExam {
   id: string;

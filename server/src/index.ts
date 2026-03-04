@@ -30,6 +30,12 @@ import { apiLimiter } from './middleware/rateLimit.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { env, getCorsOrigins } from './config/env.js';
 
+// --- DODATO ZA MONGODB STATISTIKU ---
+import { connectMongo, disconnectMongo } from './databases/mongodb/client.js';
+import statsRoutes from './databases/mongodb/routes/statsRoutes.js';
+import questionBankRoutes from './databases/mongodb/routes/questionBankRoutes.js';
+// -------------------------
+
 const PORT = process.env.PORT || 3000;
 
 const app = express();
@@ -40,6 +46,7 @@ if (env.TRUST_PROXY) {
 }
 
 const corsOrigins = getCorsOrigins();
+const localDevOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://[::1]:5173'];
 const corsOptions: cors.CorsOptions = {
   origin: corsOrigins.length
     ? (origin, callback) => {
@@ -59,11 +66,11 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       baseUri: ["'self'"],
-      frameAncestors: ["'self'", 'http://localhost:5173', 'http://127.0.0.1:5173', ...corsOrigins],
+      frameAncestors: ["'self'", ...localDevOrigins, ...corsOrigins],
       imgSrc: ["'self'", 'data:', 'https:'],
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
-      connectSrc: ["'self'", ...corsOrigins]
+      connectSrc: ["'self'", ...localDevOrigins, ...corsOrigins]
     }
   }
 }));
@@ -95,6 +102,11 @@ app.use('/api/exams', examRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/judge0', judge0Routes);
 
+// --- DODATO ZA MONGODB STATISTIKU ---
+app.use('/api/stats', statsRoutes);
+app.use('/api/question-bank', questionBankRoutes);
+// -------------------------
+
 app.use(errorHandler);
 
 async function initializeDatabases() {
@@ -112,6 +124,9 @@ async function initializeDatabases() {
   await cassandraClient.connect();
   console.log('Connected to Cassandra (Astra DB)');
 
+  // --- DODATO ZA MONGODB ---
+  await connectMongo();
+  // -------------------------
 }
 
 const startServer = async () => {
@@ -134,6 +149,11 @@ const gracefulShutdown = async () => {
     await neo4jDriver.close();
     if (redisClient.isOpen) await redisClient.quit();
     await cassandraClient.shutdown();
+    
+    // --- DODATO ZA MONGODB ---
+    await disconnectMongo();
+    // -------------------------
+
     server.close(() => process.exit(0));
   } catch (error) {
     console.error(error);

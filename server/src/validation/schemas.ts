@@ -77,7 +77,10 @@ export const taskSchemas = {
     testCases: z.union([z.string(), z.array(z.any())]).optional().nullable(),
     exampleInput: z.string().max(2000).optional().nullable(),
     exampleOutput: z.string().max(2000).optional().nullable(),
-    notes: z.string().max(2000).optional().nullable()
+    notes: z.string().max(2000).optional().nullable(),
+    saveToQuestionBank: z.union([z.boolean(), z.string()]).optional(),
+    bankDifficulty: z.enum(['EASY', 'MEDIUM', 'HARD']).optional(),
+    bankTags: z.union([z.string(), z.array(z.string())]).optional().nullable()
   }),
   update: z.object({
     title: z.string().trim().min(1).max(120).optional(),
@@ -86,7 +89,10 @@ export const taskSchemas = {
     testCases: z.union([z.string(), z.array(z.any())]).optional().nullable(),
     exampleInput: z.string().max(2000).optional().nullable(),
     exampleOutput: z.string().max(2000).optional().nullable(),
-    notes: z.string().max(2000).optional().nullable()
+    notes: z.string().max(2000).optional().nullable(),
+    saveToQuestionBank: z.union([z.boolean(), z.string()]).optional(),
+    bankDifficulty: z.enum(['EASY', 'MEDIUM', 'HARD']).optional(),
+    bankTags: z.union([z.string(), z.array(z.string())]).optional().nullable()
   })
 };
 
@@ -148,7 +154,10 @@ export const adminSchemas = {
     testCases: z.union([z.string(), z.array(z.any())]).optional().nullable(),
     exampleInput: z.string().max(2000).optional().nullable(),
     exampleOutput: z.string().max(2000).optional().nullable(),
-    notes: z.string().max(2000).optional().nullable()
+    notes: z.string().max(2000).optional().nullable(),
+    saveToQuestionBank: z.union([z.boolean(), z.string()]).optional(),
+    bankDifficulty: z.enum(['EASY', 'MEDIUM', 'HARD']).optional(),
+    bankTags: z.union([z.string(), z.array(z.string())]).optional().nullable()
   }),
   updateTask: z.object({
     title: z.string().trim().min(1).max(120).optional(),
@@ -157,7 +166,10 @@ export const adminSchemas = {
     testCases: z.union([z.string(), z.array(z.any())]).optional().nullable(),
     exampleInput: z.string().max(2000).optional().nullable(),
     exampleOutput: z.string().max(2000).optional().nullable(),
-    notes: z.string().max(2000).optional().nullable()
+    notes: z.string().max(2000).optional().nullable(),
+    saveToQuestionBank: z.union([z.boolean(), z.string()]).optional(),
+    bankDifficulty: z.enum(['EASY', 'MEDIUM', 'HARD']).optional(),
+    bankTags: z.union([z.string(), z.array(z.string())]).optional().nullable()
   })
 };
 

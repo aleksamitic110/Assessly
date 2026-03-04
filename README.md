@@ -30,6 +30,7 @@ Set-ExecutionPolicy -Scope Process Bypass
 ### Posle starta otvoriti
 - Client: http://localhost:5173
 - Server: http://localhost:3000
+- Alternativa: `http://127.0.0.1:5173` i `http://127.0.0.1:3000` (podrzano)
 
 ### Napomena za cloud baze
 Moguce je da su baze zbog nekoriscenja otisle u hibernate mode. `assessly_start.ps1` sada automatski pokusava da ih probudi i proverava spremnost preko:

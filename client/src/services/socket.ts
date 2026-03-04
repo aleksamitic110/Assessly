@@ -1,13 +1,24 @@
 import { io, Socket } from 'socket.io-client';
 
 const getToken = () => localStorage.getItem('token');
+const socketUrl = import.meta.env.VITE_SOCKET_URL?.trim();
 
-export const socket: Socket = io('http://localhost:3000', {
-  autoConnect: false,
-  auth: (cb) => {
-    cb({ token: getToken() });
-  }
-});
+const createSocket = () =>
+  socketUrl
+    ? io(socketUrl, {
+        autoConnect: false,
+        auth: (cb) => {
+          cb({ token: getToken() });
+        }
+      })
+    : io({
+        autoConnect: false,
+        auth: (cb) => {
+          cb({ token: getToken() });
+        }
+      });
+
+export const socket: Socket = createSocket();
 
 export const connectSocket = () => {
   if (!socket.connected) {

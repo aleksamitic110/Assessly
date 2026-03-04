@@ -8,6 +8,8 @@ import Register from './pages/Register';
 import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
 import ProfessorDashboard from './pages/ProfessorDashboard';
+import ProfessorQuestionBankPage from './pages/ProfessorQuestionBankPage';
+import ProfessorAnalyticsPage from './pages/ProfessorAnalyticsPage';
 import StudentDashboard from './pages/StudentDashboard';
 import ExamPage from './pages/ExamPage';
 import ProfessorReviewPage from './pages/ProfessorReviewPage';
@@ -50,6 +52,22 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['PROFESSOR']}>
                 <ProfessorReviewPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/professor/subject/:subjectId/question-bank"
+            element={
+              <ProtectedRoute allowedRoles={['PROFESSOR']}>
+                <ProfessorQuestionBankPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/professor/subject/:subjectId/analytics"
+            element={
+              <ProtectedRoute allowedRoles={['PROFESSOR']}>
+                <ProfessorAnalyticsPage />
               </ProtectedRoute>
             }
           />

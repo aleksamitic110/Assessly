@@ -101,7 +101,6 @@ export default function ExamChatPanel({ examId, isProfessor = false }: ExamChatP
   };
 
   const pendingMessages = messages.filter(m => m.status === 'pending');
-  const approvedMessages = messages.filter(m => m.status === 'approved');
 
   // For students, show approved messages + their own pending messages
   const visibleMessages = isProfessor

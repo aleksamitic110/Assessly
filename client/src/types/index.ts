@@ -140,3 +140,145 @@ export interface ChatMessage {
   createdAt: string;
   approvedAt: string | null;
 }
+
+export type QuestionDifficulty = 'EASY' | 'MEDIUM' | 'HARD';
+
+export interface QuestionBankItem {
+  id: string;
+  _id?: string;
+  subjectId: string;
+  createdByProfessorId: string;
+  sourceExamId?: string | null;
+  sourceTaskId?: string | null;
+  title: string;
+  description?: string | null;
+  starterCode?: string | null;
+  testCases: string;
+  pdfPath?: string | null;
+  exampleInput?: string | null;
+  exampleOutput?: string | null;
+  notes?: string | null;
+  tags: string[];
+  difficulty: QuestionDifficulty;
+  useCount: number;
+  archived: boolean;
+  lastUsedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskDifficultyStat {
+  taskId: string;
+  taskTitle: string;
+  attempts: number;
+  studentsCount: number;
+  successfulStudents: number;
+  successRate: number;
+  errorRate: number;
+  hardnessScore: number;
+  examId?: string | null;
+  examName?: string | null;
+}
+
+export interface ExamOverviewStats {
+  exam: {
+    id: string;
+    name: string;
+    subjectId: string;
+    subjectName: string;
+  };
+  counts: {
+    enrolled: number;
+    worked: number;
+    submitted: number;
+    graded: number;
+    passed: number;
+    withdrawn: number;
+  };
+  rates: {
+    workRate: number;
+    submissionRate: number;
+    passRateAmongGraded: number;
+    passRateAmongEnrolled: number;
+    withdrawalRate: number;
+  };
+  grades: {
+    average: number;
+    median: number;
+    distribution: Record<string, number>;
+  };
+  tasks: {
+    hardest: TaskDifficultyStat[];
+    easiest: TaskDifficultyStat[];
+  };
+}
+
+export interface SubjectOverviewStats {
+  subject: {
+    id: string;
+    name: string;
+  };
+  totals: {
+    exams: number;
+    enrolledStudents: number;
+    studentsWhoWorked: number;
+    studentsWhoSubmitted: number;
+    gradedCount: number;
+    passedCount: number;
+  };
+  rates: {
+    activeRate: number;
+    submissionRate: number;
+    passRateAmongGraded: number;
+  };
+  grades: {
+    average: number;
+    median: number;
+    distribution: Record<string, number>;
+  };
+  exams: {
+    hardest: Array<{
+      examId: string;
+      examName: string;
+      startTime: string | null;
+      submittedCount: number;
+      workedCount: number;
+      withdrawnCount: number;
+      gradedCount: number;
+      passedCount: number;
+      passRate: number;
+      averageGrade: number;
+      hardnessScore: number;
+    }>;
+    easiest: Array<{
+      examId: string;
+      examName: string;
+      startTime: string | null;
+      submittedCount: number;
+      workedCount: number;
+      withdrawnCount: number;
+      gradedCount: number;
+      passedCount: number;
+      passRate: number;
+      averageGrade: number;
+      hardnessScore: number;
+    }>;
+    all: Array<{
+      examId: string;
+      examName: string;
+      startTime: string | null;
+      submittedCount: number;
+      workedCount: number;
+      withdrawnCount: number;
+      gradedCount: number;
+      passedCount: number;
+      passRate: number;
+      averageGrade: number;
+      hardnessScore: number;
+    }>;
+  };
+  tasks: {
+    hardest: TaskDifficultyStat[];
+    easiest: TaskDifficultyStat[];
+  };
+}

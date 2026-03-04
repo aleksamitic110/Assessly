@@ -1,13 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import api, { gradeApi, commentsApi } from '../services/api';
 import type { ExamStudent, Submission, ExamComment, Exam, Task } from '../types';
 
 export default function ProfessorReviewPage() {
   const { examId } = useParams<{ examId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
 
   const [exam, setExam] = useState<Exam | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -30,7 +28,6 @@ export default function ProfessorReviewPage() {
   const [newCommentLine, setNewCommentLine] = useState<string>('');
   const [newCommentMessage, setNewCommentMessage] = useState('');
   const [isSavingComment, setIsSavingComment] = useState(false);
-  const [isUpdatingComment, setIsUpdatingComment] = useState(false);
 
   // Load exam, tasks, and students
   const loadData = useCallback(async () => {
@@ -179,15 +176,12 @@ export default function ProfessorReviewPage() {
       return;
     }
 
-    setIsUpdatingComment(true);
     setError('');
     try {
       const res = await commentsApi.updateComment(examId, selectedStudent.studentId, comment.commentId, newLine, newMessage.trim());
       setComments(prev => prev.map(c => (c.commentId === comment.commentId ? res.data : c)));
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to update comment');
-    } finally {
-      setIsUpdatingComment(false);
     }
   };
 
