@@ -46,6 +46,17 @@ export const gradeApi = {
   setGrade: (examId: string, studentId: string, value: number, comment: string) =>
     api.post<Grade>(`/exams/${examId}/grade/${studentId}`, { value, comment }),
 
+  setTaskPoints: (examId: string, studentId: string, taskId: string, points: number) =>
+    api.post<{
+      examId: string;
+      studentId: string;
+      taskId: string;
+      points: number;
+      taskMaxPoints: number;
+      totalAwardedPoints: number;
+      totalMaxPoints: number;
+    }>(`/exams/${examId}/grade/${studentId}/task-points`, { taskId, points }),
+
   getGrade: (examId: string, studentId: string) =>
     api.get<Grade | null>(`/exams/${examId}/grade/${studentId}`),
 

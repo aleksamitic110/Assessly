@@ -25,6 +25,53 @@ const ADMIN_EMAIL = 'admin';
 const ADMIN_PASSWORD = 'admin';
 const ADMIN_ID = 'admin-000-000-000';
 
+const normalizeMaxPoints = (value: unknown, fallback = 10) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return fallback;
+  }
+  return Math.round(numeric * 100) / 100;
+};
+
+const findSubjectsByEnrollmentCode = async (
+  session: any,
+  enrollmentCode: string,
+  options?: { excludeSubjectId?: string }
+) => {
+  const result = await session.run(
+    `
+    MATCH (s:Subject)
+    WHERE s.passwordHash IS NOT NULL
+    RETURN s
+    `
+  );
+
+  const matches: Array<Record<string, any>> = [];
+  for (const record of result.records) {
+    const subject = record.get('s')?.properties;
+    if (!subject) {
+      continue;
+    }
+
+    const subjectId = String(subject.id || '');
+    if (options?.excludeSubjectId && subjectId === options.excludeSubjectId) {
+      continue;
+    }
+
+    const passwordHash = String(subject.passwordHash || '');
+    if (!passwordHash) {
+      continue;
+    }
+
+    const isMatch = await bcrypt.compare(enrollmentCode, passwordHash);
+    if (isMatch) {
+      matches.push(subject);
+    }
+  }
+
+  return matches;
+};
+
 // ─── Admin Login ───────────────────────────────────────────────────────────────
 
 export const adminLogin = async (req: Request, res: Response) => {
@@ -221,6 +268,7 @@ export const adminGetExams = async (_req: Request, res: Response) => {
         name: exam.name,
         startTime: exam.startTime,
         durationMinutes: Number(exam.durationMinutes),
+        maxPoints: normalizeMaxPoints(exam.maxPoints, 100),
         subjectId: subject.id,
         subjectName: subject.name,
         taskCount
@@ -798,7 +846,17 @@ export const adminCreateSubject = async (req: Request, res: Response) => {
   const session = neo4jDriver.session();
 
   try {
-    const passwordHash = await bcrypt.hash(String(password), 10);
+    const enrollmentCode = String(password || '').trim();
+    if (!enrollmentCode) {
+      return res.status(400).json({ error: 'Subject code is required' });
+    }
+
+    const duplicateSubjects = await findSubjectsByEnrollmentCode(session, enrollmentCode);
+    if (duplicateSubjects.length > 0) {
+      return res.status(409).json({ error: 'Subject code is already in use. Choose a different code.' });
+    }
+
+    const passwordHash = await bcrypt.hash(enrollmentCode, 10);
     const id = uuidv4();
 
     const result = await session.run(
@@ -828,9 +886,23 @@ export const adminUpdateSubject = async (req: Request, res: Response) => {
   const { subjectId } = req.params;
   const { name, description, password } = req.body;
   const session = neo4jDriver.session();
+  const subjectIdValue = String(subjectId || '');
 
   try {
-    const passwordHash = password ? await bcrypt.hash(String(password), 10) : null;
+    let passwordHash: string | null = null;
+    if (typeof password === 'string') {
+      const enrollmentCode = password.trim();
+      if (!enrollmentCode) {
+        return res.status(400).json({ error: 'Subject code cannot be empty' });
+      }
+
+      const duplicateSubjects = await findSubjectsByEnrollmentCode(session, enrollmentCode, { excludeSubjectId: subjectIdValue });
+      if (duplicateSubjects.length > 0) {
+        return res.status(409).json({ error: 'Subject code is already in use. Choose a different code.' });
+      }
+
+      passwordHash = await bcrypt.hash(enrollmentCode, 10);
+    }
 
     const result = await session.run(
       `MATCH (s:Subject {id: $subjectId})
@@ -838,7 +910,7 @@ export const adminUpdateSubject = async (req: Request, res: Response) => {
            s.description = COALESCE($description, s.description),
            s.passwordHash = COALESCE($passwordHash, s.passwordHash)
        RETURN s`,
-      { subjectId, name: name || null, description: description !== undefined ? description : null, passwordHash }
+      { subjectId: subjectIdValue, name: name || null, description: description !== undefined ? description : null, passwordHash }
     );
 
     if (result.records.length === 0) {
@@ -847,7 +919,7 @@ export const adminUpdateSubject = async (req: Request, res: Response) => {
 
     const s = result.records[0].get('s').properties;
     delete s.passwordHash;
-    await logAdminActivity('ADMIN_SUBJECT_UPDATE', { subjectId, name: s.name });
+    await logAdminActivity('ADMIN_SUBJECT_UPDATE', { subjectId: subjectIdValue, name: s.name });
     res.json(s);
   } catch (error) {
     res.status(500).json({ error: 'Error updating subject' });
@@ -859,17 +931,24 @@ export const adminUpdateSubject = async (req: Request, res: Response) => {
 // ─── Admin CRUD: Exams ────────────────────────────────────────────────────────
 
 export const adminCreateExam = async (req: Request, res: Response) => {
-  const { subjectId, name, startTime, durationMinutes } = req.body;
+  const { subjectId, name, startTime, durationMinutes, maxPoints } = req.body;
   const session = neo4jDriver.session();
 
   try {
+    const normalizedExamMaxPoints = normalizeMaxPoints(maxPoints, 100);
     const id = uuidv4();
     const result = await session.run(
       `MATCH (s:Subject {id: $subjectId})
-       CREATE (e:Exam {id: $id, name: $name, startTime: $startTime, durationMinutes: $durationMinutes})
+       CREATE (e:Exam {
+         id: $id,
+         name: $name,
+         startTime: $startTime,
+         durationMinutes: $durationMinutes,
+         maxPoints: $maxPoints
+       })
        CREATE (s)-[:SADRZI]->(e)
        RETURN e`,
-      { subjectId, id, name, startTime, durationMinutes }
+      { subjectId, id, name, startTime, durationMinutes, maxPoints: normalizedExamMaxPoints }
     );
 
     if (result.records.length === 0) {
@@ -878,7 +957,10 @@ export const adminCreateExam = async (req: Request, res: Response) => {
 
     const e = result.records[0].get('e').properties;
     await logAdminActivity('ADMIN_EXAM_CREATE', { examId: id, name, subjectId });
-    res.status(201).json(e);
+    res.status(201).json({
+      ...e,
+      maxPoints: normalizeMaxPoints(e.maxPoints, normalizedExamMaxPoints)
+    });
   } catch (error) {
     res.status(500).json({ error: 'Error creating exam' });
   } finally {
@@ -888,17 +970,25 @@ export const adminCreateExam = async (req: Request, res: Response) => {
 
 export const adminUpdateExam = async (req: Request, res: Response) => {
   const { examId } = req.params;
-  const { name, startTime, durationMinutes } = req.body;
+  const { name, startTime, durationMinutes, maxPoints } = req.body;
   const session = neo4jDriver.session();
 
   try {
+    const normalizedExamMaxPoints = maxPoints !== undefined ? normalizeMaxPoints(maxPoints, 100) : null;
     const result = await session.run(
       `MATCH (e:Exam {id: $examId})
        SET e.name = COALESCE($name, e.name),
            e.startTime = COALESCE($startTime, e.startTime),
-           e.durationMinutes = COALESCE($durationMinutes, e.durationMinutes)
+           e.durationMinutes = COALESCE($durationMinutes, e.durationMinutes),
+           e.maxPoints = COALESCE($maxPoints, e.maxPoints)
        RETURN e`,
-      { examId, name: name || null, startTime: startTime || null, durationMinutes: durationMinutes ?? null }
+      {
+        examId,
+        name: name || null,
+        startTime: startTime || null,
+        durationMinutes: durationMinutes ?? null,
+        maxPoints: normalizedExamMaxPoints
+      }
     );
 
     if (result.records.length === 0) {
@@ -907,7 +997,10 @@ export const adminUpdateExam = async (req: Request, res: Response) => {
 
     const e = result.records[0].get('e').properties;
     await logAdminActivity('ADMIN_EXAM_UPDATE', { examId, name: e.name });
-    res.json(e);
+    res.json({
+      ...e,
+      maxPoints: normalizeMaxPoints(e.maxPoints, 100)
+    });
   } catch (error) {
     res.status(500).json({ error: 'Error updating exam' });
   } finally {
@@ -938,24 +1031,36 @@ export const adminGetTasks = async (req: Request, res: Response) => {
 };
 
 export const adminCreateTask = async (req: Request, res: Response) => {
-  const { examId, title, description, starterCode, testCases, exampleInput, exampleOutput, notes } = req.body;
+  const { examId, title, maxPoints, description, starterCode, testCases, exampleInput, exampleOutput, notes } = req.body;
   const session = neo4jDriver.session();
 
   try {
+    const normalizedTaskMaxPoints = normalizeMaxPoints(maxPoints, 10);
     const id = uuidv4();
     const testCasesStr = testCases ? (typeof testCases === 'string' ? testCases : JSON.stringify(testCases)) : null;
 
     const result = await session.run(
       `MATCH (e:Exam {id: $examId})
        CREATE (t:Task {
-         id: $id, title: $title, description: $description,
+         id: $id, title: $title, maxPoints: $maxPoints, description: $description,
          starterCode: $starterCode, testCases: $testCases,
          exampleInput: $exampleInput, exampleOutput: $exampleOutput,
          notes: $notes
        })
        CREATE (e)-[:IMA_ZADATAK]->(t)
        RETURN t`,
-      { examId, id, title, description: description || '', starterCode: starterCode || '', testCases: testCasesStr, exampleInput: exampleInput || '', exampleOutput: exampleOutput || '', notes: notes || '' }
+      {
+        examId,
+        id,
+        title,
+        maxPoints: normalizedTaskMaxPoints,
+        description: description || '',
+        starterCode: starterCode || '',
+        testCases: testCasesStr,
+        exampleInput: exampleInput || '',
+        exampleOutput: exampleOutput || '',
+        notes: notes || ''
+      }
     );
 
     if (result.records.length === 0) {
@@ -964,7 +1069,10 @@ export const adminCreateTask = async (req: Request, res: Response) => {
 
     const t = result.records[0].get('t').properties;
     await logAdminActivity('ADMIN_TASK_CREATE', { taskId: id, examId, title });
-    res.status(201).json(t);
+    res.status(201).json({
+      ...t,
+      maxPoints: normalizeMaxPoints(t.maxPoints, normalizedTaskMaxPoints)
+    });
   } catch (error) {
     res.status(500).json({ error: 'Error creating task' });
   } finally {
@@ -974,10 +1082,11 @@ export const adminCreateTask = async (req: Request, res: Response) => {
 
 export const adminUpdateTask = async (req: Request, res: Response) => {
   const { taskId } = req.params;
-  const { title, description, starterCode, testCases, exampleInput, exampleOutput, notes } = req.body;
+  const { title, maxPoints, description, starterCode, testCases, exampleInput, exampleOutput, notes } = req.body;
   const session = neo4jDriver.session();
 
   try {
+    const normalizedTaskMaxPoints = maxPoints !== undefined ? normalizeMaxPoints(maxPoints, 10) : null;
     const testCasesStr = testCases !== undefined
       ? (testCases ? (typeof testCases === 'string' ? testCases : JSON.stringify(testCases)) : null)
       : undefined;
@@ -985,6 +1094,7 @@ export const adminUpdateTask = async (req: Request, res: Response) => {
     const result = await session.run(
       `MATCH (t:Task {id: $taskId})
        SET t.title = COALESCE($title, t.title),
+           t.maxPoints = COALESCE($maxPoints, t.maxPoints),
            t.description = COALESCE($description, t.description),
            t.starterCode = COALESCE($starterCode, t.starterCode),
            t.testCases = COALESCE($testCases, t.testCases),
@@ -995,6 +1105,7 @@ export const adminUpdateTask = async (req: Request, res: Response) => {
       {
         taskId,
         title: title || null,
+        maxPoints: normalizedTaskMaxPoints,
         description: description !== undefined ? description : null,
         starterCode: starterCode !== undefined ? starterCode : null,
         testCases: testCasesStr !== undefined ? testCasesStr : null,
@@ -1010,7 +1121,10 @@ export const adminUpdateTask = async (req: Request, res: Response) => {
 
     const t = result.records[0].get('t').properties;
     await logAdminActivity('ADMIN_TASK_UPDATE', { taskId, title: t.title });
-    res.json(t);
+    res.json({
+      ...t,
+      maxPoints: normalizeMaxPoints(t.maxPoints, 10)
+    });
   } catch (error) {
     res.status(500).json({ error: 'Error updating task' });
   } finally {

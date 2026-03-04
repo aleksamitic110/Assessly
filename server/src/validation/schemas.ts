@@ -38,19 +38,19 @@ export const subjectSchemas = {
   create: z.object({
     name: trimmedString(100),
     description: z.string().trim().max(500).optional().nullable(),
-    password: z.string().min(6).max(128)
+    password: z.string().trim().min(6).max(128)
   }),
   update: z.object({
     name: z.string().trim().min(1).max(100).optional(),
     description: z.string().trim().max(500).optional().nullable(),
-    password: z.string().min(6).max(128).optional(),
+    password: z.string().trim().min(6).max(128).optional(),
     invalidateEnrollments: z.boolean().optional()
   }),
   addProfessor: z.object({
     email: z.string().email().max(254).transform((v) => v.toLowerCase())
   }),
   enroll: z.object({
-    password: z.string().min(6).max(128)
+    password: z.string().trim().min(6).max(128)
   })
 };
 
@@ -59,12 +59,14 @@ export const examSchemas = {
     subjectId: z.string().uuid(),
     name: trimmedString(120),
     startTime: z.string().datetime(),
-    durationMinutes: z.coerce.number().int().min(1).max(600)
+    durationMinutes: z.coerce.number().int().min(1).max(600),
+    maxPoints: z.coerce.number().min(1).max(10000).default(100)
   }),
   update: z.object({
     name: z.string().trim().min(1).max(120).optional(),
     startTime: z.string().datetime().optional(),
-    durationMinutes: z.coerce.number().int().min(1).max(600).optional()
+    durationMinutes: z.coerce.number().int().min(1).max(600).optional(),
+    maxPoints: z.coerce.number().min(1).max(10000).optional()
   })
 };
 
@@ -72,6 +74,7 @@ export const taskSchemas = {
   create: z.object({
     examId: z.string().uuid(),
     title: trimmedString(120),
+    maxPoints: z.coerce.number().min(1).max(10000).default(10),
     description: z.string().trim().max(2000).optional().nullable(),
     starterCode: z.string().max(20000).optional().nullable(),
     testCases: z.union([z.string(), z.array(z.any())]).optional().nullable(),
@@ -84,6 +87,7 @@ export const taskSchemas = {
   }),
   update: z.object({
     title: z.string().trim().min(1).max(120).optional(),
+    maxPoints: z.coerce.number().min(1).max(10000).optional(),
     description: z.string().trim().max(2000).optional().nullable(),
     starterCode: z.string().max(20000).optional().nullable(),
     testCases: z.union([z.string(), z.array(z.any())]).optional().nullable(),
@@ -127,28 +131,31 @@ export const adminSchemas = {
   createSubject: z.object({
     name: trimmedString(100),
     description: z.string().trim().max(500).optional().nullable(),
-    password: z.string().min(6).max(128),
+    password: z.string().trim().min(6).max(128),
     professorId: z.string().uuid()
   }),
   updateSubject: z.object({
     name: z.string().trim().min(1).max(100).optional(),
     description: z.string().trim().max(500).optional().nullable(),
-    password: z.string().min(6).max(128).optional()
+    password: z.string().trim().min(6).max(128).optional()
   }),
   createExam: z.object({
     subjectId: z.string().uuid(),
     name: trimmedString(120),
     startTime: z.string().datetime(),
-    durationMinutes: z.coerce.number().int().min(1).max(600)
+    durationMinutes: z.coerce.number().int().min(1).max(600),
+    maxPoints: z.coerce.number().min(1).max(10000).default(100)
   }),
   updateExam: z.object({
     name: z.string().trim().min(1).max(120).optional(),
     startTime: z.string().datetime().optional(),
-    durationMinutes: z.coerce.number().int().min(1).max(600).optional()
+    durationMinutes: z.coerce.number().int().min(1).max(600).optional(),
+    maxPoints: z.coerce.number().min(1).max(10000).optional()
   }),
   createTask: z.object({
     examId: z.string().uuid(),
     title: trimmedString(120),
+    maxPoints: z.coerce.number().min(1).max(10000).default(10),
     description: z.string().trim().max(2000).optional().nullable(),
     starterCode: z.string().max(20000).optional().nullable(),
     testCases: z.union([z.string(), z.array(z.any())]).optional().nullable(),
@@ -161,6 +168,7 @@ export const adminSchemas = {
   }),
   updateTask: z.object({
     title: z.string().trim().min(1).max(120).optional(),
+    maxPoints: z.coerce.number().min(1).max(10000).optional(),
     description: z.string().trim().max(2000).optional().nullable(),
     starterCode: z.string().max(20000).optional().nullable(),
     testCases: z.union([z.string(), z.array(z.any())]).optional().nullable(),
@@ -179,6 +187,17 @@ export const runSchemas = {
     sourceCode: z.string().max(50000),
     input: z.string().max(10000).optional().nullable(),
     languageId: z.coerce.number().int().positive().optional().nullable()
+  })
+};
+
+export const gradeSchemas = {
+  setGrade: z.object({
+    value: z.coerce.number().int().min(5).max(10),
+    comment: z.string().max(1000).optional().nullable()
+  }),
+  setTaskPoints: z.object({
+    taskId: z.string().uuid(),
+    points: z.coerce.number().min(0).max(10000)
   })
 };
 

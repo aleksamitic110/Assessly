@@ -107,6 +107,45 @@ const fetchSubjectIdForExam = async (examId: string) => {
   }
 };
 
+const findSubjectsByEnrollmentCode = async (
+  session: any,
+  enrollmentCode: string,
+  options?: { excludeSubjectId?: string }
+) => {
+  const subjectsResult = await session.run(
+    `
+    MATCH (s:Subject)
+    WHERE s.passwordHash IS NOT NULL
+    RETURN s
+    `
+  );
+
+  const matches: Array<Record<string, any>> = [];
+  for (const record of subjectsResult.records) {
+    const subject = record.get('s')?.properties;
+    if (!subject) {
+      continue;
+    }
+
+    const subjectId = String(subject.id || '');
+    if (options?.excludeSubjectId && subjectId === options.excludeSubjectId) {
+      continue;
+    }
+
+    const passwordHash = String(subject.passwordHash || '');
+    if (!passwordHash) {
+      continue;
+    }
+
+    const isMatch = await bcrypt.compare(enrollmentCode, passwordHash);
+    if (isMatch) {
+      matches.push(subject);
+    }
+  }
+
+  return matches;
+};
+
 const shouldTreatAsWithdrawn = async (examId: string, studentId: string) => {
   const [withdrawnRaw, sessionId] = await redisClient.mGet([
     getWithdrawnKey(examId, studentId),
@@ -119,10 +158,91 @@ const shouldTreatAsWithdrawn = async (examId: string, studentId: string) => {
 
   if (sessionId && withdrawnRaw !== sessionId) {
     await redisClient.del(getWithdrawnKey(examId, studentId));
-    return false;
+    const relationSession = neo4jDriver.session();
+    try {
+      const relationResult = await relationSession.run(
+        `
+        MATCH (u:User {id: $studentId}), (e:Exam {id: $examId})
+        OPTIONAL MATCH (u)-[w:WITHDREW_EXAM]->(e)
+        OPTIONAL MATCH (u)-[s:SUBMITTED_EXAM]->(e)
+        RETURN count(w) AS withdrawnCount, count(s) AS submittedCount
+        `,
+        { studentId, examId }
+      );
+      const withdrawnCount = toNumber(relationResult.records[0]?.get('withdrawnCount'));
+      const submittedCount = toNumber(relationResult.records[0]?.get('submittedCount'));
+      return withdrawnCount > 0 && submittedCount === 0;
+    } finally {
+      await relationSession.close();
+    }
   }
 
-  return true;
+  const relationSession = neo4jDriver.session();
+  try {
+    const relationResult = await relationSession.run(
+      `
+      MATCH (u:User {id: $studentId}), (e:Exam {id: $examId})
+      OPTIONAL MATCH (u)-[w:WITHDREW_EXAM]->(e)
+      OPTIONAL MATCH (u)-[s:SUBMITTED_EXAM]->(e)
+      RETURN count(w) AS withdrawnCount, count(s) AS submittedCount
+      `,
+      { studentId, examId }
+    );
+
+    const withdrawnCount = toNumber(relationResult.records[0]?.get('withdrawnCount'));
+    const submittedCount = toNumber(relationResult.records[0]?.get('submittedCount'));
+    if (submittedCount > 0 || withdrawnCount === 0) {
+      await redisClient.del(getWithdrawnKey(examId, studentId));
+      return false;
+    }
+    return true;
+  } finally {
+    await relationSession.close();
+  }
+};
+
+const normalizeMaxPoints = (value: unknown, fallback = 10) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return fallback;
+  }
+  return Math.round(numeric * 100) / 100;
+};
+
+const toNumber = (value: unknown, fallback = 0) => {
+  if (typeof (value as { toNumber?: () => number })?.toNumber === 'function') {
+    return (value as { toNumber: () => number }).toNumber();
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+};
+
+const hasStudentSubmittedExam = async (session: any, examId: string, studentId: string) => {
+  const submittedResult = await session.run(
+    `
+    MATCH (u:User {id: $studentId})-[se:SUBMITTED_EXAM]->(e:Exam {id: $examId})
+    RETURN count(se) AS submittedCount
+    `,
+    { examId, studentId }
+  );
+  const submittedCount = toNumber(submittedResult.records[0]?.get('submittedCount'));
+  return submittedCount > 0;
+};
+
+const fetchStudentExamPointsSummary = async (session: any, examId: string, studentId: string) => {
+  const pointsResult = await session.run(
+    `
+    MATCH (e:Exam {id: $examId})-[:IMA_ZADATAK]->(t:Task)
+    OPTIONAL MATCH (u:User {id: $studentId})-[r:SUBMITTED]->(t)
+    RETURN sum(coalesce(toFloat(t.maxPoints), 10.0)) AS totalMaxPoints,
+           sum(coalesce(toFloat(r.awardedPoints), 0.0)) AS totalAwardedPoints
+    `,
+    { examId, studentId }
+  );
+  return {
+    totalMaxPoints: Math.round(toNumber(pointsResult.records[0]?.get('totalMaxPoints')) * 100) / 100,
+    totalAwardedPoints: Math.round(toNumber(pointsResult.records[0]?.get('totalAwardedPoints')) * 100) / 100
+  };
 };
 
 export const createSubject = async (req: any, res: Response) => {
@@ -131,10 +251,17 @@ export const createSubject = async (req: any, res: Response) => {
   const session = neo4jDriver.session();
 
   try {
-    if (!password) {
-      return res.status(400).json({ error: 'Subject password is required' });
+    const enrollmentCode = String(password || '').trim();
+    if (!enrollmentCode) {
+      return res.status(400).json({ error: 'Subject code is required' });
     }
-    const passwordHash = await bcrypt.hash(String(password), 10);
+
+    const duplicateSubjects = await findSubjectsByEnrollmentCode(session, enrollmentCode);
+    if (duplicateSubjects.length > 0) {
+      return res.status(409).json({ error: 'Subject code is already in use. Choose a different code.' });
+    }
+
+    const passwordHash = await bcrypt.hash(enrollmentCode, 10);
     const id = uuidv4();
     const result = await session.run(
       `
@@ -164,7 +291,21 @@ export const updateSubject = async (req: any, res: Response) => {
   const session = neo4jDriver.session();
 
   try {
-    const passwordHash = password ? await bcrypt.hash(String(password), 10) : null;
+    let passwordHash: string | null = null;
+    if (typeof password === 'string') {
+      const enrollmentCode = password.trim();
+      if (!enrollmentCode) {
+        return res.status(400).json({ error: 'Subject code cannot be empty' });
+      }
+
+      const duplicateSubjects = await findSubjectsByEnrollmentCode(session, enrollmentCode, { excludeSubjectId: subjectId });
+      if (duplicateSubjects.length > 0) {
+        return res.status(409).json({ error: 'Subject code is already in use. Choose a different code.' });
+      }
+
+      passwordHash = await bcrypt.hash(enrollmentCode, 10);
+    }
+
     const result = await session.run(
       `
       MATCH (p:User {id: $professorId})-[:PREDAJE]->(s:Subject {id: $subjectId})
@@ -264,36 +405,21 @@ export const enrollSubject = async (req: any, res: Response) => {
   if (req.user?.role !== 'STUDENT') {
     return res.status(403).json({ error: 'Only students can enroll' });
   }
-  if (!password) {
-    return res.status(400).json({ error: 'Subject password is required' });
+  const enrollmentCode = String(password || '').trim();
+  if (!enrollmentCode) {
+    return res.status(400).json({ error: 'Subject code is required' });
   }
 
   const session = neo4jDriver.session();
   try {
-    const subjectsResult = await session.run(
-      `
-      MATCH (s:Subject)
-      WHERE s.passwordHash IS NOT NULL
-      RETURN s
-      `
-    );
-
-    let matchedSubject: any = null;
-    for (const record of subjectsResult.records) {
-      const subject = record.get('s').properties;
-      if (!subject.passwordHash) {
-        continue;
-      }
-      const isMatch = await bcrypt.compare(String(password), String(subject.passwordHash));
-      if (isMatch) {
-        matchedSubject = subject;
-        break;
-      }
+    const matchedSubjects = await findSubjectsByEnrollmentCode(session, enrollmentCode);
+    if (matchedSubjects.length === 0) {
+      return res.status(401).json({ error: 'Invalid subject code' });
     }
-
-    if (!matchedSubject) {
-      return res.status(401).json({ error: 'Invalid subject password' });
+    if (matchedSubjects.length > 1) {
+      return res.status(409).json({ error: 'Subject code is not unique. Contact your professor/admin.' });
     }
+    const matchedSubject = matchedSubjects[0];
 
     const enrollResult = await session.run(
       `
@@ -387,6 +513,7 @@ export const getStudentSubjects = async (req: any, res: Response) => {
         name: item.exam.properties.name,
         startTime: item.exam.properties.startTime,
         durationMinutes: Number(item.exam.properties.durationMinutes),
+        maxPoints: normalizeMaxPoints(item.exam.properties.maxPoints, 100),
         subjectId: subject.id,
         subjectName: subject.name,
         _submitted: item.submitted
@@ -428,27 +555,38 @@ export const getStudentSubjects = async (req: any, res: Response) => {
 };
 
 export const createExam = async (req: any, res: Response) => {
-  const { subjectId, name, startTime, durationMinutes } = req.body;
+  const { subjectId, name, startTime, durationMinutes, maxPoints } = req.body;
   const professorId = req.user.id;
   const session = neo4jDriver.session();
 
   try {
+    const normalizedExamMaxPoints = normalizeMaxPoints(maxPoints, 100);
     const id = uuidv4();
     const result = await session.run(
       `
       MATCH (p:User {id: $professorId})-[:PREDAJE]->(s:Subject {id: $subjectId})
-      CREATE (e:Exam {id: $id, name: $name, startTime: $startTime, durationMinutes: $durationMinutes})
+      CREATE (e:Exam {
+        id: $id,
+        name: $name,
+        startTime: $startTime,
+        durationMinutes: $durationMinutes,
+        maxPoints: $maxPoints
+      })
       CREATE (s)-[:SADRZI]->(e)
       RETURN e
       `,
-      { professorId, subjectId, id, name, startTime, durationMinutes }
+      { professorId, subjectId, id, name, startTime, durationMinutes, maxPoints: normalizedExamMaxPoints }
     );
 
     if (result.records.length === 0) {
       return res.status(403).json({ error: 'You can only create exams for your subjects' });
     }
 
-    res.status(201).json(result.records[0].get('e').properties);
+    const exam = result.records[0].get('e').properties;
+    res.status(201).json({
+      ...exam,
+      maxPoints: normalizeMaxPoints(exam.maxPoints, normalizedExamMaxPoints)
+    });
     emitExamChanged(subjectId, 'exam_created');
   } catch (error) {
     res.status(500).json({ error: 'Error while creating exam' });
@@ -459,27 +597,33 @@ export const createExam = async (req: any, res: Response) => {
 
 export const updateExam = async (req: any, res: Response) => {
   const { examId } = req.params;
-  const { name, startTime, durationMinutes } = req.body;
+  const { name, startTime, durationMinutes, maxPoints } = req.body;
   const professorId = req.user.id;
   const session = neo4jDriver.session();
 
   try {
+    const normalizedExamMaxPoints = maxPoints !== undefined ? normalizeMaxPoints(maxPoints, 100) : null;
     const result = await session.run(
       `
       MATCH (p:User {id: $professorId})-[:PREDAJE]->(:Subject)-[:SADRZI]->(e:Exam {id: $examId})
       SET e.name = COALESCE($name, e.name),
           e.startTime = COALESCE($startTime, e.startTime),
-          e.durationMinutes = COALESCE($durationMinutes, e.durationMinutes)
+          e.durationMinutes = COALESCE($durationMinutes, e.durationMinutes),
+          e.maxPoints = COALESCE($maxPoints, e.maxPoints)
       RETURN e
       `,
-      { professorId, examId, name, startTime, durationMinutes }
+      { professorId, examId, name, startTime, durationMinutes, maxPoints: normalizedExamMaxPoints }
     );
 
     if (result.records.length === 0) {
       return res.status(404).json({ error: 'Exam not found' });
     }
 
-    res.json(result.records[0].get('e').properties);
+    const exam = result.records[0].get('e').properties;
+    res.json({
+      ...exam,
+      maxPoints: normalizeMaxPoints(exam.maxPoints, 100)
+    });
     emitExamChanged(examId, 'exam_updated');
   } catch (error) {
     res.status(500).json({ error: 'Error while updating exam' });
@@ -530,6 +674,7 @@ export const createTask = async (req: any, res: Response) => {
   const {
     examId,
     title,
+    maxPoints,
     description,
     starterCode,
     testCases,
@@ -546,6 +691,7 @@ export const createTask = async (req: any, res: Response) => {
   const session = neo4jDriver.session();
 
   try {
+    const normalizedTaskMaxPoints = normalizeMaxPoints(maxPoints, 10);
     const id = uuidv4();
     const normalizedTestCases = typeof testCases === 'string' ? testCases : JSON.stringify(testCases || []);
     const result = await session.run(
@@ -554,6 +700,7 @@ export const createTask = async (req: any, res: Response) => {
       CREATE (t:Task {
         id: $id,
         title: $title,
+        maxPoints: $maxPoints,
         description: $description,
         starterCode: $starterCode,
         testCases: $testCases,
@@ -570,6 +717,7 @@ export const createTask = async (req: any, res: Response) => {
         examId,
         id,
         title,
+        maxPoints: normalizedTaskMaxPoints,
         description,
         starterCode,
         testCases: normalizedTestCases,
@@ -613,6 +761,7 @@ export const createTask = async (req: any, res: Response) => {
     const serverBaseUrl = process.env.SERVER_BASE_URL || 'http://localhost:3000';
     res.status(201).json({
       ...task,
+      maxPoints: normalizeMaxPoints(task.maxPoints, normalizedTaskMaxPoints),
       pdfUrl: task.pdfPath ? `${serverBaseUrl}${task.pdfPath}` : null,
       savedToQuestionBank: shouldSaveToQuestionBank(saveToQuestionBank)
     });
@@ -627,6 +776,7 @@ export const updateTask = async (req: any, res: Response) => {
   const { taskId } = req.params;
   const {
     title,
+    maxPoints,
     description,
     starterCode,
     testCases,
@@ -667,10 +817,12 @@ export const updateTask = async (req: any, res: Response) => {
       pdfPath = `/uploads/tasks/${pdfFile.filename}`;
     }
 
+    const normalizedTaskMaxPoints = maxPoints !== undefined ? normalizeMaxPoints(maxPoints, 10) : null;
     const result = await session.run(
       `
       MATCH (p:User {id: $professorId})-[:PREDAJE]->(:Subject)-[:SADRZI]->(:Exam)-[:IMA_ZADATAK]->(t:Task {id: $taskId})
       SET t.title = COALESCE($title, t.title),
+          t.maxPoints = COALESCE($maxPoints, t.maxPoints),
           t.description = COALESCE($description, t.description),
           t.starterCode = COALESCE($starterCode, t.starterCode),
           t.testCases = COALESCE($testCases, t.testCases),
@@ -684,6 +836,7 @@ export const updateTask = async (req: any, res: Response) => {
         professorId,
         taskId,
         title,
+        maxPoints: normalizedTaskMaxPoints,
         description,
         starterCode,
         testCases: typeof testCases === 'string' ? testCases : testCases ? JSON.stringify(testCases) : null,
@@ -722,6 +875,7 @@ export const updateTask = async (req: any, res: Response) => {
     const serverBaseUrl = process.env.SERVER_BASE_URL || 'http://localhost:3000';
     res.json({
       ...task,
+      maxPoints: normalizeMaxPoints(task.maxPoints, 10),
       pdfUrl: task.pdfPath ? `${serverBaseUrl}${task.pdfPath}` : null,
       savedToQuestionBank: shouldSaveToQuestionBank(saveToQuestionBank)
     });
@@ -800,6 +954,7 @@ export const getAvailableExams = async (req: any, res: Response) => {
         name: exam.name,
         startTime: exam.startTime,
         durationMinutes: Number(exam.durationMinutes),
+        maxPoints: normalizeMaxPoints(exam.maxPoints, 100),
         subjectId: subject.id,
         subjectName: subject.name
       };
@@ -875,6 +1030,7 @@ export const getExamById = async (req: any, res: Response) => {
           name: exam.name,
           startTime: exam.startTime,
           durationMinutes: Number(exam.durationMinutes),
+          maxPoints: normalizeMaxPoints(exam.maxPoints, 100),
           subjectId: subject.id,
           subjectName: subject.name,
           status: 'submitted',
@@ -888,6 +1044,7 @@ export const getExamById = async (req: any, res: Response) => {
           name: exam.name,
           startTime: exam.startTime,
           durationMinutes: Number(exam.durationMinutes),
+          maxPoints: normalizeMaxPoints(exam.maxPoints, 100),
           subjectId: subject.id,
           subjectName: subject.name,
           status: 'withdrawn',
@@ -901,6 +1058,7 @@ export const getExamById = async (req: any, res: Response) => {
       name: exam.name,
       startTime: exam.startTime,
       durationMinutes: Number(exam.durationMinutes),
+      maxPoints: normalizeMaxPoints(exam.maxPoints, 100),
       subjectId: subject.id,
       subjectName: subject.name,
       ...state
@@ -961,6 +1119,7 @@ export const getProfessorSubjects = async (req: any, res: Response) => {
           name: examProps.name,
           startTime: examProps.startTime,
           durationMinutes: Number(examProps.durationMinutes),
+          maxPoints: normalizeMaxPoints(examProps.maxPoints, 100),
           subjectId: subject.id,
           subjectName: subject.name,
           taskCount
@@ -1054,6 +1213,7 @@ export const getExamTasks = async (req: any, res: Response) => {
       return {
         id: task.id,
         title: task.title,
+        maxPoints: normalizeMaxPoints(task.maxPoints, 10),
         description: task.description,
         starterCode: task.starterCode,
         testCases: task.testCases,
@@ -1291,6 +1451,10 @@ export const getMySubmissions = async (req: any, res: Response) => {
       return {
         taskId: task.id,
         taskTitle: task.title,
+        taskMaxPoints: normalizeMaxPoints(task.maxPoints, 10),
+        awardedPoints: rel?.properties?.awardedPoints !== undefined && rel?.properties?.awardedPoints !== null
+          ? Number(rel.properties.awardedPoints)
+          : null,
         sourceCode: rel?.properties?.sourceCode || '',
         output: rel?.properties?.output || '',
         updatedAt: rel?.properties?.updatedAt || null
@@ -1307,13 +1471,28 @@ export const getMySubmissions = async (req: any, res: Response) => {
 
 export const getStudentSubmissions = async (req: any, res: Response) => {
   const { examId, studentId } = req.params;
+  const professorId = req.user?.id;
 
   if (req.user?.role !== 'PROFESSOR') {
     return res.status(403).json({ error: 'Only professors can view student submissions' });
   }
+  if (!professorId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
 
   const session = neo4jDriver.session();
   try {
+    const accessCheck = await session.run(
+      `
+      MATCH (p:User {id: $professorId})-[:PREDAJE]->(:Subject)-[:SADRZI]->(e:Exam {id: $examId})
+      RETURN count(e) AS examCount
+      `,
+      { professorId, examId }
+    );
+    if (!toNumber(accessCheck.records[0]?.get('examCount'))) {
+      return res.status(403).json({ error: 'You do not have access to this exam' });
+    }
+
     const result = await session.run(
       `
       MATCH (e:Exam {id: $examId})-[:IMA_ZADATAK]->(t:Task)
@@ -1330,6 +1509,10 @@ export const getStudentSubmissions = async (req: any, res: Response) => {
       return {
         taskId: task.id,
         taskTitle: task.title,
+        taskMaxPoints: normalizeMaxPoints(task.maxPoints, 10),
+        awardedPoints: rel?.properties?.awardedPoints !== undefined && rel?.properties?.awardedPoints !== null
+          ? Number(rel.properties.awardedPoints)
+          : null,
         sourceCode: rel?.properties?.sourceCode || '',
         output: rel?.properties?.output || '',
         updatedAt: rel?.properties?.updatedAt || null
@@ -1378,9 +1561,14 @@ export const submitExam = async (req: any, res: Response) => {
       MATCH (u:User {id: $studentId}), (e:Exam {id: $examId})
       MERGE (u)-[r:SUBMITTED_EXAM]->(e)
       SET r.submittedAt = datetime()
+      WITH u, e
+      OPTIONAL MATCH (u)-[w:WITHDREW_EXAM]->(e)
+      DELETE w
       `,
       { studentId, examId }
     );
+
+    await redisClient.del(getWithdrawnKey(examId, studentId));
 
     if (subjectId) {
       await markExamSubmitted({ examId, subjectId, studentId }).catch((mongoError) => {
@@ -1406,9 +1594,31 @@ export const withdrawExam = async (req: any, res: Response) => {
     return res.status(403).json({ error: 'Only students can withdraw' });
   }
 
+  const session = neo4jDriver.session();
   try {
+    const access = await session.run(
+      `
+      MATCH (u:User {id: $studentId})-[:ENROLLED_IN]->(:Subject)-[:SADRZI]->(e:Exam {id: $examId})
+      RETURN count(e) AS examCount
+      `,
+      { studentId, examId }
+    );
+    const count = toNumber(access.records[0]?.get('examCount'));
+    if (!count) {
+      return res.status(403).json({ error: 'You are not enrolled in this subject' });
+    }
+
     const sessionId = await redisClient.get(getSessionKey(examId));
     await redisClient.set(getWithdrawnKey(examId, studentId), sessionId || 'true', { EX: STATE_TTL_SECONDS });
+    await session.run(
+      `
+      MATCH (u:User {id: $studentId}), (e:Exam {id: $examId})
+      MERGE (u)-[w:WITHDREW_EXAM]->(e)
+      SET w.updatedAt = datetime()
+      `,
+      { studentId, examId }
+    );
+
     const subjectId = await fetchSubjectIdForExam(examId);
     if (subjectId) {
       await markExamWithdrawn({ examId, subjectId, studentId }).catch((mongoError) => {
@@ -1421,6 +1631,8 @@ export const withdrawExam = async (req: any, res: Response) => {
     res.json({ message: 'Withdrawn' });
   } catch (error) {
     res.status(500).json({ error: 'Error while withdrawing from exam' });
+  } finally {
+    await session.close();
   }
 };
 
@@ -1459,6 +1671,11 @@ export const setGrade = async (req: any, res: Response) => {
     }
     const subjectIdRaw = accessCheck.records[0]?.get('subjectId');
     subjectId = subjectIdRaw ? String(subjectIdRaw) : null;
+
+    const submitted = await hasStudentSubmittedExam(session, examId, studentId);
+    if (!submitted) {
+      return res.status(400).json({ error: 'Student has not submitted this exam yet' });
+    }
 
     const result = await session.run(
       `
@@ -1502,17 +1719,107 @@ export const setGrade = async (req: any, res: Response) => {
     }
     // ------------------------------------
 
+    const pointsSummary = await fetchStudentExamPointsSummary(session, examId, studentId);
     res.json({
       examId: grade.examId,
       studentId: grade.studentId,
       value: grade.value,
       comment: grade.comment,
       professorId: grade.professorId,
-      updatedAt: grade.updatedAt?.toString?.() || null
+      updatedAt: grade.updatedAt?.toString?.() || null,
+      totalAwardedPoints: pointsSummary.totalAwardedPoints,
+      totalMaxPoints: pointsSummary.totalMaxPoints
     });
   } catch (error) {
     console.error('Set grade error:', error);
     res.status(500).json({ error: 'Error while setting grade' });
+  } finally {
+    await session.close();
+  }
+};
+
+export const setTaskPoints = async (req: any, res: Response) => {
+  const { examId, studentId } = req.params;
+  const { taskId, points } = req.body;
+  const professorId = req.user?.id;
+
+  if (!professorId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  if (req.user?.role !== 'PROFESSOR') {
+    return res.status(403).json({ error: 'Only professors can set task points' });
+  }
+
+  const numericPoints = Number(points);
+  if (!Number.isFinite(numericPoints) || numericPoints < 0) {
+    return res.status(400).json({ error: 'Points must be a non-negative number' });
+  }
+
+  const session = neo4jDriver.session();
+  try {
+    const accessCheck = await session.run(
+      `
+      MATCH (p:User {id: $professorId})-[:PREDAJE]->(:Subject)-[:SADRZI]->(e:Exam {id: $examId})
+      RETURN count(e) AS examCount
+      `,
+      { professorId, examId }
+    );
+    if (!toNumber(accessCheck.records[0]?.get('examCount'))) {
+      return res.status(403).json({ error: 'You do not have access to this exam' });
+    }
+
+    const submitted = await hasStudentSubmittedExam(session, examId, studentId);
+    if (!submitted) {
+      return res.status(400).json({ error: 'Student has not submitted this exam yet' });
+    }
+
+    const taskCheck = await session.run(
+      `
+      MATCH (p:User {id: $professorId})-[:PREDAJE]->(:Subject)-[:SADRZI]->(e:Exam {id: $examId})-[:IMA_ZADATAK]->(t:Task {id: $taskId})
+      RETURN t.maxPoints AS taskMaxPoints
+      `,
+      { professorId, examId, taskId }
+    );
+    if (taskCheck.records.length === 0) {
+      return res.status(404).json({ error: 'Task not found in this exam' });
+    }
+
+    const taskMaxPoints = normalizeMaxPoints(taskCheck.records[0].get('taskMaxPoints'), 10);
+    if (numericPoints > taskMaxPoints) {
+      return res.status(400).json({ error: `Points cannot exceed task max points (${taskMaxPoints})` });
+    }
+
+    const saveResult = await session.run(
+      `
+      MATCH (u:User {id: $studentId})
+      MATCH (e:Exam {id: $examId})-[:IMA_ZADATAK]->(t:Task {id: $taskId})
+      MERGE (u)-[r:SUBMITTED]->(t)
+      SET r.awardedPoints = $points,
+          r.gradedBy = $professorId,
+          r.gradedAt = datetime(),
+          r.updatedAt = coalesce(r.updatedAt, datetime()),
+          r.sourceCode = coalesce(r.sourceCode, ''),
+          r.output = coalesce(r.output, '')
+      RETURN r.awardedPoints AS awardedPoints
+      `,
+      { examId, taskId, studentId, points: Math.round(numericPoints * 100) / 100, professorId }
+    );
+
+    const awardedPoints = toNumber(saveResult.records[0]?.get('awardedPoints'));
+    const pointsSummary = await fetchStudentExamPointsSummary(session, examId, studentId);
+
+    return res.json({
+      examId,
+      studentId,
+      taskId,
+      points: awardedPoints,
+      taskMaxPoints,
+      totalAwardedPoints: pointsSummary.totalAwardedPoints,
+      totalMaxPoints: pointsSummary.totalMaxPoints
+    });
+  } catch (error) {
+    console.error('Set task points error:', error);
+    return res.status(500).json({ error: 'Error while setting task points' });
   } finally {
     await session.close();
   }
@@ -1563,13 +1870,16 @@ export const getGrade = async (req: any, res: Response) => {
     }
 
     const grade = result.records[0].get('g').properties;
+    const pointsSummary = await fetchStudentExamPointsSummary(session, examId, studentId);
     res.json({
       examId: grade.examId,
       studentId: grade.studentId,
       value: grade.value,
       comment: grade.comment,
       professorId: grade.professorId,
-      updatedAt: grade.updatedAt?.toString?.() || null
+      updatedAt: grade.updatedAt?.toString?.() || null,
+      totalAwardedPoints: pointsSummary.totalAwardedPoints,
+      totalMaxPoints: pointsSummary.totalMaxPoints
     });
   } catch (error) {
     console.error('Get grade error:', error);
@@ -1610,6 +1920,8 @@ export const getExamStudents = async (req: any, res: Response) => {
       `
       MATCH (s:User)-[sub:SUBMITTED_EXAM]->(e:Exam {id: $examId})
       OPTIONAL MATCH (e)-[:HAS_GRADE]->(g:Grade {studentId: s.id})
+      OPTIONAL MATCH (e)-[:IMA_ZADATAK]->(t:Task)
+      OPTIONAL MATCH (s)-[r:SUBMITTED]->(t)
       RETURN s.id AS studentId,
              s.email AS email,
              s.firstName AS firstName,
@@ -1617,7 +1929,9 @@ export const getExamStudents = async (req: any, res: Response) => {
              sub.submittedAt AS submittedAt,
              g.value AS gradeValue,
              g.comment AS gradeComment,
-             g.updatedAt AS gradeUpdatedAt
+             g.updatedAt AS gradeUpdatedAt,
+             sum(coalesce(toFloat(t.maxPoints), 10.0)) AS totalMaxPoints,
+             sum(coalesce(toFloat(r.awardedPoints), 0.0)) AS totalAwardedPoints
       ORDER BY s.lastName, s.firstName
       `,
       { examId }
@@ -1629,6 +1943,8 @@ export const getExamStudents = async (req: any, res: Response) => {
       firstName: record.get('firstName'),
       lastName: record.get('lastName'),
       submittedAt: record.get('submittedAt')?.toString?.() || null,
+      totalMaxPoints: Math.round(toNumber(record.get('totalMaxPoints')) * 100) / 100,
+      totalAwardedPoints: Math.round(toNumber(record.get('totalAwardedPoints')) * 100) / 100,
       grade: record.get('gradeValue') !== null ? {
         value: record.get('gradeValue'),
         comment: record.get('gradeComment') || '',

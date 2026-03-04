@@ -169,7 +169,7 @@ export default function StudentDashboard() {
     setEnrollError('');
     setEnrollMessage('');
     if (!enrollPassword.trim()) {
-      setEnrollError('Please enter a subject password.');
+      setEnrollError('Please enter a subject code.');
       return;
     }
     try {
@@ -320,14 +320,14 @@ export default function StudentDashboard() {
             Add a subject
           </h3>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            Enter the subject password given by your professor.
+            Enter the subject code given by your professor.
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <input
               type="password"
               value={enrollPassword}
               onChange={(e) => setEnrollPassword(e.target.value)}
-              placeholder="Subject password"
+              placeholder="Subject code"
               className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl dark:bg-gray-700/50 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
             />
             <button

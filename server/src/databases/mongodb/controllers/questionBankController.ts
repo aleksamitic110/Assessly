@@ -25,6 +25,14 @@ const parseBoolean = (value: unknown) => {
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const shuffleInPlace = <T>(items: T[]) => {
+  for (let i = items.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+  return items;
+};
+
 const ensureProfessorSubjectAccess = async (professorId: string, subjectId: string) => {
   const session = neo4jDriver.session();
   try {
@@ -65,9 +73,31 @@ const getProfessorExamContext = async (professorId: string, examId: string) => {
   }
 };
 
+const getExamQuestionBankItemIds = async (examId: string) => {
+  const session = neo4jDriver.session();
+  try {
+    const result = await session.run(
+      `
+      MATCH (e:Exam {id: $examId})-[:IMA_ZADATAK]->(t:Task)
+      WHERE t.questionBankItemId IS NOT NULL
+      RETURN collect(DISTINCT t.questionBankItemId) AS itemIds
+      `,
+      { examId }
+    );
+
+    const raw = (result.records[0]?.get('itemIds') || []) as Array<string | null | undefined>;
+    return raw
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      .map((value) => value.trim());
+  } finally {
+    await session.close();
+  }
+};
+
 type TaskPayload = {
   id: string;
   title: string;
+  maxPoints?: number | null;
   description: string | null;
   starterCode: string | null;
   testCases: string;
@@ -92,6 +122,7 @@ const createTaskInExam = async (
       CREATE (t:Task {
         id: $id,
         title: $title,
+        maxPoints: coalesce($maxPoints, 10),
         description: $description,
         starterCode: $starterCode,
         testCases: $testCases,
@@ -310,6 +341,11 @@ export const importQuestionBankItemToExam = async (req: any, res: Response) => {
     return res.status(404).json({ error: 'Question bank item not found for this subject' });
   }
 
+  const existingItemIds = new Set(await getExamQuestionBankItemIds(examId));
+  if (existingItemIds.has(String(item._id))) {
+    return res.status(409).json({ error: 'This question is already added to the selected exam' });
+  }
+
   const newTaskId = uuidv4();
   const createdTask = await createTaskInExam(
     professorId,
@@ -318,6 +354,7 @@ export const importQuestionBankItemToExam = async (req: any, res: Response) => {
     {
       id: newTaskId,
       title: item.title,
+      maxPoints: 10,
       description: item.description || null,
       starterCode: item.starterCode || null,
       testCases: item.testCases || '[]',
@@ -372,16 +409,17 @@ export const autoGenerateTasksFromQuestionBank = async (req: any, res: Response)
     filter.tags = { $all: parsedTags };
   }
 
-  const sampledItems = await QuestionBankItem.aggregate([
-    { $match: filter },
-    { $sample: { size: requestedCount } }
-  ]);
+  const existingItemIds = new Set(await getExamQuestionBankItemIds(examId));
+  const matchingItems = await QuestionBankItem.find(filter).lean();
+  const availableItems = matchingItems.filter((item) => !existingItemIds.has(String(item._id)));
 
-  if (sampledItems.length < requestedCount) {
+  if (availableItems.length < requestedCount) {
     return res.status(400).json({
-      error: `Not enough matching tasks in question bank. Requested ${requestedCount}, available ${sampledItems.length}.`
+      error: `Not enough matching tasks in question bank. Requested ${requestedCount}, available ${availableItems.length}.`
     });
   }
+
+  const sampledItems = shuffleInPlace(availableItems).slice(0, requestedCount);
 
   const createdTasks: Array<Record<string, unknown>> = [];
   for (const item of sampledItems) {
@@ -392,6 +430,7 @@ export const autoGenerateTasksFromQuestionBank = async (req: any, res: Response)
       {
         id: uuidv4(),
         title: item.title,
+        maxPoints: 10,
         description: item.description || null,
         starterCode: item.starterCode || null,
         testCases: item.testCases || '[]',

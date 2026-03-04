@@ -56,6 +56,7 @@ export default function ProfessorDashboard() {
     name: '',
     startTime: '',
     durationMinutes: 60,
+    maxPoints: 100,
     subjectId: '',
   });
 
@@ -78,15 +79,13 @@ export default function ProfessorDashboard() {
   const [editingTask, setEditingTask] = useState<TaskType | null>(null);
   const [taskForm, setTaskForm] = useState({
     title: '',
+    maxPoints: 10,
     description: '',
     starterCode: '',
     testCases: '[]',
     exampleInput: '',
     exampleOutput: '',
     notes: '',
-    saveToQuestionBank: false,
-    bankDifficulty: 'MEDIUM',
-    bankTags: '',
     pdfFile: null as File | null,
   });
   const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
@@ -101,6 +100,7 @@ export default function ProfessorDashboard() {
     name: '',
     startTime: '',
     durationMinutes: 60,
+    maxPoints: 100,
   });
 
   const alertsByExam = useMemo(() => {
@@ -290,15 +290,13 @@ export default function ProfessorDashboard() {
   const resetTaskForm = () => {
     setTaskForm({
       title: '',
+      maxPoints: 10,
       description: '',
       starterCode: '',
       testCases: '[]',
       exampleInput: '',
       exampleOutput: '',
       notes: '',
-      saveToQuestionBank: false,
-      bankDifficulty: 'MEDIUM',
-      bankTags: '',
       pdfFile: null,
     });
     setEditingTask(null);
@@ -339,12 +337,10 @@ export default function ProfessorDashboard() {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
-    if (e.target instanceof HTMLInputElement && e.target.type === 'checkbox') {
-      const target = e.target as HTMLInputElement;
-      setTaskForm((prev) => ({ ...prev, [name]: target.checked }));
-      return;
-    }
-    setTaskForm((prev) => ({ ...prev, [name]: value }));
+    setTaskForm((prev) => ({
+      ...prev,
+      [name]: name === 'maxPoints' ? Number(value) : value
+    }));
   };
 
   const handleTaskFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -356,15 +352,13 @@ export default function ProfessorDashboard() {
     setEditingTask(task);
     setTaskForm({
       title: task.title || '',
+      maxPoints: task.maxPoints ?? 10,
       description: task.description || '',
       starterCode: task.starterCode || '',
       testCases: task.testCases || '[]',
       exampleInput: task.exampleInput || '',
       exampleOutput: task.exampleOutput || '',
       notes: task.notes || '',
-      saveToQuestionBank: false,
-      bankDifficulty: 'MEDIUM',
-      bankTags: '',
       pdfFile: null,
     });
   };
@@ -372,6 +366,10 @@ export default function ProfessorDashboard() {
   const handleSubmitTask = async (e: React.FormEvent, examId: string) => {
     e.preventDefault();
     setTaskError('');
+    if (!taskForm.maxPoints || taskForm.maxPoints <= 0) {
+      setTaskError('Task max points must be greater than 0.');
+      return;
+    }
     try {
       JSON.parse(taskForm.testCases || '[]');
     } catch {
@@ -381,15 +379,13 @@ export default function ProfessorDashboard() {
 
     const formData = new FormData();
     formData.append('title', taskForm.title);
+    formData.append('maxPoints', String(taskForm.maxPoints));
     formData.append('description', taskForm.description);
     formData.append('starterCode', taskForm.starterCode);
     formData.append('testCases', taskForm.testCases);
     formData.append('exampleInput', taskForm.exampleInput);
     formData.append('exampleOutput', taskForm.exampleOutput);
     formData.append('notes', taskForm.notes);
-    formData.append('saveToQuestionBank', String(taskForm.saveToQuestionBank));
-    formData.append('bankDifficulty', taskForm.bankDifficulty);
-    formData.append('bankTags', taskForm.bankTags);
     if (taskForm.pdfFile) {
       formData.append('pdf', taskForm.pdfFile);
     }
@@ -550,6 +546,7 @@ export default function ProfessorDashboard() {
       name: exam.name || '',
       startTime: exam.startTime ? toDateTimeLocal(exam.startTime) : '',
       durationMinutes: exam.durationMinutes || 60,
+      maxPoints: exam.maxPoints ?? 100,
     });
   };
 
@@ -559,6 +556,7 @@ export default function ProfessorDashboard() {
       name: '',
       startTime: '',
       durationMinutes: 60,
+      maxPoints: 100,
     });
   };
 
@@ -566,7 +564,7 @@ export default function ProfessorDashboard() {
     const { name, value } = e.target;
     setExamEditForm((prev) => ({
       ...prev,
-      [name]: name === 'durationMinutes' ? Number(value) : value,
+      [name]: name === 'durationMinutes' || name === 'maxPoints' ? Number(value) : value,
     }));
   };
 
@@ -574,8 +572,9 @@ export default function ProfessorDashboard() {
     setError('');
     setMessage('');
     const durationMinutes = Number(examEditForm.durationMinutes);
-    if (!examEditForm.name.trim() || !examEditForm.startTime.trim() || !durationMinutes || durationMinutes <= 0) {
-      setError('Please provide a valid name, start time, and duration.');
+    const maxPoints = Number(examEditForm.maxPoints);
+    if (!examEditForm.name.trim() || !examEditForm.startTime.trim() || !durationMinutes || durationMinutes <= 0 || !maxPoints || maxPoints <= 0) {
+      setError('Please provide a valid name, start time, duration, and max points.');
       return;
     }
     try {
@@ -583,6 +582,7 @@ export default function ProfessorDashboard() {
         name: examEditForm.name.trim(),
         startTime: toIsoString(examEditForm.startTime.trim()),
         durationMinutes,
+        maxPoints,
       });
       setSubjects((prev) =>
         prev.map((subject) => ({
@@ -692,6 +692,10 @@ export default function ProfessorDashboard() {
     setMessage('');
 
     try {
+      if (!examData.maxPoints || examData.maxPoints <= 0) {
+        setError('Exam max points must be greater than 0.');
+        return;
+      }
       const response = await api.post('/exams/exams', {
         ...examData,
         startTime: toIsoString(examData.startTime),
@@ -708,7 +712,7 @@ export default function ProfessorDashboard() {
             : subject
         )
       );
-      setExamData({ name: '', startTime: '', durationMinutes: 60, subjectId: '' });
+      setExamData({ name: '', startTime: '', durationMinutes: 60, maxPoints: 100, subjectId: '' });
       setShowExamForm(false);
     } catch (err: any) {
       console.error('Create exam error:', err);
@@ -812,7 +816,7 @@ export default function ProfessorDashboard() {
                 <div>
                   <input
                     type="password"
-                    placeholder="Subject password"
+                    placeholder="Subject code"
                     value={subjectData.password}
                     onChange={(e) => setSubjectData({ ...subjectData, password: e.target.value })}
                     required
@@ -883,6 +887,20 @@ export default function ProfessorDashboard() {
                     value={examData.durationMinutes}
                     onChange={(e) => setExamData({ ...examData, durationMinutes: parseInt(e.target.value) })}
                     min={1}
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                    Exam max points
+                  </label>
+                  <input
+                    type="number"
+                    value={examData.maxPoints}
+                    onChange={(e) => setExamData({ ...examData, maxPoints: parseFloat(e.target.value) })}
+                    min={1}
+                    step="0.5"
                     required
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
                   />
@@ -1091,7 +1109,7 @@ export default function ProfessorDashboard() {
                                 type="password"
                                 value={subjectEditForm.password}
                                 onChange={handleSubjectEditChange}
-                                placeholder="New subject password (optional)"
+                                placeholder="New subject code (optional)"
                                 className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
                               />
                               <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
@@ -1219,7 +1237,7 @@ export default function ProfessorDashboard() {
                                           </span>
                                         </div>
                                         <span className="text-xs text-gray-500 dark:text-gray-400">
-                                          ID: {exam.id} | Start: {new Date(exam.startTime).toLocaleString()} | Tasks: {taskCount}
+                                          ID: {exam.id} | Start: {new Date(exam.startTime).toLocaleString()} | Max: {exam.maxPoints ?? 100} pts | Tasks: {taskCount}
                                         </span>
                                       </div>
                                       
@@ -1371,7 +1389,7 @@ export default function ProfessorDashboard() {
                                         <div className="text-sm font-semibold text-indigo-700 dark:text-indigo-200 mb-3">
                                           Edit exam
                                         </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                                           <input
                                             name="name"
                                             value={examEditForm.name}
@@ -1393,6 +1411,16 @@ export default function ProfessorDashboard() {
                                             min="1"
                                             value={examEditForm.durationMinutes}
                                             onChange={handleExamEditChange}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                          />
+                                          <input
+                                            name="maxPoints"
+                                            type="number"
+                                            min="1"
+                                            step="0.5"
+                                            value={examEditForm.maxPoints}
+                                            onChange={handleExamEditChange}
+                                            placeholder="Max points"
                                             className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
                                           />
                                         </div>
@@ -1425,6 +1453,20 @@ export default function ProfessorDashboard() {
                                             {taskError}
                                           </div>
                                         )}
+                                        {(() => {
+                                          const loadedTasks = tasksByExam[exam.id] || [];
+                                          const taskPointsSum = loadedTasks.reduce((sum, task) => sum + Number(task.maxPoints ?? 10), 0);
+                                          const examMaxPoints = Number(exam.maxPoints ?? 100);
+                                          const hasMismatch = loadedTasks.length > 0 && Math.abs(taskPointsSum - examMaxPoints) > 0.01;
+                                          if (!hasMismatch) {
+                                            return null;
+                                          }
+                                          return (
+                                            <div className="mb-3 text-xs rounded border border-amber-300 bg-amber-50 px-3 py-2 text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                                              Warning: sum of task max points is {taskPointsSum}, while exam max points is {examMaxPoints}. This is allowed, but values are not equal.
+                                            </div>
+                                          );
+                                        })()}
 
                                         <form
                                           className="grid grid-cols-1 gap-3"
@@ -1435,6 +1477,17 @@ export default function ProfessorDashboard() {
                                             value={taskForm.title}
                                             onChange={handleTaskInputChange}
                                             placeholder="Task title"
+                                            required
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
+                                          />
+                                          <input
+                                            name="maxPoints"
+                                            type="number"
+                                            min="1"
+                                            step="0.5"
+                                            value={taskForm.maxPoints}
+                                            onChange={handleTaskInputChange}
+                                            placeholder="Task max points"
                                             required
                                             className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
                                           />
@@ -1487,34 +1540,6 @@ export default function ProfessorDashboard() {
                                             rows={3}
                                             className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white font-mono"
                                           />
-                                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 rounded-lg border border-emerald-200 bg-emerald-50/60 dark:bg-emerald-900/15 dark:border-emerald-800/60">
-                                            <label className="flex items-center gap-2 text-xs font-medium text-emerald-800 dark:text-emerald-300">
-                                              <input
-                                                type="checkbox"
-                                                name="saveToQuestionBank"
-                                                checked={taskForm.saveToQuestionBank}
-                                                onChange={handleTaskInputChange}
-                                              />
-                                              Save this task to question bank
-                                            </label>
-                                            <select
-                                              name="bankDifficulty"
-                                              value={taskForm.bankDifficulty}
-                                              onChange={handleTaskInputChange}
-                                              className="px-3 py-2 text-sm border border-emerald-300 rounded bg-white dark:bg-gray-700 dark:text-white"
-                                            >
-                                              <option value="EASY">Easy</option>
-                                              <option value="MEDIUM">Medium</option>
-                                              <option value="HARD">Hard</option>
-                                            </select>
-                                            <input
-                                              name="bankTags"
-                                              value={taskForm.bankTags}
-                                              onChange={handleTaskInputChange}
-                                              placeholder="Tags: loops, arrays, recursion"
-                                              className="px-3 py-2 text-sm border border-emerald-300 rounded bg-white dark:bg-gray-700 dark:text-white"
-                                            />
-                                          </div>
                                           <input
                                             type="file"
                                             accept="application/pdf"
@@ -1559,6 +1584,9 @@ export default function ProfessorDashboard() {
                                                   <div className="flex flex-col">
                                                     <span className="font-semibold text-gray-700 dark:text-gray-200">
                                                       {task.title}
+                                                    </span>
+                                                    <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                                                      Max points: {task.maxPoints ?? 10}
                                                     </span>
                                                     {task.pdfUrl && (
                                                       <a
