@@ -86,6 +86,7 @@ export default function ProfessorDashboard() {
     exampleInput: '',
     exampleOutput: '',
     notes: '',
+    saveToQuestionBank: false,
     pdfFile: null as File | null,
   });
   const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
@@ -297,6 +298,7 @@ export default function ProfessorDashboard() {
       exampleInput: '',
       exampleOutput: '',
       notes: '',
+      saveToQuestionBank: false,
       pdfFile: null,
     });
     setEditingTask(null);
@@ -336,7 +338,17 @@ export default function ProfessorDashboard() {
   const handleTaskInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
-    const { name, value } = e.target;
+    const target = e.target;
+    if (target instanceof HTMLInputElement && target.type === 'checkbox') {
+      const { name, checked } = target;
+      setTaskForm((prev) => ({
+        ...prev,
+        [name]: checked
+      }));
+      return;
+    }
+
+    const { name, value } = target;
     setTaskForm((prev) => ({
       ...prev,
       [name]: name === 'maxPoints' ? Number(value) : value
@@ -359,6 +371,7 @@ export default function ProfessorDashboard() {
       exampleInput: task.exampleInput || '',
       exampleOutput: task.exampleOutput || '',
       notes: task.notes || '',
+      saveToQuestionBank: false,
       pdfFile: null,
     });
   };
@@ -386,6 +399,7 @@ export default function ProfessorDashboard() {
     formData.append('exampleInput', taskForm.exampleInput);
     formData.append('exampleOutput', taskForm.exampleOutput);
     formData.append('notes', taskForm.notes);
+    formData.append('saveToQuestionBank', String(taskForm.saveToQuestionBank));
     if (taskForm.pdfFile) {
       formData.append('pdf', taskForm.pdfFile);
     }
@@ -1524,6 +1538,16 @@ export default function ProfessorDashboard() {
                                             rows={2}
                                             className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white"
                                           />
+                                          <label className="inline-flex items-center gap-2 text-xs text-gray-700 dark:text-gray-200">
+                                            <input
+                                              type="checkbox"
+                                              name="saveToQuestionBank"
+                                              checked={taskForm.saveToQuestionBank}
+                                              onChange={handleTaskInputChange}
+                                              className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                            />
+                                            Save task to question bank
+                                          </label>
                                           <textarea
                                             name="starterCode"
                                             value={taskForm.starterCode}
