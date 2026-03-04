@@ -429,7 +429,16 @@ export default function ProfessorDashboard() {
             task.id === editingTask.id ? response.data : task
           ),
         }));
-        setMessage(`Task "${response.data.title}" updated.`);
+        if (taskForm.saveToQuestionBank && !response.data?.savedToQuestionBank) {
+          const reason = response.data?.questionBankError ? ` Reason: ${response.data.questionBankError}` : '';
+          setTaskError(`Task updated, but was not saved to question bank.${reason}`);
+        } else {
+          setMessage(
+            taskForm.saveToQuestionBank
+              ? `Task "${response.data.title}" updated and synced to question bank.`
+              : `Task "${response.data.title}" updated.`
+          );
+        }
       } else {
         formData.append('examId', examId);
         const response = await api.post('/exams/tasks', formData, {
@@ -439,7 +448,16 @@ export default function ProfessorDashboard() {
           ...prev,
           [examId]: [...(prev[examId] || []), response.data],
         }));
-        setMessage(`Task "${response.data.title}" added.`);
+        if (taskForm.saveToQuestionBank && !response.data?.savedToQuestionBank) {
+          const reason = response.data?.questionBankError ? ` Reason: ${response.data.questionBankError}` : '';
+          setTaskError(`Task added, but was not saved to question bank.${reason}`);
+        } else {
+          setMessage(
+            taskForm.saveToQuestionBank
+              ? `Task "${response.data.title}" added and saved to question bank.`
+              : `Task "${response.data.title}" added.`
+          );
+        }
         setSubjects((prev) =>
           prev.map((subject) => ({
             ...subject,

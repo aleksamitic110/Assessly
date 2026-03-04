@@ -692,6 +692,9 @@ export const createTask = async (req: any, res: Response) => {
 
   try {
     const normalizedTaskMaxPoints = normalizeMaxPoints(maxPoints, 10);
+    const shouldSyncToQuestionBank = shouldSaveToQuestionBank(saveToQuestionBank);
+    let savedToQuestionBank = false;
+    let questionBankError: string | null = null;
     const id = uuidv4();
     const normalizedTestCases = typeof testCases === 'string' ? testCases : JSON.stringify(testCases || []);
     const result = await session.run(
@@ -735,7 +738,7 @@ export const createTask = async (req: any, res: Response) => {
     const task = result.records[0].get('t').properties;
     const subjectId = String(result.records[0].get('subjectId'));
 
-    if (shouldSaveToQuestionBank(saveToQuestionBank)) {
+    if (shouldSyncToQuestionBank) {
       try {
         await upsertQuestionBankItemFromTask({
           subjectId,
@@ -754,8 +757,10 @@ export const createTask = async (req: any, res: Response) => {
           difficulty: bankDifficulty,
           tags: bankTags
         });
+        savedToQuestionBank = true;
       } catch (mongoError) {
         console.error('Failed to store task in question bank:', mongoError);
+        questionBankError = mongoError instanceof Error ? mongoError.message : 'Unknown error';
       }
     }
 
@@ -764,7 +769,9 @@ export const createTask = async (req: any, res: Response) => {
       ...task,
       maxPoints: normalizeMaxPoints(task.maxPoints, normalizedTaskMaxPoints),
       pdfUrl: task.pdfPath ? `${serverBaseUrl}${task.pdfPath}` : null,
-      savedToQuestionBank: shouldSaveToQuestionBank(saveToQuestionBank)
+      savedToQuestionBank,
+      questionBankSyncRequested: shouldSyncToQuestionBank,
+      questionBankError
     });
   } catch (error) {
     res.status(500).json({ error: 'Error while creating task' });
@@ -793,6 +800,9 @@ export const updateTask = async (req: any, res: Response) => {
   const session = neo4jDriver.session();
 
   try {
+    const shouldSyncToQuestionBank = shouldSaveToQuestionBank(saveToQuestionBank);
+    let savedToQuestionBank = false;
+    let questionBankError: string | null = null;
     const existing = await session.run(
       `
       MATCH (p:User {id: $professorId})-[:PREDAJE]->(s:Subject)-[:SADRZI]->(e:Exam)-[:IMA_ZADATAK]->(t:Task {id: $taskId})
@@ -850,7 +860,7 @@ export const updateTask = async (req: any, res: Response) => {
 
     const task = result.records[0].get('t').properties;
 
-    if (shouldSaveToQuestionBank(saveToQuestionBank)) {
+    if (shouldSyncToQuestionBank) {
       try {
         await upsertQuestionBankItemFromTask({
           subjectId,
@@ -869,8 +879,10 @@ export const updateTask = async (req: any, res: Response) => {
           difficulty: bankDifficulty,
           tags: bankTags
         });
+        savedToQuestionBank = true;
       } catch (mongoError) {
         console.error('Failed to update question bank item from task:', mongoError);
+        questionBankError = mongoError instanceof Error ? mongoError.message : 'Unknown error';
       }
     }
 
@@ -879,7 +891,9 @@ export const updateTask = async (req: any, res: Response) => {
       ...task,
       maxPoints: normalizeMaxPoints(task.maxPoints, 10),
       pdfUrl: task.pdfPath ? `${serverBaseUrl}${task.pdfPath}` : null,
-      savedToQuestionBank: shouldSaveToQuestionBank(saveToQuestionBank)
+      savedToQuestionBank,
+      questionBankSyncRequested: shouldSyncToQuestionBank,
+      questionBankError
     });
   } catch (error) {
     res.status(500).json({ error: 'Error while updating task' });
